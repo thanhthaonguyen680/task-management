@@ -55,7 +55,24 @@ st.set_page_config(
 )
 
 st.markdown(
-    "<style>[data-testid='stToolbar']{display:none!important;}</style>",
+    """
+    <style>
+    /* Ẩn toolbar trên: Share, GitHub, star */
+    [data-testid="stToolbar"]          { display: none !important; }
+    /* Ẩn nút Manage app góc dưới phải */
+    [data-testid="manage-app-button"]  { display: none !important; }
+    [data-testid="stDeployButton"]     { display: none !important; }
+    [data-testid="stStatusWidget"]     { display: none !important; }
+    /* Ẩn viewer badge (icon vương miện + avatar) */
+    [data-testid="stDecoration"]       { display: none !important; }
+    .viewerBadge_container__r5tak      { display: none !important; }
+    .viewerBadge_link__qRIco           { display: none !important; }
+    [class*="viewerBadge"]             { display: none !important; }
+    [class*="ViewerBadge"]             { display: none !important; }
+    [class*="deployButton"]            { display: none !important; }
+    [class*="StatusWidget"]            { display: none !important; }
+    </style>
+    """,
     unsafe_allow_html=True,
 )
 
