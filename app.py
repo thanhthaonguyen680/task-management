@@ -51,7 +51,7 @@ st.set_page_config(
     page_title="Quản Lý Công Việc",
     page_icon="📋",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="auto"
 )
 
 # CSS ẩn toolbar + avatar badge trong iframe app
@@ -80,10 +80,10 @@ st.markdown(
     /* Thêm padding-bottom trên mobile để nội dung không bị avatar badge che khuất */
     @media (max-width: 768px) {
         .main .block-container {
-            padding-bottom: 80px !important;
+            padding-bottom: 2rem !important;
         }
         section[data-testid="stMain"] > div {
-            padding-bottom: 80px !important;
+            padding-bottom: 2rem !important;
         }
     }
     </style>
@@ -2479,73 +2479,50 @@ def inject_css():
         font-size: 0.8rem !important;
     }
 
-    /* ===== ẨN SIDEBAR BUTTON & SIDEBAR HOÀN TOÀN ===== */
-    [data-testid="stSidebar"],
-    [data-testid="stSidebarCollapsedControl"],
-    [data-testid="collapsedControl"] {
-        display: none !important;
+    /* ===== SIDEBAR ===== */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1e1b4b 0%, #312e81 60%, #4c1d95 100%) !important;
+        min-width: 220px !important;
     }
+    [data-testid="stSidebar"] * {
+        color: white !important;
+    }
+    /* Nút trong sidebar */
+    [data-testid="stSidebar"] .stButton > button {
+        background: rgba(255,255,255,0.12) !important;
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+        padding: 0.6rem 1rem !important;
+        width: 100% !important;
+        text-align: left !important;
+        box-shadow: none !important;
+        transition: background 0.2s ease !important;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(255,255,255,0.22) !important;
+        transform: none !important;
+    }
+    /* Nút đang active (view hiện tại) */
+    [data-testid="stSidebar"] .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
+        border-color: transparent !important;
+        box-shadow: 0 4px 14px rgba(102,126,234,0.5) !important;
+    }
+    /* Divider trong sidebar */
+    [data-testid="stSidebar"] hr {
+        border-color: rgba(255,255,255,0.2) !important;
+        margin: 0.8rem 0 !important;
+    }
+
+    /* Padding nội dung chính bình thường */
     .main .block-container {
-        padding-bottom: 80px !important; /* chỗ cho bottom nav */
+        padding-bottom: 2rem !important;
     }
 
-    /* ===== BOTTOM NAV BAR ===== */
-    .bottom-nav {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        z-index: 9999;
-        background: #ffffff;
-        border-top: 1px solid #e5e7eb;
-        box-shadow: 0 -4px 20px rgba(0,0,0,0.10);
-        display: flex;
-        height: 64px;
-        align-items: stretch;
-    }
-    .nav-item {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        cursor: pointer;
-        border: none;
-        background: transparent;
-        color: #9ca3af;
-        font-size: 0.68rem;
-        font-family: 'Be Vietnam Pro', sans-serif;
-        font-weight: 600;
-        letter-spacing: 0.3px;
-        transition: color 0.2s ease;
-        text-decoration: none;
-        padding: 8px 0;
-    }
-    .nav-item .nav-icon {
-        font-size: 1.45rem;
-        line-height: 1;
-    }
-    .nav-item.active {
-        color: #667eea;
-    }
-    .nav-item.active .nav-icon {
-        filter: drop-shadow(0 2px 6px rgba(102,126,234,0.45));
-    }
-
-    /* indicator gạch chân */
-    .nav-item.active::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        width: 40px;
-        height: 3px;
-        background: linear-gradient(90deg,#667eea,#764ba2);
-        border-radius: 0 0 4px 4px;
-    }
-    .nav-item { position: relative; }
-
-    /* Ẩn radio Streamlit gốc (dùng để giữ state), chỉ dùng bottom nav HTML */
+    /* Ẩn radio Streamlit gốc */
     div[data-testid="stRadio"] {
         display: none !important;
     }
@@ -2923,31 +2900,38 @@ def main():
             <div class="main-header-user">{role_badge} &nbsp;<b>{ho_ten}</b></div>
         </div>
     """, unsafe_allow_html=True)
-    # Nút đăng xuất — căn phải, có chữ rõ ràng
-    col_gap, col_logout = st.columns([7, 2])
-    with col_logout:
-        if st.button("🚪 Đăng Xuất", use_container_width=True, type="secondary"):
+
+    # ── Sidebar navigation ─────────────────────────────────────────────────
+    with st.sidebar:
+        st.markdown("### 📋 Quản Lý Công Việc")
+        st.markdown(f"**{role_badge} {ho_ten}**")
+        st.divider()
+
+        if vai_tro == "admin":
+            view = st.session_state.get("vai_tro", "admin")
+            st.markdown("**🗂️ Chuyển giao diện**")
+            if st.button(
+                "👤 Nhân Viên" + (" ✓" if view == "nhan_vien" else ""),
+                key="nav_nv",
+                type="primary" if view == "nhan_vien" else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state["vai_tro"] = "nhan_vien"
+                st.rerun()
+            if st.button(
+                "⚙️ Admin" + (" ✓" if view == "admin" else ""),
+                key="nav_admin",
+                type="primary" if view == "admin" else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state["vai_tro"] = "admin"
+                st.rerun()
+            st.divider()
+
+        if st.button("🚪 Đăng Xuất", key="sidebar_logout", use_container_width=True):
             for key in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro"]:
                 st.session_state.pop(key, None)
             st.rerun()
-
-    # ── Bottom nav (chỉ admin mới thấy để chuyển qua lại view) ────────────
-    if vai_tro == "admin":
-        view = st.session_state.get("vai_tro", "admin")
-        is_admin = "active" if view == "admin" else ""
-        is_nv    = "active" if view == "nhan_vien" else ""
-        st.markdown(f"""
-            <div class="bottom-nav">
-                <a class="nav-item {is_nv}" href="?role=nhan_vien">
-                    <span class="nav-icon">👤</span>
-                    <span>Nhân Viên</span>
-                </a>
-                <a class="nav-item {is_admin}" href="?role=admin">
-                    <span class="nav-icon">⚙️</span>
-                    <span>Admin</span>
-                </a>
-            </div>
-        """, unsafe_allow_html=True)
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
