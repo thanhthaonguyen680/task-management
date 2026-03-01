@@ -181,10 +181,11 @@ components.html(
 )
 
 
-@st.cache_resource
 def _cookie_manager():
     """Cookie manager dùng lưu session đăng nhập."""
-    return stx.CookieManager(key="qlcv_cookies")
+    if "__cookie_mgr" not in st.session_state:
+        st.session_state["__cookie_mgr"] = stx.CookieManager(key="qlcv_cookies")
+    return st.session_state["__cookie_mgr"]
 
 
 # ============================================================
