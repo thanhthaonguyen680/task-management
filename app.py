@@ -57,11 +57,50 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    [data-testid="stToolbar"]    { visibility: hidden !important; }
-    [data-testid="stDeployButton"] { visibility: hidden !important; }
+    /* Ẩn toolbar trên (Share, GitHub, ...) */
+    [data-testid="stToolbar"] { visibility: hidden !important; }
+    /* Nhiều selector cho Manage app button */
+    [data-testid="stDeployButton"] { display: none !important; }
+    [class*="deployButton"]        { display: none !important; }
+    [class*="StatusWidget"]        { display: none !important; }
+    [data-testid="stStatusWidget"] { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
+)
+
+# Inject JS để ẩn nút Manage app (chạy sau khi DOM load xong)
+import streamlit.components.v1 as components
+components.html(
+    """
+    <script>
+    function hideManageApp() {
+        // Tìm trong parent document (Streamlit Cloud shell)
+        var doc = window.parent.document;
+        // Theo text content
+        var all = doc.querySelectorAll('*');
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (el.childElementCount === 0 && el.textContent.trim() === 'Manage app') {
+                var node = el;
+                for (var j = 0; j < 6; j++) {
+                    node = node.parentElement;
+                    if (!node) break;
+                    var pos = window.getComputedStyle(node).position;
+                    if (pos === 'fixed' || pos === 'absolute') {
+                        node.style.display = 'none';
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    setTimeout(hideManageApp, 500);
+    setTimeout(hideManageApp, 1500);
+    setInterval(hideManageApp, 3000);
+    </script>
+    """,
+    height=0,
 )
 
 
