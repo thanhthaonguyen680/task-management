@@ -54,47 +54,63 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS ẩn toolbar trong iframe app
+# CSS ẩn toolbar + avatar badge trong iframe app
 st.markdown(
     """
     <style>
-    [data-testid="stToolbar"]         { display: none !important; }
-    [data-testid="stDecoration"]      { display: none !important; }
-    [data-testid="stStatusWidget"]    { display: none !important; }
-    [class*="viewerBadge"]            { display: none !important; }
-    [class*="ViewerBadge"]            { display: none !important; }
-    [class*="StatusWidget"]           { display: none !important; }
-    [class*="createdBy"]              { display: none !important; }
-    [class*="CreatedBy"]              { display: none !important; }
-    footer                            { display: none !important; }
-    /* Avatar tròn góc dưới phải */
-    .stApp > div > div > div > div > div:last-child img[style*="border-radius"] { display: none !important; }
+    /* ẩn toolbar Streamlit */
+    [data-testid="stToolbar"]      { display: none !important; visibility: hidden !important; }
+    [data-testid="stDecoration"]   { display: none !important; visibility: hidden !important; }
+    /* ẩn status widget / avatar badge */
+    [data-testid="stStatusWidget"] { display: none !important; visibility: hidden !important; }
+    [data-testid="stBottom"]       { display: none !important; visibility: hidden !important; }
+    /* ẩn theo class name (phòng trường hợp testid thay đổi) */
+    [class*="viewerBadge"]         { display: none !important; visibility: hidden !important; }
+    [class*="ViewerBadge"]         { display: none !important; visibility: hidden !important; }
+    [class*="StatusWidget"]        { display: none !important; visibility: hidden !important; }
+    [class*="statusWidget"]        { display: none !important; visibility: hidden !important; }
+    [class*="createdBy"]           { display: none !important; visibility: hidden !important; }
+    [class*="CreatedBy"]           { display: none !important; visibility: hidden !important; }
+    [class*="deployButton"]        { display: none !important; visibility: hidden !important; }
+    [class*="manage"]              { display: none !important; visibility: hidden !important; }
+    footer                         { display: none !important; visibility: hidden !important; }
+    /* ẩn ảnh tròn cứng */
+    img[style*="border-radius: 50"] { display: none !important; visibility: hidden !important; }
+    img[style*="border-radius:50"]  { display: none !important; visibility: hidden !important; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# JS dùng MutationObserver để ẩn avatar + Manage app khi chúng xuất hiện
+# JS inject CSS vào tất cả frames có thể truy cập
 import streamlit.components.v1 as components
 components.html(
     """
     <script>
-    var CSS_RULES = [
-        '[data-testid="stStatusWidget"]{display:none!important}',
-        '[data-testid="stDeployButton"]{display:none!important}',
-        '[data-testid="manage-app-button"]{display:none!important}',
-        '[class*="StatusWidget"]{display:none!important}',
-        '[class*="viewerBadge"]{display:none!important}',
-        '[class*="ViewerBadge"]{display:none!important}',
-        '[class*="deployButton"]{display:none!important}',
-        '[class*="createdBy"]{display:none!important}',
-        'footer{display:none!important}',
-    ].join('');
+    var HIDE = [
+        '[data-testid="stStatusWidget"]',
+        '[data-testid="stBottom"]',
+        '[data-testid="stDeployButton"]',
+        '[data-testid="manage-app-button"]',
+        '[data-testid="stToolbar"]',
+        '[class*="StatusWidget"]',
+        '[class*="statusWidget"]',
+        '[class*="viewerBadge"]',
+        '[class*="ViewerBadge"]',
+        '[class*="deployButton"]',
+        '[class*="createdBy"]',
+        '[class*="CreatedBy"]',
+        'footer',
+        'img[style*="border-radius: 50"]',
+        'img[style*="border-radius:50"]',
+    ];
+    var CSS_RULES = HIDE.map(function(s){ return s+'{display:none!important;visibility:hidden!important}'; }).join('');
 
     function injectCSS(doc) {
         try {
-            var id = '__st_hide_css';
-            if (doc.getElementById(id)) return;
+            var id = '__st_hide_v2';
+            var existing = doc.getElementById(id);
+            if (existing) return;
             var s = doc.createElement('style');
             s.id = id;
             s.textContent = CSS_RULES;
@@ -102,23 +118,56 @@ components.html(
         } catch(e) {}
     }
 
-    // Inject vào: iframe hiện tại, parent, parent.parent
-    [window.document, window.parent.document, window.parent.parent.document].forEach(function(doc) {
-        try { injectCSS(doc); } catch(e) {}
-    });
-
-    // MutationObserver theo dõi DOM thay đổi trong parent
-    function observeDoc(doc) {
+    function hideElements(doc) {
         try {
-            var obs = new MutationObserver(function() { injectCSS(doc); });
-            obs.observe(doc.body || doc.documentElement, { childList: true, subtree: true });
+            HIDE.forEach(function(sel) {
+                try {
+                    doc.querySelectorAll(sel).forEach(function(el) {
+                        el.style.setProperty('display', 'none', 'important');
+                        el.style.setProperty('visibility', 'hidden', 'important');
+                    });
+                } catch(e) {}
+            });
         } catch(e) {}
     }
-    try { observeDoc(window.parent.document); } catch(e) {}
-    try { observeDoc(window.parent.parent.document); } catch(e) {}
+
+    // Thử inject vào window.top và tất cả ancestors
+    var frames = [];
+    try { frames.push(window.document); } catch(e) {}
+    try { frames.push(window.parent.document); } catch(e) {}
+    try { frames.push(window.parent.parent.document); } catch(e) {}
+    try { frames.push(window.top.document); } catch(e) {}
+
+    frames.forEach(function(doc) {
+        injectCSS(doc);
+        hideElements(doc);
+    });
+
+    // MutationObserver để bắt các element được thêm sau
+    function observeDoc(doc) {
+        try {
+            var obs = new MutationObserver(function(mutations) {
+                injectCSS(doc);
+                hideElements(doc);
+            });
+            obs.observe(doc.documentElement, { childList: true, subtree: true });
+        } catch(e) {}
+    }
+
+    frames.forEach(function(doc) { observeDoc(doc); });
+
+    // Chạy lại sau 1s và 3s phòng element load chậm
+    [1000, 3000, 6000].forEach(function(delay) {
+        setTimeout(function() {
+            frames.forEach(function(doc) {
+                injectCSS(doc);
+                hideElements(doc);
+            });
+        }, delay);
+    });
     </script>
     """,
-    height=0,
+    height=1,
 )
 
 
