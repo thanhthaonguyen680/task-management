@@ -62,6 +62,14 @@ st.markdown(
     [data-testid="stDecoration"]      { display: none !important; }
     [class*="viewerBadge"]            { display: none !important; }
     [class*="ViewerBadge"]            { display: none !important; }
+    /* Ẩn "Created by" + avatar trên mobile */
+    [data-testid="stBottom"]          { display: none !important; }
+    .stBottom                         { display: none !important; }
+    footer                            { display: none !important; }
+    [class*="Footer"]                 { display: none !important; }
+    [class*="footer"]                 { display: none !important; }
+    [class*="createdBy"]              { display: none !important; }
+    [class*="CreatedBy"]              { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -77,10 +85,15 @@ components.html(
             '[data-testid="manage-app-button"]{display:none!important}',
             '[data-testid="stDeployButton"]{display:none!important}',
             '[data-testid="stStatusWidget"]{display:none!important}',
+            '[data-testid="stBottom"]{display:none!important}',
             '[class*="viewerBadge"]{display:none!important}',
             '[class*="ViewerBadge"]{display:none!important}',
             '[class*="deployButton"]{display:none!important}',
             '[class*="StatusWidget"]{display:none!important}',
+            '[class*="createdBy"]{display:none!important}',
+            '[class*="CreatedBy"]{display:none!important}',
+            '[class*="Footer"]{display:none!important}',
+            'footer{display:none!important}',
         ].join('');
 
         [window.parent, window.parent.parent].forEach(function(w) {
@@ -106,10 +119,15 @@ components.html(
                 '[data-testid="manage-app-button"]{display:none!important}',
                 '[data-testid="stDeployButton"]{display:none!important}',
                 '[data-testid="stStatusWidget"]{display:none!important}',
+                '[data-testid="stBottom"]{display:none!important}',
                 '[class*="viewerBadge"]{display:none!important}',
                 '[class*="ViewerBadge"]{display:none!important}',
                 '[class*="deployButton"]{display:none!important}',
                 '[class*="StatusWidget"]{display:none!important}',
+                '[class*="createdBy"]{display:none!important}',
+                '[class*="CreatedBy"]{display:none!important}',
+                '[class*="Footer"]{display:none!important}',
+                'footer{display:none!important}',
             ].join('');
             [window.parent, window.parent.parent].forEach(function(w) {
                 try {
