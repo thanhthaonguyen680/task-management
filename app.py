@@ -8,9 +8,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 import cloudinary
 import cloudinary.uploader
+import extra_streamlit_components as stx
 from fpdf import FPDF
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 import tempfile
 import os
@@ -51,7 +52,7 @@ st.set_page_config(
     page_title="Quản Lý Công Việc",
     page_icon="📋",
     layout="wide",
-    initial_sidebar_state="auto"
+    initial_sidebar_state="collapsed"
 )
 
 # CSS ẩn toolbar + avatar badge trong iframe app
@@ -178,6 +179,12 @@ components.html(
     """,
     height=1,
 )
+
+
+@st.cache_resource
+def _cookie_manager():
+    """Cookie manager dùng lưu session đăng nhập."""
+    return stx.CookieManager(key="qlcv_cookies")
 
 
 # ============================================================
@@ -2309,7 +2316,7 @@ def giao_dien_nhan_vien():
 # ============================================================
 # GIAO DIỆN ĐĂNG NHẬP / ĐĂNG KÝ
 # ============================================================
-def giao_dien_dang_nhap():
+def giao_dien_dang_nhap(cookie_mgr=None):
     """
     Trang đăng nhập và đăng ký.
     Lưu thông tin người dùng vào session_state sau khi xác thực thành công.
@@ -2367,6 +2374,13 @@ def giao_dien_dang_nhap():
                     st.session_state["username"]       = user["username"]
                     st.session_state["ho_ten"]         = user["ho_ten"]
                     st.session_state["vai_tro"]        = user["vai_tro"]
+                    # Lưu vào cookie để giữ đăng nhập khi reload
+                    if cookie_mgr is not None:
+                        expires = datetime.now() + timedelta(days=7)
+                        cookie_mgr.set("qlcv_uid",    str(user["id"]),       expires_at=expires, key="set_uid")
+                        cookie_mgr.set("qlcv_uname",  user["username"],      expires_at=expires, key="set_uname")
+                        cookie_mgr.set("qlcv_hoten",  user["ho_ten"],        expires_at=expires, key="set_hoten")
+                        cookie_mgr.set("qlcv_vaitro", user["vai_tro"],       expires_at=expires, key="set_vaitro")
                     st.success(f"Chào mừng, **{user['ho_ten']}**! 🎉")
                     st.rerun()
                 else:
@@ -2479,64 +2493,36 @@ def inject_css():
         font-size: 0.8rem !important;
     }
 
-    /* ===== SIDEBAR ===== */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e1b4b 0%, #312e81 60%, #4c1d95 100%) !important;
-        min-width: 230px !important;
+    /* ===== ẨN SIDEBAR HOÀN TOÀN ===== */
+    [data-testid="stSidebar"],
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
+        display: none !important;
     }
-    [data-testid="stSidebar"] * {
-        color: white !important;
-    }
-    /* Avatar role badge */
-    .sidebar-avatar {
-        width: 64px;
-        height: 64px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #667eea, #764ba2);
+
+    /* Nút đăng xuất nhỏ gọn trên header */
+    .logout-btn-wrap {
         display: flex;
         align-items: center;
-        justify-content: center;
-        font-size: 2rem;
-        margin: 0 auto 0.6rem auto;
+        height: 100%;
+        padding-top: 0.35rem;
     }
-    .sidebar-name {
-        text-align: center;
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: white;
-        margin-bottom: 0.2rem;
-    }
-    .sidebar-role {
-        text-align: center;
-        font-size: 0.78rem;
-        color: rgba(255,255,255,0.65);
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        margin-bottom: 0.2rem;
-    }
-    /* Nút đăng xuất trong sidebar */
-    [data-testid="stSidebar"] .stButton > button {
-        background: rgba(239,68,68,0.18) !important;
-        color: #fca5a5 !important;
-        border: 1px solid rgba(239,68,68,0.35) !important;
-        border-radius: 10px !important;
+    .logout-btn-wrap .stButton > button {
+        background: rgba(239,68,68,0.15) !important;
+        color: #ef4444 !important;
+        border: 1.5px solid rgba(239,68,68,0.4) !important;
+        border-radius: 8px !important;
         font-weight: 600 !important;
-        font-size: 0.95rem !important;
-        padding: 0.6rem 1rem !important;
-        width: 100% !important;
+        font-size: 0.85rem !important;
+        padding: 0.35rem 0.85rem !important;
         box-shadow: none !important;
-        transition: background 0.2s ease !important;
-        margin-top: 0.5rem !important;
+        white-space: nowrap !important;
+        transition: all 0.2s ease !important;
     }
-    [data-testid="stSidebar"] .stButton > button:hover {
-        background: rgba(239,68,68,0.35) !important;
+    .logout-btn-wrap .stButton > button:hover {
+        background: rgba(239,68,68,0.3) !important;
+        border-color: rgba(239,68,68,0.7) !important;
         transform: none !important;
-    }
-    /* Divider trong sidebar */
-    [data-testid="stSidebar"] hr {
-        border-color: rgba(255,255,255,0.15) !important;
-        margin: 1rem 0 !important;
     }
 
     /* Padding nội dung chính bình thường */
@@ -2897,45 +2883,46 @@ def main():
     """Hàm chính: khởi động và điều hướng ứng dụng."""
     inject_css()
 
-    # ── Kiểm tra đăng nhập ─────────────────────────────────────────────────
+    cookie_mgr = _cookie_manager()
+
+    # ── Khôi phục session từ cookie nếu chưa đăng nhập ───────────────────
     if not st.session_state.get("dang_nhap"):
-        giao_dien_dang_nhap()
-        return
+        uid = cookie_mgr.get("qlcv_uid")
+        if uid:
+            st.session_state["dang_nhap"] = True
+            st.session_state["user_id"]   = uid
+            st.session_state["username"]  = cookie_mgr.get("qlcv_uname") or ""
+            st.session_state["ho_ten"]    = cookie_mgr.get("qlcv_hoten") or ""
+            st.session_state["vai_tro"]   = cookie_mgr.get("qlcv_vaitro") or "nhan_vien"
+            st.rerun()
+        else:
+            giao_dien_dang_nhap(cookie_mgr)
+            return
 
     vai_tro   = st.session_state.get("vai_tro", "nhan_vien")
     ho_ten    = st.session_state.get("ho_ten", "")
 
-    # ── Header compact (topbar) ────────────────────────────────────────────
+    # ── Header + nút đăng xuất góc phải ───────────────────────────────────
     role_badge = "🛡️ Admin" if vai_tro == "admin" else "👤"
-    st.markdown(f"""
-        <div class="main-header">
-            <h1>📋 Quản Lý Công Việc</h1>
-            <div class="main-header-user">{role_badge} &nbsp;<b>{ho_ten}</b></div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # ── Sidebar ─────────────────────────────────────────────
-    avatar_icon = "🛡️" if vai_tro == "admin" else "👤"
-    role_label  = "Quản Trị Viên" if vai_tro == "admin" else "Nhân Viên"
-    with st.sidebar:
+    col_header, col_logout = st.columns([5, 1])
+    with col_header:
         st.markdown(f"""
-            <div style="padding: 1.2rem 0 0.5rem 0;">
-                <div class="sidebar-avatar">{avatar_icon}</div>
-                <div class="sidebar-name">{ho_ten}</div>
-                <div class="sidebar-role">{role_label}</div>
+            <div class="main-header">
+                <h1>📋 Quản Lý Công Việc</h1>
+                <div class="main-header-user">{role_badge} &nbsp;<b>{ho_ten}</b></div>
             </div>
         """, unsafe_allow_html=True)
-        st.divider()
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.5);font-size:0.75rem;text-align:center;padding-bottom:0.3rem;'>"
-            "📋 Quản Lý Công Việc</div>",
-            unsafe_allow_html=True
-        )
-        st.divider()
-        if st.button("🚪 Đăng Xuất", key="sidebar_logout", use_container_width=True):
-            for key in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro"]:
-                st.session_state.pop(key, None)
+    with col_logout:
+        st.markdown('<div class="logout-btn-wrap">', unsafe_allow_html=True)
+        if st.button("🚪 Đăng Xuất", key="topbar_logout", use_container_width=True):
+            cookie_mgr.delete("qlcv_uid",    key="del_uid")
+            cookie_mgr.delete("qlcv_uname",  key="del_uname")
+            cookie_mgr.delete("qlcv_hoten",  key="del_hoten")
+            cookie_mgr.delete("qlcv_vaitro", key="del_vaitro")
+            for k in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro"]:
+                st.session_state.pop(k, None)
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
