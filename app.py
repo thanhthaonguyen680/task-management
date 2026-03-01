@@ -54,6 +54,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+st.markdown(
+    "<style>[data-testid='stToolbar']{display:none!important;}</style>",
+    unsafe_allow_html=True,
+)
+
 
 # ============================================================
 # KẾT NỐI GOOGLE SHEETS
