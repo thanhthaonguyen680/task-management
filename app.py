@@ -2166,11 +2166,13 @@ def giao_dien_nhan_vien():
         ten_nhan_vien = ho_ten_hien_tai
         st.markdown(f"##### Xin chào, **{ten_nhan_vien}** 👋")
 
-    # Khi nhân viên vừa chọn tên → xóa cache để lấy dữ liệu mới nhất từ Google Sheets
-    _nv_key = f"_nv_loaded_{ten_nhan_vien}"
-    if not st.session_state.get(_nv_key):
+    # Chuẩn hóa tên (trim khoảng trắng) để so sánh chính xác
+    ten_nhan_vien = ten_nhan_vien.strip()
+
+    # Mỗi lần tải trang luôn xóa cache để lấy dữ liệu mới nhất từ Google Sheets
+    if "_last_nv_load" not in st.session_state or st.session_state["_last_nv_load"] != ten_nhan_vien:
         lay_danh_sach_cong_viec.clear()
-        st.session_state[_nv_key] = True
+        st.session_state["_last_nv_load"] = ten_nhan_vien
 
     # ---- Tabs ----
     tab_cong_viec, tab_tao_task = st.tabs([
@@ -2188,14 +2190,16 @@ def giao_dien_nhan_vien():
         with col_btn:
             if st.button("🔄 Làm mới"):
                 lay_danh_sach_cong_viec.clear()
+                st.session_state.pop("_last_nv_load", None)
                 st.rerun()
 
         # Tải danh sách công việc
         with st.spinner("Đang tải công việc..."):
             df = lay_danh_sach_cong_viec()
 
-        # Lọc công việc thuộc nhân viên này
-        df_cua_toi = df[df["Nhân Viên"] == ten_nhan_vien].copy()
+        # Lọc công việc thuộc nhân viên này (normalize tên cả 2 phía)
+        df["_nv_norm"] = df["Nhân Viên"].fillna("").str.strip()
+        df_cua_toi = df[df["_nv_norm"] == ten_nhan_vien].copy()
 
         if df_cua_toi.empty:
             st.success("🎉 Bạn hiện chưa có công việc nào được giao!")
@@ -2251,7 +2255,7 @@ def giao_dien_nhan_vien():
             my_subtasks = [
                 (i, cv) for i, cv in enumerate(ds_cv)
                 if isinstance(cv, dict)
-                and (cv.get("nguoi") or cv.get("nhan_vien") or "") == ten_nhan_vien
+                and (cv.get("nguoi") or cv.get("nhan_vien") or "").strip() == ten_nhan_vien
             ]
             if my_subtasks:
                 tasks_co_subtask.append((row.to_dict(), ds_cv, my_subtasks))
