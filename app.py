@@ -60,87 +60,62 @@ st.markdown(
     <style>
     [data-testid="stToolbar"]         { display: none !important; }
     [data-testid="stDecoration"]      { display: none !important; }
+    [data-testid="stStatusWidget"]    { display: none !important; }
     [class*="viewerBadge"]            { display: none !important; }
     [class*="ViewerBadge"]            { display: none !important; }
-    /* Ẩn "Created by" + avatar trên mobile */
-    [data-testid="stBottom"]          { display: none !important; }
-    .stBottom                         { display: none !important; }
-    footer                            { display: none !important; }
-    [class*="Footer"]                 { display: none !important; }
-    [class*="footer"]                 { display: none !important; }
+    [class*="StatusWidget"]           { display: none !important; }
     [class*="createdBy"]              { display: none !important; }
     [class*="CreatedBy"]              { display: none !important; }
+    footer                            { display: none !important; }
+    /* Avatar tròn góc dưới phải */
+    .stApp > div > div > div > div > div:last-child img[style*="border-radius"] { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# JS inject CSS vào parent frame để ẩn Manage app + viewer badge
+# JS dùng MutationObserver để ẩn avatar + Manage app khi chúng xuất hiện
 import streamlit.components.v1 as components
 components.html(
     """
     <script>
-    (function hide() {
-        var css = [
-            '[data-testid="manage-app-button"]{display:none!important}',
-            '[data-testid="stDeployButton"]{display:none!important}',
-            '[data-testid="stStatusWidget"]{display:none!important}',
-            '[data-testid="stBottom"]{display:none!important}',
-            '[class*="viewerBadge"]{display:none!important}',
-            '[class*="ViewerBadge"]{display:none!important}',
-            '[class*="deployButton"]{display:none!important}',
-            '[class*="StatusWidget"]{display:none!important}',
-            '[class*="createdBy"]{display:none!important}',
-            '[class*="CreatedBy"]{display:none!important}',
-            '[class*="Footer"]{display:none!important}',
-            'footer{display:none!important}',
-        ].join('');
+    var CSS_RULES = [
+        '[data-testid="stStatusWidget"]{display:none!important}',
+        '[data-testid="stDeployButton"]{display:none!important}',
+        '[data-testid="manage-app-button"]{display:none!important}',
+        '[class*="StatusWidget"]{display:none!important}',
+        '[class*="viewerBadge"]{display:none!important}',
+        '[class*="ViewerBadge"]{display:none!important}',
+        '[class*="deployButton"]{display:none!important}',
+        '[class*="createdBy"]{display:none!important}',
+        'footer{display:none!important}',
+    ].join('');
 
-        [window.parent, window.parent.parent].forEach(function(w) {
-            try {
-                var doc = w.document;
-                if (doc.__st_hidden) return;
-                doc.__st_hidden = true;
-                var s = doc.createElement('style');
-                s.textContent = css;
-                doc.head.appendChild(s);
-            } catch(e) {}
-        });
-    })();
-    setTimeout(function(){
-        [window.parent, window.parent.parent].forEach(function(w) {
-            try {
-                var doc = w.document;
-                doc.__st_hidden = false;
-            } catch(e) {}
-        });
-        (function hide() {
-            var css = [
-                '[data-testid="manage-app-button"]{display:none!important}',
-                '[data-testid="stDeployButton"]{display:none!important}',
-                '[data-testid="stStatusWidget"]{display:none!important}',
-                '[data-testid="stBottom"]{display:none!important}',
-                '[class*="viewerBadge"]{display:none!important}',
-                '[class*="ViewerBadge"]{display:none!important}',
-                '[class*="deployButton"]{display:none!important}',
-                '[class*="StatusWidget"]{display:none!important}',
-                '[class*="createdBy"]{display:none!important}',
-                '[class*="CreatedBy"]{display:none!important}',
-                '[class*="Footer"]{display:none!important}',
-                'footer{display:none!important}',
-            ].join('');
-            [window.parent, window.parent.parent].forEach(function(w) {
-                try {
-                    var doc = w.document;
-                    if (doc.__st_hidden) return;
-                    doc.__st_hidden = true;
-                    var s = doc.createElement('style');
-                    s.textContent = css;
-                    doc.head.appendChild(s);
-                } catch(e) {}
-            });
-        })();
-    }, 2000);
+    function injectCSS(doc) {
+        try {
+            var id = '__st_hide_css';
+            if (doc.getElementById(id)) return;
+            var s = doc.createElement('style');
+            s.id = id;
+            s.textContent = CSS_RULES;
+            (doc.head || doc.documentElement).appendChild(s);
+        } catch(e) {}
+    }
+
+    // Inject vào: iframe hiện tại, parent, parent.parent
+    [window.document, window.parent.document, window.parent.parent.document].forEach(function(doc) {
+        try { injectCSS(doc); } catch(e) {}
+    });
+
+    // MutationObserver theo dõi DOM thay đổi trong parent
+    function observeDoc(doc) {
+        try {
+            var obs = new MutationObserver(function() { injectCSS(doc); });
+            obs.observe(doc.body || doc.documentElement, { childList: true, subtree: true });
+        } catch(e) {}
+    }
+    try { observeDoc(window.parent.document); } catch(e) {}
+    try { observeDoc(window.parent.parent.document); } catch(e) {}
     </script>
     """,
     height=0,
