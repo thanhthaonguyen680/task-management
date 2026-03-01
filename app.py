@@ -60,21 +60,25 @@ st.markdown(
     <style>
     /* Ẩn toàn bộ toolbar góc trên phải (Share, GitHub, menu ...) */
     [data-testid="stToolbar"] { display: none !important; }
-    /* Ẩn nút Deploy / Manage app */
+    /* Ẩn nút Deploy / Manage app (toolbar) */
     [data-testid="manage-app-button"] { display: none !important; }
+    /* Ẩn nút Manage app (bottom-right floating) */
+    [data-testid="stDeployButton"] { display: none !important; }
     /* Ẩn thanh decoration màu đỏ của Streamlit */
     [data-testid="stDecoration"] { display: none !important; }
-    /* Ẩn nút Manage app (bottom-right corner) */
-    [data-testid="stAppViewBlockContainer"] ~ div { display: none !important; }
+    /* Ẩn badge / viewer badge */
     .viewerBadge_container__r5tak { display: none !important; }
     .viewerBadge_link__qRIco { display: none !important; }
     #MainMenu { display: none !important; }
     footer { display: none !important; }
-    /* Selector cho nút Manage app dạng floating */
-    button[kind="manage"] { display: none !important; }
+    /* Selector tổng quát cho mọi biến thể Manage app */
+    [class*="deployButton"] { display: none !important; }
     [class*="manageApp"] { display: none !important; }
     [class*="manage-app"] { display: none !important; }
     [class*="ManageApp"] { display: none !important; }
+    [class*="stDeployButton"] { display: none !important; }
+    /* Ẩn toàn bộ vùng fixed bottom-right chứa nút Manage app */
+    .stApp > div:last-of-type > div:last-of-type { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
