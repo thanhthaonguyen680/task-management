@@ -77,6 +77,15 @@ st.markdown(
     /* ẩn ảnh tròn cứng */
     img[style*="border-radius: 50"] { display: none !important; visibility: hidden !important; }
     img[style*="border-radius:50"]  { display: none !important; visibility: hidden !important; }
+    /* Thêm padding-bottom trên mobile để nội dung không bị avatar badge che khuất */
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding-bottom: 80px !important;
+        }
+        section[data-testid="stMain"] > div {
+            padding-bottom: 80px !important;
+        }
+    }
     </style>
     """,
     unsafe_allow_html=True,
