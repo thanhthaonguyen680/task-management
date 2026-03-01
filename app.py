@@ -54,50 +54,62 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Ẩn toolbar (Share, GitHub, ...) trong app iframe
 st.markdown(
     """
     <style>
-    /* Ẩn toolbar trên (Share, GitHub, ...) */
-    [data-testid="stToolbar"] { visibility: hidden !important; }
-    /* Nhiều selector cho Manage app button */
-    [data-testid="stDeployButton"] { display: none !important; }
-    [class*="deployButton"]        { display: none !important; }
-    [class*="StatusWidget"]        { display: none !important; }
-    [data-testid="stStatusWidget"] { display: none !important; }
+    [data-testid="stToolbar"]    { display: none !important; }
+    [data-testid="stDecoration"] { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# Inject JS để ẩn nút Manage app (chạy sau khi DOM load xong)
+# Inject JS để ẩn nút "Manage app" nằm trong frame cha của Streamlit Cloud
 import streamlit.components.v1 as components
 components.html(
     """
     <script>
     function hideManageApp() {
-        // Tìm trong parent document (Streamlit Cloud shell)
-        var doc = window.parent.document;
-        // Theo text content
-        var all = doc.querySelectorAll('*');
-        for (var i = 0; i < all.length; i++) {
-            var el = all[i];
-            if (el.childElementCount === 0 && el.textContent.trim() === 'Manage app') {
-                var node = el;
-                for (var j = 0; j < 6; j++) {
-                    node = node.parentElement;
-                    if (!node) break;
-                    var pos = window.getComputedStyle(node).position;
-                    if (pos === 'fixed' || pos === 'absolute') {
-                        node.style.display = 'none';
-                        break;
+        // Thử cả parent và parent.parent (tuỳ cấu trúc iframe Streamlit Cloud)
+        var docs = [];
+        try { docs.push(window.parent.document); } catch(e) {}
+        try { docs.push(window.parent.parent.document); } catch(e) {}
+
+        docs.forEach(function(doc) {
+            try {
+                // Tìm element có text "Manage app"
+                var all = doc.querySelectorAll('*');
+                for (var i = 0; i < all.length; i++) {
+                    var el = all[i];
+                    if (el.childNodes.length === 1
+                        && el.childNodes[0].nodeType === 3
+                        && el.textContent.trim() === 'Manage app') {
+                        // Đi lên tìm container fixed/absolute
+                        var node = el;
+                        for (var j = 0; j < 8; j++) {
+                            if (!node.parentElement) break;
+                            node = node.parentElement;
+                            var pos = window.getComputedStyle(node).position;
+                            if (pos === 'fixed' || pos === 'absolute') {
+                                node.style.setProperty('display','none','important');
+                                break;
+                            }
+                        }
                     }
                 }
-            }
-        }
+                // Tìm theo data-testid phổ biến
+                ['stDeployButton','manage-app-button','stStatusWidget'].forEach(function(id) {
+                    var el2 = doc.querySelector('[data-testid="' + id + '"]');
+                    if (el2) el2.style.setProperty('display','none','important');
+                });
+            } catch(e) {}
+        });
     }
-    setTimeout(hideManageApp, 500);
-    setTimeout(hideManageApp, 1500);
-    setInterval(hideManageApp, 3000);
+    hideManageApp();
+    setTimeout(hideManageApp, 800);
+    setTimeout(hideManageApp, 2000);
+    setInterval(hideManageApp, 4000);
     </script>
     """,
     height=0,
