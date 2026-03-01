@@ -2215,17 +2215,17 @@ def giao_dien_nhan_vien():
         # Lấy danh sách trạng thái (custom từ admin, hoặc mặc định)
         ds_tt = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
-        # Hiển thị từng task dưới dạng expander
+        # Hiển thị từng task chính dưới dạng expander
+        _ICON_TT = {
+            "Đang Kiểm Tra": "🔵", "Đã Phê Duyệt": "🟢", "Đã Báo Giá": "🟠",
+            "Có Đơn": "🟣", "Chờ Giao": "🟡",
+            "Đã Hoàn Thành - Giao Máy": "✅",
+            "Đã Xuất Hóa Đơn": "⬜", "Bảo Hành - Trả Lại": "🔴",
+            "Chờ Làm": "🔴", "Đang Làm": "🟡", "Hoàn Thành": "🟢",
+        }
         for _, hang in df_cua_toi.iterrows():
             task_id    = hang["ID"]
             trang_thai = hang.get("Trạng Thái", "Chờ Làm")
-            _ICON_TT = {
-                "Đang Kiểm Tra": "🔵", "Đã Phê Duyệt": "🟢", "Đã Báo Giá": "🟠",
-                "Có Đơn": "🟣", "Chờ Giao": "🟡",
-                "Đã Hoàn Thành - Giao Máy": "✅",
-                "Đã Xuất Hóa Đơn": "⬜", "Bảo Hành - Trả Lại": "🔴",
-                "Chờ Làm": "🔴", "Đang Làm": "🟡", "Hoàn Thành": "🟢",
-            }
             icon_tt    = _ICON_TT.get(trang_thai, "⚪")
             ten_cv     = hang.get("Tên Công Việc", "")
             cong_ty    = hang.get("Công Ty", "")
@@ -2235,6 +2235,93 @@ def giao_dien_nhan_vien():
                 expanded=(trang_thai in ["Chờ Làm", "Đang Làm"])
             ):
                 _fragment_chi_tiet_task(hang.to_dict(), ds_tt)
+
+        # ── Công việc con được giao ────────────────────────────────
+        st.divider()
+        st.subheader("📋 Công Việc Con Được Giao")
+
+        # Tìm tất cả task có subtask giao cho nhân viên này
+        tasks_co_subtask = []
+        for _, row in df.iterrows():
+            raw = row.get("Công Việc Con", "") or "[]"
+            try:
+                ds_cv = json.loads(raw)
+            except Exception:
+                ds_cv = []
+            my_subtasks = [
+                (i, cv) for i, cv in enumerate(ds_cv)
+                if isinstance(cv, dict)
+                and (cv.get("nguoi") or cv.get("nhan_vien") or "") == ten_nhan_vien
+            ]
+            if my_subtasks:
+                tasks_co_subtask.append((row.to_dict(), ds_cv, my_subtasks))
+
+        if not tasks_co_subtask:
+            st.info("✅ Bạn chưa có công việc con nào được giao.")
+        else:
+            st.caption(f"Bạn được giao **{sum(len(m) for _, _, m in tasks_co_subtask)} công việc con** trong **{len(tasks_co_subtask)} task**")
+            for hang_dict, ds_cv_full, my_subtasks in tasks_co_subtask:
+                tid    = hang_dict["ID"]
+                tt     = hang_dict.get("Trạng Thái", "")
+                icon   = _ICON_TT.get(tt, "⚪")
+                cty    = hang_dict.get("Công Ty", "")
+                ten    = hang_dict.get("Tên Công Việc", "")
+                nv_chu = hang_dict.get("Nhân Viên", "")
+                dl     = hang_dict.get("Deadline", "")
+                mo_ta  = hang_dict.get("Mô Tả", "") or ""
+
+                all_done = all(cv.get("done", False) for _, cv in my_subtasks)
+                badge    = " ✅" if all_done else ""
+
+                with st.expander(
+                    f"{icon} [{cty}] Task #{tid}: {ten}  —  {tt}{badge}",
+                    expanded=not all_done
+                ):
+                    # Thông tin task đầy đủ
+                    col_i1, col_i2, col_i3 = st.columns(3)
+                    col_i1.markdown(f"**🏢 Công Ty:** {cty}")
+                    col_i2.markdown(f"**👤 Người Phụ Trách:** {nv_chu}")
+                    col_i3.markdown(f"**📅 Hạn Chính:** {dl}")
+                    if mo_ta:
+                        st.markdown(f"**📝 Mô Tả:** {mo_ta}")
+                    st.divider()
+
+                    # Subtask của nhân viên này với checkbox tick done
+                    st.markdown("**🔧 Công Việc Con Của Bạn:**")
+                    cv_changed_nv = False
+                    for j, cv in my_subtasks:
+                        ten_sub  = cv.get("ten", cv.get("Tên", f"Việc {j+1}"))
+                        dl_sub   = cv.get("deadline", cv.get("Deadline", ""))
+                        done_sub = bool(cv.get("done", False))
+
+                        col_chk, col_info = st.columns([1, 9])
+                        with col_chk:
+                            new_done = st.checkbox(
+                                "Xong",
+                                value=done_sub,
+                                key=f"nv_sub_{tid}_{j}",
+                                label_visibility="collapsed",
+                            )
+                        with col_info:
+                            label    = f"~~{ten_sub}~~" if new_done else f"**{ten_sub}**"
+                            dl_txt   = f"  📅 {dl_sub}" if dl_sub else ""
+                            done_txt = "  ✅ Đã hoàn thành" if new_done else ""
+                            st.markdown(f"{j+1}. {label}{dl_txt}{done_txt}")
+
+                        if new_done != done_sub:
+                            ds_cv_full[j]["done"] = new_done
+                            cv_changed_nv = True
+
+                    if cv_changed_nv:
+                        try:
+                            _sh = lay_sheet()
+                            _o  = _sh.find(str(tid), in_column=1)
+                            if _o:
+                                _sh.update_cell(_o.row, 14, json.dumps(ds_cv_full, ensure_ascii=False))
+                                lay_danh_sach_cong_viec.clear()
+                            st.success("✅ Đã lưu trạng thái!")
+                        except Exception as e:
+                            st.error(f"🔌 Lưu thất bại: {e}")
 
     # ========================================================
     # Tab 2: Tạo Công Việc Mới (nhân viên tự nhập)
