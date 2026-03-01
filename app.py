@@ -58,8 +58,17 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    [data-testid="stToolbar"]    { display: none !important; }
-    [data-testid="stDecoration"] { display: none !important; }
+    /* Ẩn toolbar trên (Share, star, GitHub, ...) */
+    [data-testid="stToolbar"]          { display: none !important; }
+    [data-testid="stDecoration"]       { display: none !important; }
+    /* Ẩn "Host with Streamlit" banner / viewer badge */
+    [data-testid="stHeader"]           { display: none !important; }
+    .viewerBadge_container__r5tak      { display: none !important; }
+    .viewerBadge_link__qRIco           { display: none !important; }
+    #stDecoration                      { display: none !important; }
+    /* Ẩn toàn bộ header tag của Streamlit */
+    header[data-testid="stHeader"]     { display: none !important; }
+    header                             { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
