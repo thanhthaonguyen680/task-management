@@ -61,22 +61,50 @@ st.markdown(
     /* ẩn toolbar Streamlit */
     [data-testid="stToolbar"]      { display: none !important; visibility: hidden !important; }
     [data-testid="stDecoration"]   { display: none !important; visibility: hidden !important; }
-    /* ẩn status widget / avatar badge */
-    [data-testid="stStatusWidget"] { display: none !important; visibility: hidden !important; }
-    [data-testid="stBottom"]       { display: none !important; visibility: hidden !important; }
-    /* ẩn theo class name (phòng trường hợp testid thay đổi) */
-    [class*="viewerBadge"]         { display: none !important; visibility: hidden !important; }
-    [class*="ViewerBadge"]         { display: none !important; visibility: hidden !important; }
-    [class*="StatusWidget"]        { display: none !important; visibility: hidden !important; }
-    [class*="statusWidget"]        { display: none !important; visibility: hidden !important; }
-    [class*="createdBy"]           { display: none !important; visibility: hidden !important; }
-    [class*="CreatedBy"]           { display: none !important; visibility: hidden !important; }
-    [class*="deployButton"]        { display: none !important; visibility: hidden !important; }
-    [class*="manage"]              { display: none !important; visibility: hidden !important; }
-    footer                         { display: none !important; visibility: hidden !important; }
-    /* ẩn ảnh tròn cứng */
-    img[style*="border-radius: 50"] { display: none !important; visibility: hidden !important; }
-    img[style*="border-radius:50"]  { display: none !important; visibility: hidden !important; }
+    /* ẩn status widget / avatar badge - nhiều cách */
+    [data-testid="stStatusWidget"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        position: fixed !important;
+        bottom: -9999px !important;
+        right: -9999px !important;
+    }
+    [data-testid="stBottom"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+    /* ẩn theo class name */
+    [class*="viewerBadge"],
+    [class*="ViewerBadge"],
+    [class*="StatusWidget"],
+    [class*="statusWidget"],
+    [class*="createdBy"],
+    [class*="CreatedBy"],
+    [class*="deployButton"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        position: fixed !important;
+        bottom: -9999px !important;
+        right: -9999px !important;
+    }
+    footer { display: none !important; visibility: hidden !important; }
+    /* ẩn ảnh tròn cứng (avatar) */
+    img[style*="border-radius: 50"],
+    img[style*="border-radius:50"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+    /* ẩn phần tử fixed ở góc dưới phải (avatar badge position) */
+    div[style*="position: fixed"][style*="bottom"][style*="right"],
+    div[style*="position:fixed"][style*="bottom"][style*="right"] {
+        display: none !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -87,7 +115,7 @@ import streamlit.components.v1 as components
 components.html(
     """
     <script>
-    var HIDE = [
+    var SELECTORS = [
         '[data-testid="stStatusWidget"]',
         '[data-testid="stBottom"]',
         '[data-testid="stDeployButton"]',
@@ -101,16 +129,20 @@ components.html(
         '[class*="createdBy"]',
         '[class*="CreatedBy"]',
         'footer',
-        'img[style*="border-radius: 50"]',
-        'img[style*="border-radius:50"]',
     ];
-    var CSS_RULES = HIDE.map(function(s){ return s+'{display:none!important;visibility:hidden!important}'; }).join('');
+
+    var CSS_RULES = SELECTORS.map(function(s){
+        return s + '{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;position:fixed!important;bottom:-9999px!important;right:-9999px!important}';
+    }).join('') +
+    'img[style*="border-radius"]{display:none!important;visibility:hidden!important;opacity:0!important}';
 
     function injectCSS(doc) {
         try {
-            var id = '__st_hide_v2';
-            var existing = doc.getElementById(id);
-            if (existing) return;
+            var id = '__st_hide_v3';
+            if (doc.getElementById(id)) {
+                doc.getElementById(id).textContent = CSS_RULES;
+                return;
+            }
             var s = doc.createElement('style');
             s.id = id;
             s.textContent = CSS_RULES;
@@ -120,50 +152,60 @@ components.html(
 
     function hideElements(doc) {
         try {
-            HIDE.forEach(function(sel) {
+            SELECTORS.forEach(function(sel) {
                 try {
                     doc.querySelectorAll(sel).forEach(function(el) {
                         el.style.setProperty('display', 'none', 'important');
                         el.style.setProperty('visibility', 'hidden', 'important');
+                        el.style.setProperty('opacity', '0', 'important');
+                        el.style.setProperty('pointer-events', 'none', 'important');
+                        el.style.setProperty('position', 'fixed', 'important');
+                        el.style.setProperty('bottom', '-9999px', 'important');
+                        el.style.setProperty('right', '-9999px', 'important');
                     });
                 } catch(e) {}
             });
+            // ẩn tất cả img tròn (avatar)
+            try {
+                doc.querySelectorAll('img').forEach(function(img) {
+                    var st = img.getAttribute('style') || '';
+                    if (st.indexOf('border-radius') !== -1) {
+                        img.style.setProperty('display', 'none', 'important');
+                    }
+                });
+            } catch(e) {}
         } catch(e) {}
     }
 
-    // Thử inject vào window.top và tất cả ancestors
+    // Thu thập tất cả frames có thể truy cập
     var frames = [];
-    try { frames.push(window.document); } catch(e) {}
-    try { frames.push(window.parent.document); } catch(e) {}
-    try { frames.push(window.parent.parent.document); } catch(e) {}
-    try { frames.push(window.top.document); } catch(e) {}
+    (function collectFrames() {
+        try { frames.push(window.document); } catch(e) {}
+        try { if (window.parent !== window) frames.push(window.parent.document); } catch(e) {}
+        try { if (window.parent.parent !== window.parent) frames.push(window.parent.parent.document); } catch(e) {}
+        try { if (window.top !== window.parent.parent) frames.push(window.top.document); } catch(e) {}
+    })();
 
+    function runAll() {
+        frames.forEach(function(doc) {
+            injectCSS(doc);
+            hideElements(doc);
+        });
+    }
+
+    runAll();
+
+    // MutationObserver để bắt element xuất hiện sau
     frames.forEach(function(doc) {
-        injectCSS(doc);
-        hideElements(doc);
-    });
-
-    // MutationObserver để bắt các element được thêm sau
-    function observeDoc(doc) {
         try {
-            var obs = new MutationObserver(function(mutations) {
-                injectCSS(doc);
-                hideElements(doc);
-            });
+            var obs = new MutationObserver(function() { runAll(); });
             obs.observe(doc.documentElement, { childList: true, subtree: true });
         } catch(e) {}
-    }
+    });
 
-    frames.forEach(function(doc) { observeDoc(doc); });
-
-    // Chạy lại sau 1s và 3s phòng element load chậm
-    [1000, 3000, 6000].forEach(function(delay) {
-        setTimeout(function() {
-            frames.forEach(function(doc) {
-                injectCSS(doc);
-                hideElements(doc);
-            });
-        }, delay);
+    // Retry nhiều lần vì Streamlit render async
+    [500, 1000, 2000, 4000, 8000].forEach(function(ms) {
+        setTimeout(runAll, ms);
     });
     </script>
     """,
