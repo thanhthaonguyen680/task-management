@@ -66,7 +66,6 @@ st.markdown(
     .viewerBadge_container__r5tak      { display: none !important; }
     .viewerBadge_link__qRIco           { display: none !important; }
     #stDecoration                      { display: none !important; }
-    /* Ẩn toàn bộ header tag của Streamlit */
     header[data-testid="stHeader"]     { display: none !important; }
     header                             { display: none !important; }
     </style>
@@ -74,51 +73,81 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Inject JS để ẩn nút "Manage app" nằm trong frame cha của Streamlit Cloud
+# Inject JS để ẩn Manage app + viewer badge (avatar + logo đỏ) trong frame cha
 import streamlit.components.v1 as components
 components.html(
     """
     <script>
-    function hideManageApp() {
-        // Thử cả parent và parent.parent (tuỳ cấu trúc iframe Streamlit Cloud)
+    function hideAll() {
         var docs = [];
         try { docs.push(window.parent.document); } catch(e) {}
         try { docs.push(window.parent.parent.document); } catch(e) {}
 
         docs.forEach(function(doc) {
             try {
-                // Tìm element có text "Manage app"
-                var all = doc.querySelectorAll('*');
-                for (var i = 0; i < all.length; i++) {
-                    var el = all[i];
+                // 1. Ẩn theo data-testid
+                var testIds = [
+                    'stDeployButton', 'manage-app-button', 'stStatusWidget',
+                    'stToolbar', 'stDecoration'
+                ];
+                testIds.forEach(function(id) {
+                    var el = doc.querySelector('[data-testid="' + id + '"]');
+                    if (el) el.style.setProperty('display', 'none', 'important');
+                });
+
+                // 2. Ẩn theo class chứa keyword
+                var keywords = ['viewerBadge', 'ViewerBadge', 'deployButton',
+                                'DeployButton', 'manageApp', 'ManageApp',
+                                'StatusWidget'];
+                keywords.forEach(function(kw) {
+                    doc.querySelectorAll('[class*="' + kw + '"]').forEach(function(el) {
+                        el.style.setProperty('display', 'none', 'important');
+                    });
+                });
+
+                // 3. Ẩn theo text content ("Manage app")
+                doc.querySelectorAll('*').forEach(function(el) {
                     if (el.childNodes.length === 1
                         && el.childNodes[0].nodeType === 3
                         && el.textContent.trim() === 'Manage app') {
-                        // Đi lên tìm container fixed/absolute
                         var node = el;
-                        for (var j = 0; j < 8; j++) {
+                        for (var j = 0; j < 10; j++) {
                             if (!node.parentElement) break;
                             node = node.parentElement;
                             var pos = window.getComputedStyle(node).position;
                             if (pos === 'fixed' || pos === 'absolute') {
-                                node.style.setProperty('display','none','important');
+                                node.style.setProperty('display', 'none', 'important');
                                 break;
                             }
                         }
                     }
-                }
-                // Tìm theo data-testid phổ biến
-                ['stDeployButton','manage-app-button','stStatusWidget'].forEach(function(id) {
-                    var el2 = doc.querySelector('[data-testid="' + id + '"]');
-                    if (el2) el2.style.setProperty('display','none','important');
                 });
+
+                // 4. Ẩn tất cả phần tử fixed/absolute ở góc dưới phải
+                // (chứa avatar, logo đỏ, Manage app)
+                doc.querySelectorAll('*').forEach(function(el) {
+                    try {
+                        var s = window.getComputedStyle(el);
+                        var right  = parseInt(s.right)  || 0;
+                        var bottom = parseInt(s.bottom) || 0;
+                        if ((s.position === 'fixed' || s.position === 'absolute')
+                            && right  >= 0 && right  <= 80
+                            && bottom >= 0 && bottom <= 80
+                            && el.offsetWidth > 0) {
+                            el.style.setProperty('display', 'none', 'important');
+                        }
+                    } catch(e2) {}
+                });
+
             } catch(e) {}
         });
     }
-    hideManageApp();
-    setTimeout(hideManageApp, 800);
-    setTimeout(hideManageApp, 2000);
-    setInterval(hideManageApp, 4000);
+
+    hideAll();
+    setTimeout(hideAll, 500);
+    setTimeout(hideAll, 1500);
+    setTimeout(hideAll, 3000);
+    setInterval(hideAll, 5000);
     </script>
     """,
     height=0,
