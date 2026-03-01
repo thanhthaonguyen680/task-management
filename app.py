@@ -2482,39 +2482,61 @@ def inject_css():
     /* ===== SIDEBAR ===== */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #1e1b4b 0%, #312e81 60%, #4c1d95 100%) !important;
-        min-width: 220px !important;
+        min-width: 230px !important;
     }
     [data-testid="stSidebar"] * {
         color: white !important;
     }
-    /* Nút trong sidebar */
+    /* Avatar role badge */
+    .sidebar-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        margin: 0 auto 0.6rem auto;
+    }
+    .sidebar-name {
+        text-align: center;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: white;
+        margin-bottom: 0.2rem;
+    }
+    .sidebar-role {
+        text-align: center;
+        font-size: 0.78rem;
+        color: rgba(255,255,255,0.65);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 0.2rem;
+    }
+    /* Nút đăng xuất trong sidebar */
     [data-testid="stSidebar"] .stButton > button {
-        background: rgba(255,255,255,0.12) !important;
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.2) !important;
+        background: rgba(239,68,68,0.18) !important;
+        color: #fca5a5 !important;
+        border: 1px solid rgba(239,68,68,0.35) !important;
         border-radius: 10px !important;
         font-weight: 600 !important;
         font-size: 0.95rem !important;
         padding: 0.6rem 1rem !important;
         width: 100% !important;
-        text-align: left !important;
         box-shadow: none !important;
         transition: background 0.2s ease !important;
+        margin-top: 0.5rem !important;
     }
     [data-testid="stSidebar"] .stButton > button:hover {
-        background: rgba(255,255,255,0.22) !important;
+        background: rgba(239,68,68,0.35) !important;
         transform: none !important;
-    }
-    /* Nút đang active (view hiện tại) */
-    [data-testid="stSidebar"] .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #667eea, #764ba2) !important;
-        border-color: transparent !important;
-        box-shadow: 0 4px 14px rgba(102,126,234,0.5) !important;
     }
     /* Divider trong sidebar */
     [data-testid="stSidebar"] hr {
-        border-color: rgba(255,255,255,0.2) !important;
-        margin: 0.8rem 0 !important;
+        border-color: rgba(255,255,255,0.15) !important;
+        margin: 1rem 0 !important;
     }
 
     /* Padding nội dung chính bình thường */
@@ -2875,15 +2897,6 @@ def main():
     """Hàm chính: khởi động và điều hướng ứng dụng."""
     inject_css()
 
-    # ── Xử lý query param chuyển vai trò (chỉ dùng cho admin) ──────────────
-    qp = st.query_params
-    if "role" in qp:
-        role_val = qp["role"]
-        if role_val in ("admin", "nhan_vien") and st.session_state.get("vai_tro") == "admin":
-            st.session_state["vai_tro"] = role_val
-        st.query_params.clear()
-        st.rerun()
-
     # ── Kiểm tra đăng nhập ─────────────────────────────────────────────────
     if not st.session_state.get("dang_nhap"):
         giao_dien_dang_nhap()
@@ -2901,33 +2914,24 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    # ── Sidebar navigation ─────────────────────────────────────────────────
+    # ── Sidebar ─────────────────────────────────────────────
+    avatar_icon = "🛡️" if vai_tro == "admin" else "👤"
+    role_label  = "Quản Trị Viên" if vai_tro == "admin" else "Nhân Viên"
     with st.sidebar:
-        st.markdown("### 📋 Quản Lý Công Việc")
-        st.markdown(f"**{role_badge} {ho_ten}**")
+        st.markdown(f"""
+            <div style="padding: 1.2rem 0 0.5rem 0;">
+                <div class="sidebar-avatar">{avatar_icon}</div>
+                <div class="sidebar-name">{ho_ten}</div>
+                <div class="sidebar-role">{role_label}</div>
+            </div>
+        """, unsafe_allow_html=True)
         st.divider()
-
-        if vai_tro == "admin":
-            view = st.session_state.get("vai_tro", "admin")
-            st.markdown("**🗂️ Chuyển giao diện**")
-            if st.button(
-                "👤 Nhân Viên" + (" ✓" if view == "nhan_vien" else ""),
-                key="nav_nv",
-                type="primary" if view == "nhan_vien" else "secondary",
-                use_container_width=True,
-            ):
-                st.session_state["vai_tro"] = "nhan_vien"
-                st.rerun()
-            if st.button(
-                "⚙️ Admin" + (" ✓" if view == "admin" else ""),
-                key="nav_admin",
-                type="primary" if view == "admin" else "secondary",
-                use_container_width=True,
-            ):
-                st.session_state["vai_tro"] = "admin"
-                st.rerun()
-            st.divider()
-
+        st.markdown(
+            "<div style='color:rgba(255,255,255,0.5);font-size:0.75rem;text-align:center;padding-bottom:0.3rem;'>"
+            "📋 Quản Lý Công Việc</div>",
+            unsafe_allow_html=True
+        )
+        st.divider()
         if st.button("🚪 Đăng Xuất", key="sidebar_logout", use_container_width=True):
             for key in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro"]:
                 st.session_state.pop(key, None)
