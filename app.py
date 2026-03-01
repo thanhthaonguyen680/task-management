@@ -54,7 +54,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Ẩn nút Share và icon GitHub trên thanh toolbar
+# Ẩn nút Share, icon GitHub và Manage app trên thanh toolbar
 st.markdown(
     """
     <style>
@@ -64,6 +64,17 @@ st.markdown(
     [data-testid="manage-app-button"] { display: none !important; }
     /* Ẩn thanh decoration màu đỏ của Streamlit */
     [data-testid="stDecoration"] { display: none !important; }
+    /* Ẩn nút Manage app (bottom-right corner) */
+    [data-testid="stAppViewBlockContainer"] ~ div { display: none !important; }
+    .viewerBadge_container__r5tak { display: none !important; }
+    .viewerBadge_link__qRIco { display: none !important; }
+    #MainMenu { display: none !important; }
+    footer { display: none !important; }
+    /* Selector cho nút Manage app dạng floating */
+    button[kind="manage"] { display: none !important; }
+    [class*="manageApp"] { display: none !important; }
+    [class*="manage-app"] { display: none !important; }
+    [class*="ManageApp"] { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
