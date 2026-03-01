@@ -54,6 +54,21 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Ẩn nút Share và icon GitHub trên thanh toolbar
+st.markdown(
+    """
+    <style>
+    /* Ẩn toàn bộ toolbar góc trên phải (Share, GitHub, menu ...) */
+    [data-testid="stToolbar"] { display: none !important; }
+    /* Ẩn nút Deploy / Manage app */
+    [data-testid="manage-app-button"] { display: none !important; }
+    /* Ẩn thanh decoration màu đỏ của Streamlit */
+    [data-testid="stDecoration"] { display: none !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 # ============================================================
 # KẾT NỐI GOOGLE SHEETS
