@@ -417,6 +417,26 @@ def lay_ten_cac_loai_may() -> list:
     return df["Tên Loại Máy"].dropna().tolist() if not df.empty else []
 
 
+# ---- Tình Trạng ----
+_TIEUDE_TINH_TRANG = ["ID", "Tên Tình Trạng", "Ngày Tạo"]
+
+@st.cache_data(ttl=60)
+def lay_danh_sach_tinh_trang() -> pd.DataFrame:
+    return _lay_df_don_gian("TinhTrang", _TIEUDE_TINH_TRANG)
+
+def them_tinh_trang(ten: str) -> int:
+    result = _them_hang_don_gian("TinhTrang", _TIEUDE_TINH_TRANG,
+                                 [ten, datetime.now().strftime("%Y-%m-%d")])
+    lay_danh_sach_tinh_trang.clear()
+    lay_ten_cac_tinh_trang.clear()
+    return result
+
+@st.cache_data(ttl=60)
+def lay_ten_cac_tinh_trang() -> list:
+    df = lay_danh_sach_tinh_trang()
+    return df["Tên Tình Trạng"].dropna().tolist() if not df.empty else []
+
+
 # ---- Trạng Thái Công Việc (manual list) ----
 _TIEUDE_TRANG_THAI = ["ID", "Tên Trạng Thái", "Ngày Tạo"]
 
@@ -480,11 +500,13 @@ def lay_danh_sach_cong_viec() -> pd.DataFrame:
     A:ID | B:Công Ty | C:Công Số | D:Năm | E:Tên Công Việc | F:Mô Tả
     G:Nhân Viên | H:Trạng Thái | I:Ngày Tạo | J:Hạn Hoàn Thành | K:Link Ảnh | L:Xem Ảnh
     """
-    # 14 cột A→N (chỉ lấy đúng số cột này — tránh lỗi duplicate header từ cột trống)
+    # 23 cột A→W (chỉ lấy đúng số cột này — tránh lỗi duplicate header từ cột trống)
     _HEADERS = [
         "ID", "Công Ty", "Công Số", "Năm", "Tên Công Việc", "Mô Tả",
         "Nhân Viên", "Trạng Thái", "Ngày Tạo", "Hạn Hoàn Thành",
-        "Link Ảnh", "Người Phê Duyệt", "Checklist", "Công Việc Con"
+        "Link Ảnh", "Người Phê Duyệt", "Checklist", "Công Việc Con", "Công Đoạn",
+        "Loại Máy", "Tình Trạng",
+        "Công Suất", "Số Cực", "Mã Số", "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá"
     ]
     _N = len(_HEADERS)
     _COT_TRONG = _HEADERS[:11]  # các cột hiển thị chính
@@ -526,14 +548,19 @@ def lay_danh_sach_cong_viec() -> pd.DataFrame:
 def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: str,
                    cong_ty: str = "", cong_so: str = "", nam: str = "",
                    trang_thai: str = "Chờ Làm", nguoi_phe_duyet: str = "",
-                   checklist: list = None, cong_viec_con: list = None) -> int:
+                   checklist: list = None, cong_viec_con: list = None,
+                   cong_doan: str = "", loai_may: str = "", tinh_trang: str = "",
+                   cong_suat: str = "", so_cuc: str = "", ma_so: str = "",
+                   so_po_noi_bo: str = "", so_po_kh: str = "", so_bao_gia: str = "") -> int:
     """
     Thêm một công việc mới vào cuối sheet.
 
     Cấu trúc hàng:
     A:ID | B:Cong_Ty | C:Cong_So | D:Nam | E:Task_Name | F:Description
     G:Assigned_To | H:Status | I:Created_Date | J:Deadline | K:Image_URL
-    L:Nguoi_Phe_Duyet | M:Checklist (JSON) | N:Cong_Viec_Con (JSON)
+    L:Nguoi_Phe_Duyet | M:Checklist (JSON) | N:Cong_Viec_Con (JSON) | O:Cong_Doan
+    P:Loai_May | Q:Tinh_Trang | R:Cong_Suat | S:So_Cuc | T:Ma_So
+    U:So_PO_Noi_Bo | V:So_PO_KH | W:So_Bao_Gia
     """
     sheet = lay_sheet()
     # Đếm số hàng qua cột A (tránh get_all_records duplicate header)
@@ -555,6 +582,15 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
         nguoi_phe_duyet,                  # L: Người Phê Duyệt
         json.dumps(checklist or [], ensure_ascii=False),      # M: Checklist
         json.dumps(cong_viec_con or [], ensure_ascii=False),  # N: Công Việc Con
+        cong_doan,                                            # O: Công Đoạn
+        loai_may,                                             # P: Loại Máy
+        tinh_trang,                                           # Q: Tình Trạng
+        cong_suat,                                            # R: Công Suất
+        so_cuc,                                               # S: Số Cực
+        ma_so,                                                # T: Mã Số
+        so_po_noi_bo,                                         # U: Số PO Nội Bộ
+        so_po_kh,                                             # V: Số PO KH/HĐ
+        so_bao_gia,                                           # W: Số Báo Giá
     ]
 
     sheet.append_row(hang_moi)
@@ -1185,35 +1221,37 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         background: #f8f7ff;
         border: 1px solid #e0dcff;
         border-radius: 12px;
-        padding: 10px 14px;
-        margin-bottom: 8px;
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
+        padding: 8px 12px;
+        margin-bottom: 4px;
     }
     .cv-con-card.done {
         background: #f0fdf4;
         border-color: #bbf7d0;
         opacity: 0.75;
     }
-    .cv-con-title {
-        font-weight: 700;
-        font-size: 0.95rem;
-        color: #1e1b4b;
-        margin-bottom: 3px;
-    }
-    .cv-con-title.done-text {
-        text-decoration: line-through;
-        color: #6b7280;
-    }
     .cv-con-meta {
         font-size: 0.8rem;
         color: #6b7280;
         display: flex;
-        gap: 14px;
+        gap: 12px;
         flex-wrap: wrap;
+        margin-top: 2px;
+        margin-left: 28px;
+        padding-bottom: 4px;
     }
     .cv-con-meta span { display:inline-flex; align-items:center; gap:3px; }
+    /* Checklist done: strikethrough */
+    div[data-testid="stCheckbox"]:has(:checked) label p {
+        text-decoration: line-through !important;
+        color: #9ca3af !important;
+    }
+    /* Ghost delete button */
+    button[title="Xóa"], button[title="Xóa công việc này"] {
+        background: transparent !important;
+        border: none !important;
+        color: #d1d5db !important;
+        box-shadow: none !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -1291,7 +1329,6 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     except Exception:
         _cl_parsed = []
 
-    # Dùng session_state làm nguồn thực tế (để fragment rerun không mất item mới thêm)
     _cl_key = f"cl_editable_{task_id}"
     if _cl_key not in st.session_state:
         st.session_state[_cl_key] = _cl_parsed
@@ -1307,55 +1344,60 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         unsafe_allow_html=True,
     )
 
-    # Inline add
+    import pandas as _pd
+    st.markdown(_FRAGMENT_CSS, unsafe_allow_html=True)
+    if checklist:
+        _done_cnt0 = sum(1 for it in checklist if (it.get("done") if isinstance(it, dict) else False))
+        st.progress(_done_cnt0 / len(checklist), text=f"{_done_cnt0}/{len(checklist)} hoàn thành")
+    _cl_xoa2   = None
+    _cl_changed = False
+    for _ci, _cit in enumerate(checklist):
+        if isinstance(_cit, str):
+            _cit = {"text": _cit, "done": False}
+            checklist[_ci] = _cit
+        _done_v = bool(_cit.get("done", False))
+        _txt0   = _cit.get("text", "") or f"Mục {_ci+1}"
+        _cls0   = "cl-card cl-done" if _done_v else "cl-card"
+        _badge0 = "<span class='cl-badge'>✅ Xong</span>" if _done_v else ""
+        st.markdown(
+            f"<div class='{_cls0}'>"
+            f"<span class='cl-num'>{_ci+1}</span>"
+            f"<span class='cl-txt'>{_txt0}</span>"
+            f"{_badge0}</div>",
+            unsafe_allow_html=True,
+        )
+        _ct1, _ct2 = st.columns(2)
+        with _ct1:
+            _tlbl = "↩️ Bỏ xong" if _done_v else "✅ Xong"
+            if st.button(_tlbl, key=f"cl_{task_id}_{_ci}", use_container_width=True):
+                checklist[_ci]["done"] = not _done_v
+                _cl_changed = True
+        with _ct2:
+            if st.button("🗑️ Xóa", key=f"cl_del_{task_id}_{_ci}", use_container_width=True):
+                _cl_xoa2 = _ci
+    if _cl_xoa2 is not None:
+        checklist.pop(_cl_xoa2)
+        st.session_state[_cl_key] = checklist
+        cap_nhat_checklist(task_id, checklist)
+    elif _cl_changed:
+        st.session_state[_cl_key] = checklist
+        cap_nhat_checklist(task_id, checklist)
+
+    # Form thêm checklist
     _cl_add_cnt = st.session_state.get(f"cl_add_cnt_{task_id}", 0)
-    col_cl_inp, col_cl_btn = st.columns([5, 1])
-    with col_cl_inp:
+    _cc1, _cc2 = st.columns([5, 2])
+    with _cc1:
         cl_moi = st.text_input(
-            "Thêm mục", placeholder="Nhập mục checklist rồi bấm ➕...",
+            "", placeholder="Nhập mục checklist...",
             key=f"cl_inp_{task_id}_{_cl_add_cnt}", label_visibility="collapsed",
         )
-    with col_cl_btn:
-        if st.button("➕", key=f"cl_add_{task_id}", use_container_width=True):
+    with _cc2:
+        if st.button("＋ Thêm", key=f"cl_add_{task_id}", use_container_width=True):
             if cl_moi.strip():
-                checklist.append({"text": cl_moi.strip(), "done": False})
-                st.session_state[_cl_key] = checklist
+                _cur = st.session_state.get(_cl_key, []) + [{"text": cl_moi.strip(), "done": False}]
+                st.session_state[_cl_key] = _cur
                 st.session_state[f"cl_add_cnt_{task_id}"] = _cl_add_cnt + 1
-                cap_nhat_checklist(task_id, checklist)
-
-    da_thay_doi = False
-    _cl_xoa = None
-    for i, item in enumerate(checklist):
-        if isinstance(item, str):
-            item = {"text": item, "done": False}
-            checklist[i] = item
-        hien_tai = bool(item.get("done", False))
-        col_ck, col_tx, col_del = st.columns([0.5, 8, 0.7])
-        with col_ck:
-            moi = st.checkbox(
-                "", value=hien_tai,
-                key=f"cl_{task_id}_{i}",
-                label_visibility="collapsed",
-            )
-        with col_tx:
-            label_style = "text-decoration:line-through;color:#9ca3af;" if hien_tai else ""
-            st.markdown(
-                f'<p style="margin:6px 0 0 0;{label_style}">{item.get("text", f"Mục {i+1}")}</p>',
-                unsafe_allow_html=True,
-            )
-        with col_del:
-            if st.button("🗑️", key=f"cl_del_{task_id}_{i}", use_container_width=True, help="Xóa mục này"):
-                _cl_xoa = i
-        if moi != hien_tai:
-            checklist[i]["done"] = moi
-            da_thay_doi = True
-    if _cl_xoa is not None:
-        checklist.pop(_cl_xoa)
-        st.session_state[_cl_key] = checklist
-        cap_nhat_checklist(task_id, checklist)
-    elif da_thay_doi:
-        st.session_state[_cl_key] = checklist
-        cap_nhat_checklist(task_id, checklist)
+                cap_nhat_checklist(task_id, _cur)
     st.divider()
 
     # ── Công việc con ─────────────────────────────────────────
@@ -1367,100 +1409,95 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
 
     _cv_key = f"cv_editable_{task_id}"
     if _cv_key not in st.session_state:
-        st.session_state[_cv_key] = _cv_parsed
+        # Normalize keys về lowercase khi load lần đầu
+        _cv_parsed_norm = [
+            {
+                "ten":       cv.get("ten", cv.get("Tên", "")),
+                "nhan_vien": cv.get("nhan_vien", cv.get("Nhân Viên", "")),
+                "deadline":  cv.get("deadline", cv.get("Deadline", "")),
+                "done":      bool(cv.get("done", False)),
+            }
+            for cv in _cv_parsed if isinstance(cv, dict)
+        ]
+        st.session_state[_cv_key] = _cv_parsed_norm
     ds_cv_con = st.session_state[_cv_key]
 
     st.markdown("**📋 Công Việc Con**")
+    if ds_cv_con:
+        _done_cnt1 = sum(1 for cv in ds_cv_con if isinstance(cv, dict) and cv.get("done"))
+        st.progress(_done_cnt1 / len(ds_cv_con), text=f"{_done_cnt1}/{len(ds_cv_con)} hoàn thành")
 
-    # Inline add row
+    _cv_xoa2 = None
+    _cv_ch2  = False
+    for _cvi, cv in enumerate(ds_cv_con):
+        if not isinstance(cv, dict): continue
+        _tcv  = cv.get("ten",       cv.get("Tên",       f"Việc {_cvi+1}"))
+        _nvcv = cv.get("nhan_vien", cv.get("Nhân Viên", "")) or ""
+        _dlcv = cv.get("deadline",  cv.get("Deadline",  "")) or ""
+        _dcv  = bool(cv.get("done", False))
+        _cls1 = "cvc-card cvc-done" if _dcv else "cvc-card"
+        _mpx  = []
+        if _nvcv and _nvcv.lower() != "none": _mpx.append(f"👤 {_nvcv}")
+        if _dlcv and _dlcv.lower() != "none": _mpx.append(f"📅 {_dlcv}")
+        _mhtml = f"<div class='cvc-meta'>{'&nbsp;&nbsp;│&nbsp;&nbsp;'.join(_mpx)}</div>" if _mpx else ""
+        _badge1 = "<div class='cvc-badge'>✅ Hoàn thành</div>" if _dcv else ""
+        st.markdown(
+            f"<div class='{_cls1}'>"
+            f"<div class='cvc-title'>{_cvi+1}. {_tcv}</div>"
+            f"{_mhtml}{_badge1}</div>",
+            unsafe_allow_html=True,
+        )
+        _cv1, _cv2 = st.columns(2)
+        with _cv1:
+            _cvlbl = "↩️ Bỏ xong" if _dcv else "✅ Xong"
+            if st.button(_cvlbl, key=f"cv_{task_id}_{_cvi}", use_container_width=True):
+                ds_cv_con[_cvi]["done"] = not _dcv
+                _cv_ch2 = True
+        with _cv2:
+            if st.button("🗑️ Xóa", key=f"cv_del_{task_id}_{_cvi}", use_container_width=True):
+                _cv_xoa2 = _cvi
+    _cv_changed2 = _cv_ch2
+    _cv_xoa = _cv_xoa2
+
+    # Form thêm công việc con
     _ds_nv_cv = lay_danh_sach_nhan_vien()
     _cv_add_cnt = st.session_state.get(f"cv_add_cnt_{task_id}", 0)
-    col_cv1, col_cv2, col_cv3, col_cv4 = st.columns([3, 2, 2, 1])
-    with col_cv1:
-        cv_ten_moi = st.text_input(
-            "Tên việc", placeholder="Ví dụ: Tháo máy",
-            key=f"cv_inp_ten_{task_id}_{_cv_add_cnt}", label_visibility="collapsed",
-        )
-    with col_cv2:
-        cv_nv_moi = st.selectbox(
-            "Nhân viên", options=["-- Chọn --"] + _ds_nv_cv,
-            key=f"cv_inp_nv_{task_id}_{_cv_add_cnt}", label_visibility="collapsed",
-        )
-    with col_cv3:
-        cv_dl_moi = st.date_input(
-            "Deadline", key=f"cv_inp_dl_{task_id}_{_cv_add_cnt}", label_visibility="collapsed",
-        )
-    with col_cv4:
-        if st.button("➕", key=f"cv_add_{task_id}", use_container_width=True):
-            if cv_ten_moi.strip():
-                nv_luu = cv_nv_moi if cv_nv_moi != "-- Chọn --" else ""
-                ds_cv_con.append({
-                    "ten": cv_ten_moi.strip(),
-                    "nhan_vien": nv_luu,
-                    "deadline": str(cv_dl_moi),
-                    "done": False,
-                })
-                st.session_state[_cv_key] = ds_cv_con
-                st.session_state[f"cv_add_cnt_{task_id}"] = _cv_add_cnt + 1
-                _sh = lay_sheet()
-                _o  = _sh.find(str(task_id), in_column=1)
-                if _o:
-                    _sh.update_cell(_o.row, 14, json.dumps(ds_cv_con, ensure_ascii=False))
-                    lay_danh_sach_cong_viec.clear()
+    st.markdown("---")
+    cv_ten_moi = st.text_input(
+        "Tên việc", placeholder="Ví dụ: Tháo máy",
+        key=f"cv_inp_ten_{task_id}_{_cv_add_cnt}", label_visibility="collapsed",
+    )
+    cv_nv_moi = st.selectbox(
+        "👤 Nhân viên", options=["-- Chọn --"] + _ds_nv_cv,
+        key=f"cv_inp_nv_{task_id}_{_cv_add_cnt}",
+    )
+    cv_dl_moi = st.date_input("📅 Deadline", key=f"cv_inp_dl_{task_id}_{_cv_add_cnt}")
+    if st.button("➕ Thêm công việc con", key=f"cv_add_{task_id}", use_container_width=True):
+        if cv_ten_moi.strip():
+            nv_luu = cv_nv_moi if cv_nv_moi != "-- Chọn --" else ""
+            ds_cv_con.append({
+                "ten": cv_ten_moi.strip(),
+                "nhan_vien": nv_luu,
+                "deadline": str(cv_dl_moi),
+                "done": False,
+            })
+            st.session_state[_cv_key] = ds_cv_con
+            st.session_state[f"cv_add_cnt_{task_id}"] = _cv_add_cnt + 1
+            _sh = lay_sheet()
+            _o  = _sh.find(str(task_id), in_column=1)
+            if _o:
+                _sh.update_cell(_o.row, 14, json.dumps(ds_cv_con, ensure_ascii=False))
+                lay_danh_sach_cong_viec.clear()
 
-    cv_changed = False
-    _cv_xoa = None
-    for j, cv in enumerate(ds_cv_con):
-        if not isinstance(cv, dict):
-            continue
-        ten_cv  = cv.get("ten",       cv.get("Tên",       f"Việc {j+1}"))
-        nv_cv   = cv.get("nhan_vien", cv.get("Nhân Viên", ""))
-        dl_cv   = cv.get("deadline",  cv.get("Deadline",  ""))
-        done_cv = bool(cv.get("done", False))
-
-        card_cls  = "cv-con-card done" if done_cv else "cv-con-card"
-        title_cls = "cv-con-title done-text" if done_cv else "cv-con-title"
-        meta_parts = []
-        if nv_cv:
-            meta_parts.append(f'<span>👤 {nv_cv}</span>')
-        if dl_cv:
-            meta_parts.append(f'<span>📅 {dl_cv}</span>')
-        if done_cv:
-            meta_parts.append('<span style="color:#16a34a;font-weight:700;">✅ Đã xong</span>')
-        meta_html = "".join(meta_parts)
-
-        col_card, col_chk, col_del = st.columns([8, 0.8, 0.8])
-        with col_card:
-            st.markdown(
-                f'<div class="{card_cls}">'
-                f'<div style="flex:1">'
-                f'<div class="{title_cls}">{j+1}. {ten_cv}</div>'
-                f'<div class="cv-con-meta">{meta_html}</div>'
-                f'</div></div>',
-                unsafe_allow_html=True,
-            )
-        with col_chk:
-            da_xong = st.checkbox(
-                "Xong", value=done_cv,
-                key=f"cv_{task_id}_{j}",
-                label_visibility="collapsed",
-            )
-            if da_xong != done_cv:
-                ds_cv_con[j]["done"] = da_xong
-                cv_changed = True
-        with col_del:
-            if st.button("🗑️", key=f"cv_del_{task_id}_{j}", use_container_width=True, help="Xóa công việc này"):
-                _cv_xoa = j
-
-    if _cv_xoa is not None:
-        ds_cv_con.pop(_cv_xoa)
+    if _cv_xoa2 is not None:
+        ds_cv_con.pop(_cv_xoa2)
         st.session_state[_cv_key] = ds_cv_con
         _sh = lay_sheet()
         _o  = _sh.find(str(task_id), in_column=1)
         if _o:
             _sh.update_cell(_o.row, 14, json.dumps(ds_cv_con, ensure_ascii=False))
             lay_danh_sach_cong_viec.clear()
-    elif cv_changed:
+    elif _cv_changed2:
         st.session_state[_cv_key] = ds_cv_con
         _sh = lay_sheet()
         _o  = _sh.find(str(task_id), in_column=1)
@@ -1532,66 +1569,58 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
 
 _FRAGMENT_CSS = """
 <style>
-/* ── Item row: checkbox + text + remove button trên 1 hàng ── */
-.frag-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    border-bottom: 1px solid #f0f0f0;
-    min-height: 42px;
-}
-.frag-row:last-child { border-bottom: none; }
-.frag-row.done-row { background: #f0fdf4; border-radius: 8px; }
-
-.frag-num  { font-size: 0.78rem; color: #bbb; min-width: 18px; }
-.frag-text { flex: 1; font-size: 0.97rem; font-weight: 500; color: #1a1a1a; }
-.frag-text.done { color: #16a34a; text-decoration: line-through; font-weight: 400; }
-
-.frag-rm {
-    background: none; border: none; cursor: pointer;
-    color: #ccc; font-size: 1rem; padding: 0 4px; line-height: 1;
-    border-radius: 4px; transition: color .15s;
-    flex-shrink: 0;
-}
-.frag-rm:hover { color: #e05252; }
-
-/* ── Ẩn label ngoài của st.checkbox khi dùng label_visibility collapsed ── */
-div[data-testid="stCheckbox"] > label > div:first-child { margin-right: 0 !important; }
-
-/* ── Shrink cột nút xoá của Streamlit ── */
-.col-del { padding: 0 !important; }
-div[data-testid="stColumn"].col-del button {
-    min-height: 30px !important; height: 30px !important;
-    padding: 0 6px !important; font-size: 0.8rem !important;
-    background: transparent !important; border: none !important;
-    color: #ccc !important; box-shadow: none !important;
-    width: 30px !important;
-}
-div[data-testid="stColumn"].col-del button:hover { color: #e05252 !important; }
-
-/* ── CVC card ── */
-.cvc-card {
-    border: 1px solid #eee;
-    border-radius: 10px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    background: #fff;
-}
-.cvc-title {
-    font-size: 0.97rem; font-weight: 600; color: #1a1a1a;
-    margin-bottom: 6px;
-}
-.cvc-meta {
+.cl-card {
     display: flex; align-items: center; gap: 10px;
-    font-size: 0.82rem; color: #888;
-    flex-wrap: wrap;
+    border-radius: 12px; padding: 11px 14px;
+    margin-bottom: 4px; border: 1.5px solid #e5e7eb;
+    background: #fff; transition: background 0.2s;
 }
-.cvc-avatar {
+.cl-card.cl-done {
+    background: #f0fdf4; border-color: #86efac;
+}
+.cl-num {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
-    width: 22px; height: 22px; border-radius: 50%;
-    background: #6c63ff; color: #fff;
-    font-size: 0.65rem; font-weight: 700; flex-shrink: 0;
+    font-size: 0.68rem; font-weight: 800; color: #fff;
+    background: #7c3aed;
+}
+.cl-card.cl-done .cl-num { background: #16a34a; }
+.cl-txt {
+    flex: 1; font-size: 0.9rem; color: #1e293b; word-break: break-word;
+}
+.cl-card.cl-done .cl-txt {
+    text-decoration: line-through; color: #94a3b8;
+}
+.cl-badge {
+    flex-shrink: 0; font-size: 0.68rem; font-weight: 700;
+    color: #16a34a; background: #dcfce7;
+    padding: 2px 8px; border-radius: 20px;
+}
+/* Ép 2 nút nằm cùng hàng trên mọi màn hình */
+div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]) {
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+}
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+    min-width: 0 !important;
+    flex: 1 1 0 !important;
+    width: 50% !important;
+}
+.cl-btn-row { margin: 0 0 10px 0; gap: 6px; display: flex; }
+/* CVC card */
+.cvc-card {
+    border: 1.5px solid #e5e7eb; border-radius: 12px;
+    padding: 10px 14px 8px; background: #fafafa;
+    margin-bottom: 4px;
+}
+.cvc-card.cvc-done { background: #f0fdf4; border-color: #86efac; }
+.cvc-title { font-size: 0.9rem; font-weight: 700; color: #1e293b; }
+.cvc-card.cvc-done .cvc-title { text-decoration: line-through; color: #94a3b8; }
+.cvc-meta { font-size: 0.78rem; color: #64748b; margin-top: 3px; }
+.cvc-badge {
+    display: inline-block; font-size: 0.68rem; font-weight: 700;
+    color: #16a34a; background: #dcfce7;
+    padding: 2px 8px; border-radius: 20px; margin-top: 4px;
 }
 </style>
 """
@@ -1607,51 +1636,64 @@ def _fragment_checklist(key_prefix: str):
     st.markdown(_FRAGMENT_CSS, unsafe_allow_html=True)
     st.markdown("**☑️ Checklist**")
 
-    # ── Mỗi item: checkbox | text | nút ✕  — 3 cột cùng hàng ─────────────
-    for i, item in enumerate(st.session_state[cl_key]):
-        done_val = item["done"]
-        txt_style = "color:#16a34a;text-decoration:line-through" if done_val else "color:#1a1a1a;font-weight:500"
-        row_bg    = "background:#f0fdf4;border-radius:8px;" if done_val else ""
+    items = st.session_state[cl_key]
 
-        col_ck, col_txt, col_del = st.columns(
-            [0.45, 6.5, 0.45], vertical_alignment="center", gap="small"
+    # Progress bar
+    if items:
+        done_cnt = sum(1 for it in items if it.get("done"))
+        st.progress(done_cnt / len(items),
+                    text=f"{done_cnt}/{len(items)} hoàn thành")
+
+    _xoa = None
+    for i, item in enumerate(items):
+        txt = item.get("text", "") or ""
+        done_val = bool(item.get("done", False))
+        cls  = "cl-card cl-done" if done_val else "cl-card"
+        badge = "<span class='cl-badge'>✅ Xong</span>" if done_val else ""
+        txt_show = txt if txt and txt.lower() != "none" else f"Mục {i+1}"
+        # HTML card
+        st.markdown(
+            f"<div class='{cls}'>"
+            f"<span class='cl-num'>{i+1}</span>"
+            f"<span class='cl-txt'>{txt_show}</span>"
+            f"{badge}</div>",
+            unsafe_allow_html=True,
         )
-        with col_ck:
-            done = st.checkbox(
-                label="done", value=done_val,
-                key=f"{key_prefix}_ck_{i}",
-                label_visibility="collapsed",
-            )
-            if done != done_val:
-                st.session_state[cl_key][i]["done"] = done
+        # 2 nút 50/50 — luôn fit mọi màn hình
+        col_t, col_d = st.columns(2)
+        with col_t:
+            toggle_lbl = "↩️ Bỏ xong" if done_val else "✅ Xong"
+            if st.button(toggle_lbl, key=f"{key_prefix}_ck_{i}",
+                         use_container_width=True):
+                st.session_state[cl_key][i]["done"] = not done_val
                 st.rerun()
-        with col_txt:
-            st.markdown(
-                f"<div style='padding:4px 0;{row_bg}'>"
-                f"<span style='font-size:0.78rem;color:#bbb;margin-right:4px'>{i+1}.</span>"
-                f"<span style='{txt_style};font-size:0.97rem'>{item['text']}</span>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-        with col_del:
-            if st.button("✕", key=f"{key_prefix}_cl_del_{i}",
-                         use_container_width=False, help="Xoá"):
-                st.session_state[cl_key].pop(i)
+        with col_d:
+            if st.button("🗑️ Xóa", key=f"{key_prefix}_cl_del_{i}",
+                         use_container_width=True):
+                _xoa = i
+
+    if _xoa is not None:
+        st.session_state[cl_key].pop(_xoa)
+        st.rerun()
+
+    st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
+    col_i, col_b = st.columns([5, 2])
+    with col_i:
+        moi = st.text_input(
+            "", placeholder="Nhập tên checklist...",
+            key=f"{key_prefix}_cl_inp_{st.session_state[cl_inp_v]}",
+            label_visibility="collapsed",
+        )
+    with col_b:
+        if st.button("＋ Thêm", key=f"{key_prefix}_cl_add",
+                     use_container_width=True):
+            val = st.session_state.get(
+                f"{key_prefix}_cl_inp_{st.session_state[cl_inp_v]}", "").strip()
+            if val:
+                st.session_state[cl_key].append({"text": val, "done": False})
+                st.session_state[cl_inp_v] += 1
                 st.rerun()
 
-    # ── Input + nút Thêm ─────────────────────────────────────────────────
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-    moi = st.text_input(
-        "", placeholder="Nhập tên checklist...",
-        key=f"{key_prefix}_cl_inp_{st.session_state[cl_inp_v]}",
-        label_visibility="collapsed",
-    )
-    if st.button("＋ Thêm checklist", key=f"{key_prefix}_cl_add",
-                 use_container_width=True):
-        if moi.strip():
-            st.session_state[cl_key].append({"text": moi.strip(), "done": False})
-            st.session_state[cl_inp_v] += 1
-            st.rerun()
 
 
 @st.fragment
@@ -1664,73 +1706,74 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list):
     st.markdown(_FRAGMENT_CSS, unsafe_allow_html=True)
     st.markdown("**📋 Công Việc Con**")
 
-    # ── Hiển thị từng item đã thêm dạng card ─────────────────────────────
-    for i, cv in enumerate(st.session_state[cv_key]):
-        nguoi = cv.get("nguoi") or ""
-        dl    = cv.get("deadline", "")
-        if nguoi:
-            parts    = nguoi.strip().split()
-            initials = parts[-1][0].upper() if parts else "?"
-            av_html  = f"<span class='cvc-avatar'>{initials}</span>"
-        else:
-            av_html  = "<span style='color:#ccc'>👤</span>"
+    items_cv = st.session_state[cv_key]
+    if items_cv:
+        done_cnt = sum(1 for cv in items_cv if cv.get("done"))
+        st.progress(done_cnt / len(items_cv),
+                    text=f"{done_cnt}/{len(items_cv)} hoàn thành")
 
-        col_card, col_del = st.columns([9, 0.6], vertical_alignment="center", gap="small")
-        with col_card:
-            st.markdown(
-                f"<div class='cvc-card'>"
-                f"<div class='cvc-title'>{i+1}. {cv['ten']}</div>"
-                f"<div class='cvc-meta'>"
-                f"  {av_html} <span>{nguoi or '— Chưa giao'}</span>"
-                f"  <span style='color:#d0d0d0'>|</span>"
-                f"  <span>📅 {dl}</span>"
-                f"</div></div>",
-                unsafe_allow_html=True,
-            )
-        with col_del:
-            if st.button("✕", key=f"{key_prefix}_cv_del_{i}", help="Xoá"):
-                st.session_state[cv_key].pop(i)
+    _xoa = None
+    for i, cv in enumerate(items_cv):
+        done_val = bool(cv.get("done", False))
+        ten = cv.get("ten", "") or f"Việc {i+1}"
+        nguoi = cv.get("nguoi", "") or ""
+        dl    = cv.get("deadline", "") or ""
+        cls   = "cvc-card cvc-done" if done_val else "cvc-card"
+        meta_parts = []
+        if nguoi and nguoi.lower() != "none": meta_parts.append(f"👤 {nguoi}")
+        if dl    and dl.lower()    != "none": meta_parts.append(f"📅 {dl}")
+        meta_html = f"<div class='cvc-meta'>{'&nbsp;&nbsp;│&nbsp;&nbsp;'.join(meta_parts)}</div>" if meta_parts else ""
+        badge = "<div class='cvc-badge'>✅ Hoàn thành</div>" if done_val else ""
+        st.markdown(
+            f"<div class='{cls}'>"
+            f"<div class='cvc-title'>{i+1}. {ten}</div>"
+            f"{meta_html}{badge}</div>",
+            unsafe_allow_html=True,
+        )
+        col_t, col_d = st.columns(2)
+        with col_t:
+            lbl = "↩️ Bỏ xong" if done_val else "✅ Xong"
+            if st.button(lbl, key=f"{key_prefix}_cvt_{i}", use_container_width=True):
+                st.session_state[cv_key][i]["done"] = not done_val
                 st.rerun()
+        with col_d:
+            if st.button("🗑️ Xóa", key=f"{key_prefix}_cv_del_{i}", use_container_width=True):
+                _xoa = i
 
-    # ── Form nhập mới ─────────────────────────────────────────────────────
-    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+    if _xoa is not None:
+        st.session_state[cv_key].pop(_xoa)
+        st.rerun()
 
-    # Field tên — full width
-    cv_ten = st.text_input(
+    st.divider()
+    st.text_input(
         "", placeholder="Tên công việc con...",
         key=f"{key_prefix}_cv_ten_{st.session_state[cv_inp_v]}",
         label_visibility="collapsed",
     )
+    st.selectbox(
+        "👤 Nhân viên",
+        options=["-- Chọn nhân viên --"] + ds_nhan_vien,
+        key=f"{key_prefix}_cv_nv_{st.session_state[cv_inp_v]}",
+    )
+    st.date_input("📅 Deadline", key=f"{key_prefix}_cv_dl")
 
-    # Hàng dưới: Nhân viên | Deadline  (2 cột đều nhau)
-    col_nv, col_dl = st.columns(2, gap="small")
-    with col_nv:
-        cv_nv = st.selectbox(
-            "👤 Nhân viên",
-            options=["-- Chọn nhân viên --"] + ds_nhan_vien,
-            key=f"{key_prefix}_cv_nv_{st.session_state[cv_inp_v]}",
-            label_visibility="visible",
-        )
-    with col_dl:
-        cv_dl = st.date_input(
-            "📅 Deadline",
-            key=f"{key_prefix}_cv_dl",
-        )
-
-    # Nút thêm full width
     if st.button("＋ Thêm công việc con", key=f"{key_prefix}_cv_add",
                  use_container_width=True):
         ten_val = st.session_state.get(
-            f"{key_prefix}_cv_ten_{st.session_state[cv_inp_v]}", ""
-        ).strip()
+            f"{key_prefix}_cv_ten_{st.session_state[cv_inp_v]}", "").strip()
+        cv_nv = st.session_state.get(
+            f"{key_prefix}_cv_nv_{st.session_state[cv_inp_v]}", "-- Chọn nhân viên --")
+        cv_dl = st.session_state.get(f"{key_prefix}_cv_dl", "")
         if ten_val:
-            nguoi_luu = cv_nv if cv_nv != "-- Chọn nhân viên --" else ""
             st.session_state[cv_key].append({
-                "ten": ten_val, "nguoi": nguoi_luu,
-                "deadline": str(cv_dl), "done": False,
+                "ten":      ten_val,
+                "nguoi":    cv_nv if cv_nv != "-- Chọn nhân viên --" else "",
+                "deadline": str(cv_dl),
+                "done":     False,
             })
-            st.session_state[cv_inp_v] += 1   # clear text + selectbox
+            st.session_state[cv_inp_v] += 1
             st.rerun()
+
 
 
 # ============================================================
@@ -1801,7 +1844,13 @@ def giao_dien_admin():
             mo_ta_them="Tên Loại Máy *",
         )
         _section_don_gian(
-            "📋 Trạng Thái Công Việc", "trang_thai",
+            "�️ Tình Trạng", "tinh_trang",
+            lay_danh_sach_tinh_trang, them_tinh_trang, "Tên Tình Trạng",
+            placeholder="Ví dụ: Bảo hành, Sửa chữa, Trả lại...",
+            mo_ta_them="Tên Tình Trạng *",
+        )
+        _section_don_gian(
+            "�📋 Trạng Thái Công Việc", "trang_thai",
             lay_danh_sach_trang_thai_custom, them_trang_thai_custom, "Tên Trạng Thái",
             placeholder="Ví dụ: Chờ Làm, Đang Làm, Hoàn Thành...",
             mo_ta_them="Tên Trạng Thái *",
@@ -2063,6 +2112,45 @@ def giao_dien_admin():
         with col_dl:
             adm_deadline = st.date_input("📅 Hạn hoàn thành", key="adm_deadline")
 
+        ds_cong_doan_adm = lay_ten_cac_cong_doan()
+        adm_cong_doan = st.selectbox(
+            "⚙️ Công Đoạn",
+            options=["-- Không chọn --"] + ds_cong_doan_adm,
+            key="adm_cong_doan",
+        )
+
+        col_lm_adm, col_tt_adm = st.columns(2)
+        with col_lm_adm:
+            ds_loai_may_adm = lay_ten_cac_loai_may()
+            adm_loai_may = st.selectbox(
+                "🔧 Loại Máy",
+                options=["-- Không chọn --"] + ds_loai_may_adm,
+                key="adm_loai_may",
+            )
+        with col_tt_adm:
+            ds_tinh_trang_adm = lay_ten_cac_tinh_trang()
+            adm_tinh_trang = st.selectbox(
+                "🛠️ Tình Trạng",
+                options=["-- Không chọn --"] + ds_tinh_trang_adm,
+                key="adm_tinh_trang",
+            )
+
+        col_cs_adm, col_sc_adm, col_ms_adm = st.columns(3)
+        with col_cs_adm:
+            adm_cong_suat = st.text_input("⚡ Công Suất", placeholder="VD: 5.5kW", key="adm_cong_suat")
+        with col_sc_adm:
+            adm_so_cuc = st.text_input("🔩 Số Cực", placeholder="VD: 4P", key="adm_so_cuc")
+        with col_ms_adm:
+            adm_ma_so = st.text_input("🏷️ Mã Số", placeholder="VD: ABC-001", key="adm_ma_so")
+
+        col_po_adm, col_kh_adm, col_bg_adm = st.columns(3)
+        with col_po_adm:
+            adm_so_po_noi_bo = st.text_input("📄 Số PO Nội Bộ", placeholder="VD: PO-2024-001", key="adm_so_po_noi_bo")
+        with col_kh_adm:
+            adm_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key="adm_so_po_kh")
+        with col_bg_adm:
+            adm_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key="adm_so_bao_gia")
+
         adm_ten_task   = st.text_input("📌 Tên công việc *", placeholder="Ví dụ: Sửa chữa động cơ bơm", key="adm_ten_task")
         adm_mo_ta      = st.text_area("📝 Mô tả chi tiết", placeholder="Nhập mô tả, yêu cầu kỹ thuật...", key="adm_mo_ta")
         adm_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai, key="adm_trang_thai")
@@ -2091,6 +2179,15 @@ def giao_dien_admin():
                         nguoi_phe_duyet=phe_duyet_luu,
                         checklist=list(st.session_state.get(f"{_ADM_PREFIX}_checklist", [])),
                         cong_viec_con=list(st.session_state.get(f"{_ADM_PREFIX}_cong_viec_con", [])),
+                        cong_doan=adm_cong_doan if adm_cong_doan != "-- Không chọn --" else "",
+                        loai_may=adm_loai_may if adm_loai_may != "-- Không chọn --" else "",
+                        tinh_trang=adm_tinh_trang if adm_tinh_trang != "-- Không chọn --" else "",
+                        cong_suat=adm_cong_suat.strip(),
+                        so_cuc=adm_so_cuc.strip(),
+                        ma_so=adm_ma_so.strip(),
+                        so_po_noi_bo=adm_so_po_noi_bo.strip(),
+                        so_po_kh=adm_so_po_kh.strip(),
+                        so_bao_gia=adm_so_bao_gia.strip(),
                     )
                 st.session_state[f"{_ADM_PREFIX}_checklist"] = []
                 st.session_state[f"{_ADM_PREFIX}_cong_viec_con"] = []
@@ -2305,8 +2402,8 @@ def giao_dien_nhan_vien():
             df = lay_danh_sach_cong_viec()
 
         # Lọc công việc thuộc nhân viên này (normalize tên cả 2 phía)
-        df["_nv_norm"] = df["Nhân Viên"].fillna("").str.strip()
-        df_cua_toi = df[df["_nv_norm"] == ten_nhan_vien].copy()
+        df["_nv_norm"] = df["Nhân Viên"].fillna("").str.strip().str.lower()
+        df_cua_toi = df[df["_nv_norm"] == ten_nhan_vien.lower()].copy()
 
         if df_cua_toi.empty:
             st.success("🎉 Bạn hiện chưa có công việc nào được giao!")
@@ -2362,7 +2459,7 @@ def giao_dien_nhan_vien():
             my_subtasks = [
                 (i, cv) for i, cv in enumerate(ds_cv)
                 if isinstance(cv, dict)
-                and (cv.get("nguoi") or cv.get("nhan_vien") or "").strip() == ten_nhan_vien
+                and (cv.get("nguoi") or cv.get("nhan_vien") or "").strip().lower() == ten_nhan_vien.lower()
             ]
             if my_subtasks:
                 tasks_co_subtask.append((row.to_dict(), ds_cv, my_subtasks))
@@ -2388,11 +2485,8 @@ def giao_dien_nhan_vien():
                     f"{icon} [{cty}] Task #{tid}: {ten}  —  {tt}{badge}",
                     expanded=not all_done
                 ):
-                    # Thông tin task đầy đủ
-                    col_i1, col_i2, col_i3 = st.columns(3)
-                    col_i1.markdown(f"**🏢 Công Ty:** {cty}")
-                    col_i2.markdown(f"**👤 Người Phụ Trách:** {nv_chu}")
-                    col_i3.markdown(f"**📅 Hạn Chính:** {dl}")
+                    # Thông tin task đầy đủ (stack dọc cho mobile)
+                    st.markdown(f"**🏢 Công Ty:** {cty}  |  **👤** {nv_chu}  |  **📅** {dl}")
                     if mo_ta:
                         st.markdown(f"**📝 Mô Tả:** {mo_ta}")
                     st.divider()
@@ -2405,19 +2499,16 @@ def giao_dien_nhan_vien():
                         dl_sub   = cv.get("deadline", cv.get("Deadline", ""))
                         done_sub = bool(cv.get("done", False))
 
-                        col_chk, col_info = st.columns([1, 9])
-                        with col_chk:
-                            new_done = st.checkbox(
-                                "Xong",
-                                value=done_sub,
-                                key=f"nv_sub_{tid}_{j}",
-                                label_visibility="collapsed",
-                            )
-                        with col_info:
-                            label    = f"~~{ten_sub}~~" if new_done else f"**{ten_sub}**"
-                            dl_txt   = f"  📅 {dl_sub}" if dl_sub else ""
-                            done_txt = "  ✅ Đã hoàn thành" if new_done else ""
-                            st.markdown(f"{j+1}. {label}{dl_txt}{done_txt}")
+                        dl_txt  = f"  📅 {dl_sub}" if dl_sub else ""
+                        chk_lbl = f"{j+1}. {ten_sub}{dl_txt}"
+                        new_done = st.checkbox(
+                            chk_lbl,
+                            value=done_sub,
+                            key=f"nv_sub_{tid}_{j}",
+                        )
+                        if new_done and not done_sub:
+                            # inject done-strike CSS class via empty markdown (CSS targets .sub-done)
+                            pass  # CSS handles via global .sub-done class
 
                         if new_done != done_sub:
                             ds_cv_full[j]["done"] = new_done
@@ -2478,6 +2569,45 @@ def giao_dien_nhan_vien():
             st.markdown(f"**👤 Nhân viên thực hiện:** `{ten_nhan_vien}` *(tự động)*")
             nv_deadline = st.date_input("📅 Hạn Hoàn Thành", key=f"{_nv_prefix}_dl")
 
+            ds_cong_doan_nv = lay_ten_cac_cong_doan()
+            nv_cong_doan = st.selectbox(
+                "⚙️ Công Đoạn",
+                options=["-- Không chọn --"] + ds_cong_doan_nv,
+                key=f"{_nv_prefix}_cong_doan",
+            )
+
+            col_lm_nv, col_tt_nv = st.columns(2)
+            with col_lm_nv:
+                ds_loai_may_nv = lay_ten_cac_loai_may()
+                nv_loai_may = st.selectbox(
+                    "🔧 Loại Máy",
+                    options=["-- Không chọn --"] + ds_loai_may_nv,
+                    key=f"{_nv_prefix}_loai_may",
+                )
+            with col_tt_nv:
+                ds_tinh_trang_nv = lay_ten_cac_tinh_trang()
+                nv_tinh_trang = st.selectbox(
+                    "🛠️ Tình Trạng",
+                    options=["-- Không chọn --"] + ds_tinh_trang_nv,
+                    key=f"{_nv_prefix}_tinh_trang",
+                )
+
+            col_cs_nv, col_sc_nv, col_ms_nv = st.columns(3)
+            with col_cs_nv:
+                nv_cong_suat = st.text_input("⚡ Công Suất", placeholder="VD: 5.5kW", key=f"{_nv_prefix}_cong_suat")
+            with col_sc_nv:
+                nv_so_cuc = st.text_input("🔩 Số Cực", placeholder="VD: 4P", key=f"{_nv_prefix}_so_cuc")
+            with col_ms_nv:
+                nv_ma_so = st.text_input("🏷️ Mã Số", placeholder="VD: ABC-001", key=f"{_nv_prefix}_ma_so")
+
+            col_po_nv, col_kh_nv, col_bg_nv = st.columns(3)
+            with col_po_nv:
+                nv_so_po_noi_bo = st.text_input("📄 Số PO Nội Bộ", placeholder="VD: PO-2024-001", key=f"{_nv_prefix}_so_po_noi_bo")
+            with col_kh_nv:
+                nv_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key=f"{_nv_prefix}_so_po_kh")
+            with col_bg_nv:
+                nv_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key=f"{_nv_prefix}_so_bao_gia")
+
             nv_ten_task = st.text_input("📌 Tên Công Việc *", placeholder="Mô tả ngắn công việc cần làm", key=f"{_nv_prefix}_ten")
             nv_mo_ta    = st.text_area("📝 Mô Tả Chi Tiết", placeholder="Mô tả chi tiết về công việc...", key=f"{_nv_prefix}_mo_ta")
 
@@ -2509,6 +2639,15 @@ def giao_dien_nhan_vien():
                             nguoi_phe_duyet = phe_duyet_nv,
                             checklist       = list(st.session_state[_cl_key]),
                             cong_viec_con   = list(st.session_state[_cv_key]),
+                            cong_doan       = nv_cong_doan if nv_cong_doan != "-- Không chọn --" else "",
+                            loai_may        = nv_loai_may if nv_loai_may != "-- Không chọn --" else "",
+                            tinh_trang      = nv_tinh_trang if nv_tinh_trang != "-- Không chọn --" else "",
+                            cong_suat       = nv_cong_suat.strip(),
+                            so_cuc          = nv_so_cuc.strip(),
+                            ma_so           = nv_ma_so.strip(),
+                            so_po_noi_bo    = nv_so_po_noi_bo.strip(),
+                            so_po_kh        = nv_so_po_kh.strip(),
+                            so_bao_gia      = nv_so_bao_gia.strip(),
                         )
                     st.session_state[_cl_key] = []
                     st.session_state[_cv_key] = []
@@ -3098,11 +3237,25 @@ def main():
     if not st.session_state.get("dang_nhap"):
         uid = cookie_mgr.get("qlcv_uid")
         if uid:
+            # Re-fetch thông tin user từ DB để đảm bảo ho_ten khớp chính xác
+            # với tên đã lưu trong cột Nhân Viên của Tasks sheet
+            ho_ten_cookie = cookie_mgr.get("qlcv_hoten") or ""
+            vai_tro_cookie = cookie_mgr.get("qlcv_vaitro") or "nhan_vien"
+            try:
+                df_users = lay_danh_sach_users()
+                if not df_users.empty:
+                    uid_int = int(uid)
+                    user_row = df_users[df_users["ID"].astype(str) == str(uid_int)]
+                    if not user_row.empty:
+                        ho_ten_cookie  = user_row.iloc[0]["HoTen"]
+                        vai_tro_cookie = user_row.iloc[0]["VaiTro"]
+            except Exception:
+                pass  # Nếu lỗi kết nối, dùng giá trị từ cookie
             st.session_state["dang_nhap"] = True
             st.session_state["user_id"]   = uid
             st.session_state["username"]  = cookie_mgr.get("qlcv_uname") or ""
-            st.session_state["ho_ten"]    = cookie_mgr.get("qlcv_hoten") or ""
-            st.session_state["vai_tro"]   = cookie_mgr.get("qlcv_vaitro") or "nhan_vien"
+            st.session_state["ho_ten"]    = ho_ten_cookie
+            st.session_state["vai_tro"]   = vai_tro_cookie
             st.rerun()
         else:
             giao_dien_dang_nhap(cookie_mgr)
