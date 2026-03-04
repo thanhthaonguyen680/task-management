@@ -239,6 +239,22 @@ def lay_sheet():
         raise ConnectionError(_xoa_cache_va_thong_bao(e)) from e
 
 
+def _lay_sheet_fresh():
+    """Lấy worksheet Tasks mới (không cache) — dùng cho các thao tác ghi."""
+    try:
+        pham_vi = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        thong_tin = st.secrets["gcp_service_account"]
+        chung_chi = Credentials.from_service_account_info(thong_tin, scopes=pham_vi)
+        gc = gspread.authorize(chung_chi)
+        return gc.open("QuanLyCongViec").worksheet("Tasks")
+    except Exception:
+        # Fallback về cached sheet nếu kết nối mới thất bại
+        return lay_sheet()
+
+
 # ============================================================
 # CẤU HÌNH CLOUDINARY (lưu trữ ảnh nghiệm thu)
 # ============================================================
@@ -513,13 +529,21 @@ def lay_danh_sach_cong_viec() -> pd.DataFrame:
     try:
         sheet   = lay_sheet()
         allvals = sheet.get_all_values()
-    except (ConnectionError, OSError, Exception):
+    except (ConnectionError, OSError, Exception) as _e:
+        import traceback
+        print(f"[lay_danh_sach_cong_viec ERROR] {_e}\n{traceback.format_exc()}")
         return pd.DataFrame(columns=_COT_TRONG)
     if len(allvals) <= 1:
         return pd.DataFrame(columns=_COT_TRONG)
     # Dùng tên cột cố định (không đọc từ row 1) — tránh lỗi duplicate
     rows = [r[:_N] for r in allvals[1:] if any(r[:_N])]
-    df = pd.DataFrame(rows, columns=_HEADERS[:len(rows[0])] if rows else _HEADERS)
+    # Pad các hàng ngắn hơn _N cột (task cũ tạo trước khi thêm cột mới)
+    rows_padded = [r + [""] * (_N - len(r)) for r in rows]
+    try:
+        df = pd.DataFrame(rows_padded, columns=_HEADERS) if rows_padded else pd.DataFrame(columns=_HEADERS)
+    except Exception:
+        # Fallback: tạo từng hàng an toàn
+        df = pd.DataFrame([dict(zip(_HEADERS, r)) for r in rows_padded]) if rows_padded else pd.DataFrame(columns=_HEADERS)
     # Tương thích ngược: map các cột tiếng Anh cũ nếu cần
     df.rename(columns={
         "Cong_Ty":      "Công Ty",
@@ -562,9 +586,11 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
     P:Loai_May | Q:Tinh_Trang | R:Cong_Suat | S:So_Cuc | T:Ma_So
     U:So_PO_Noi_Bo | V:So_PO_KH | W:So_Bao_Gia
     """
-    sheet = lay_sheet()
-    # Đếm số hàng qua cột A (tránh get_all_records duplicate header)
-    id_moi   = len(sheet.col_values(1))  # header row + các hàng = ID tiếp theo
+    sheet = _lay_sheet_fresh()  # Luôn dùng connection mới cho thao tác ghi
+    # ID = max ID hiện tại + 1 (tránh trùng khi dữ liệu có hàng trống hoặc xoá)
+    _ids_hien_co = sheet.col_values(1)[1:]  # bỏ header
+    _so_ids = [int(x) for x in _ids_hien_co if str(x).strip().isdigit()]
+    id_moi   = (max(_so_ids) + 1) if _so_ids else 1
     ngay_tao = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     hang_moi = [
@@ -593,7 +619,14 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
         so_bao_gia,                                           # W: Số Báo Giá
     ]
 
-    sheet.append_row(hang_moi)
+    # Tự tính row tiếp theo dựa trên số hàng thực tế — tránh gspread append_row
+    # bị lỗi "end of table" detection khi số cột không đồng nhất giữa rows cũ và mới
+    _so_hang_hien_co = len(sheet.col_values(1))  # header + data rows
+    _dong_moi = _so_hang_hien_co + 1
+    sheet.update(f"A{_dong_moi}:W{_dong_moi}", [hang_moi])
+    # Clear cả lay_sheet cache để lần đọc tiếp theo dùng connection sạch
+    lay_sheet.clear()
+    _lay_bang_tinh.clear()
     lay_danh_sach_cong_viec.clear()
     return id_moi
 
@@ -1294,6 +1327,28 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
             st.markdown(f"✅ **Người phê duyệt:** `{hang.get('Người Phê Duyệt', '')}`")
         st.markdown(f"📅 **Hạn hoàn thành:** `{hang.get('Hạn Hoàn Thành', '')}`")
         st.markdown(f"🕐 **Ngày tạo:** `{hang.get('Ngày Tạo', '')}`")
+
+        # ── Thông số kỹ thuật / thương mại ───────────────────
+        _thong_so = {
+            "⚙️ Công Đoạn":    hang.get("Công Đoạn", ""),
+            "🔧 Loại Máy":     hang.get("Loại Máy", ""),
+            "🛠️ Tình Trạng":   hang.get("Tình Trạng", ""),
+            "⚡ Công Suất":    hang.get("Công Suất", ""),
+            "🔩 Số Cực":       hang.get("Số Cực", ""),
+            "🏷️ Mã Số":        hang.get("Mã Số", ""),
+            "📄 Số PO Nội Bộ": hang.get("Số PO Nội Bộ", ""),
+            "📋 Số PO KH/HĐ":  hang.get("Số PO KH/HĐ", ""),
+            "💰 Số Báo Giá":   hang.get("Số Báo Giá", ""),
+        }
+        _co_du_lieu = {k: v for k, v in _thong_so.items() if v and str(v).strip()}
+        if _co_du_lieu:
+            st.markdown("---")
+            _items = list(_co_du_lieu.items())
+            for _i in range(0, len(_items), 3):
+                _row_cols = st.columns(3)
+                for _j, (_label, _val) in enumerate(_items[_i:_i+3]):
+                    _row_cols[_j].markdown(f"**{_label}**<br>`{_val}`", unsafe_allow_html=True)
+
         if hang.get("Mô Tả"):
             with st.expander("📝 Xem mô tả chi tiết"):
                 st.write(hang.get("Mô Tả", ""))
@@ -1366,15 +1421,15 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
             f"{_badge0}</div>",
             unsafe_allow_html=True,
         )
-        _ct1, _ct2 = st.columns(2)
-        with _ct1:
-            _tlbl = "↩️ Bỏ xong" if _done_v else "✅ Xong"
-            if st.button(_tlbl, key=f"cl_{task_id}_{_ci}", use_container_width=True):
-                checklist[_ci]["done"] = not _done_v
-                _cl_changed = True
-        with _ct2:
-            if st.button("🗑️ Xóa", key=f"cl_del_{task_id}_{_ci}", use_container_width=True):
-                _cl_xoa2 = _ci
+        if not _done_v:
+            _ct1, _ct2 = st.columns(2)
+            with _ct1:
+                if st.button("✅ Xong", key=f"cl_{task_id}_{_ci}", use_container_width=True):
+                    checklist[_ci]["done"] = True
+                    _cl_changed = True
+            with _ct2:
+                if st.button("🗑️ Xóa", key=f"cl_del_{task_id}_{_ci}", use_container_width=True):
+                    _cl_xoa2 = _ci
     if _cl_xoa2 is not None:
         checklist.pop(_cl_xoa2)
         st.session_state[_cl_key] = checklist
@@ -1413,7 +1468,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         _cv_parsed_norm = [
             {
                 "ten":       cv.get("ten", cv.get("Tên", "")),
-                "nhan_vien": cv.get("nhan_vien", cv.get("Nhân Viên", "")),
+                "nhan_vien": cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))),
                 "deadline":  cv.get("deadline", cv.get("Deadline", "")),
                 "done":      bool(cv.get("done", False)),
             }
@@ -1447,15 +1502,15 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
             f"{_mhtml}{_badge1}</div>",
             unsafe_allow_html=True,
         )
-        _cv1, _cv2 = st.columns(2)
-        with _cv1:
-            _cvlbl = "↩️ Bỏ xong" if _dcv else "✅ Xong"
-            if st.button(_cvlbl, key=f"cv_{task_id}_{_cvi}", use_container_width=True):
-                ds_cv_con[_cvi]["done"] = not _dcv
-                _cv_ch2 = True
-        with _cv2:
-            if st.button("🗑️ Xóa", key=f"cv_del_{task_id}_{_cvi}", use_container_width=True):
-                _cv_xoa2 = _cvi
+        if not _dcv:
+            _cv1, _cv2 = st.columns(2)
+            with _cv1:
+                if st.button("✅ Xong", key=f"cv_{task_id}_{_cvi}", use_container_width=True):
+                    ds_cv_con[_cvi]["done"] = True
+                    _cv_ch2 = True
+            with _cv2:
+                if st.button("🗑️ Xóa", key=f"cv_del_{task_id}_{_cvi}", use_container_width=True):
+                    _cv_xoa2 = _cvi
     _cv_changed2 = _cv_ch2
     _cv_xoa = _cv_xoa2
 
@@ -1648,6 +1703,8 @@ def _fragment_checklist(key_prefix: str):
     for i, item in enumerate(items):
         txt = item.get("text", "") or ""
         done_val = bool(item.get("done", False))
+        nguoi = item.get("nhan_vien", item.get("nguoi", "")) or ""
+        dl    = item.get("deadline", "") or ""
         cls  = "cl-card cl-done" if done_val else "cl-card"
         badge = "<span class='cl-badge'>✅ Xong</span>" if done_val else ""
         txt_show = txt if txt and txt.lower() != "none" else f"Mục {i+1}"
@@ -1659,18 +1716,18 @@ def _fragment_checklist(key_prefix: str):
             f"{badge}</div>",
             unsafe_allow_html=True,
         )
-        # 2 nút 50/50 — luôn fit mọi màn hình
-        col_t, col_d = st.columns(2)
-        with col_t:
-            toggle_lbl = "↩️ Bỏ xong" if done_val else "✅ Xong"
-            if st.button(toggle_lbl, key=f"{key_prefix}_ck_{i}",
-                         use_container_width=True):
-                st.session_state[cl_key][i]["done"] = not done_val
-                st.rerun()
-        with col_d:
-            if st.button("🗑️ Xóa", key=f"{key_prefix}_cl_del_{i}",
-                         use_container_width=True):
-                _xoa = i
+        # Chỉ hiện nút khi chưa hoàn thành
+        if not done_val:
+            col_t, col_d = st.columns(2)
+            with col_t:
+                if st.button("✅ Xong", key=f"{key_prefix}_ck_{i}",
+                             use_container_width=True):
+                    st.session_state[cl_key][i]["done"] = True
+                    st.rerun()
+            with col_d:
+                if st.button("🗑️ Xóa", key=f"{key_prefix}_cl_del_{i}",
+                             use_container_width=True):
+                    _xoa = i
 
     if _xoa is not None:
         st.session_state[cl_key].pop(_xoa)
@@ -1716,7 +1773,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list):
     for i, cv in enumerate(items_cv):
         done_val = bool(cv.get("done", False))
         ten = cv.get("ten", "") or f"Việc {i+1}"
-        nguoi = cv.get("nguoi", "") or ""
+        nguoi = cv.get("nhan_vien", cv.get("nguoi", "")) or ""
         dl    = cv.get("deadline", "") or ""
         cls   = "cvc-card cvc-done" if done_val else "cvc-card"
         meta_parts = []
@@ -1730,15 +1787,15 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list):
             f"{meta_html}{badge}</div>",
             unsafe_allow_html=True,
         )
-        col_t, col_d = st.columns(2)
-        with col_t:
-            lbl = "↩️ Bỏ xong" if done_val else "✅ Xong"
-            if st.button(lbl, key=f"{key_prefix}_cvt_{i}", use_container_width=True):
-                st.session_state[cv_key][i]["done"] = not done_val
-                st.rerun()
-        with col_d:
-            if st.button("🗑️ Xóa", key=f"{key_prefix}_cv_del_{i}", use_container_width=True):
-                _xoa = i
+        if not done_val:
+            col_t, col_d = st.columns(2)
+            with col_t:
+                if st.button("✅ Xong", key=f"{key_prefix}_cvt_{i}", use_container_width=True):
+                    st.session_state[cv_key][i]["done"] = True
+                    st.rerun()
+            with col_d:
+                if st.button("🗑️ Xóa", key=f"{key_prefix}_cv_del_{i}", use_container_width=True):
+                    _xoa = i
 
     if _xoa is not None:
         st.session_state[cv_key].pop(_xoa)
@@ -1767,7 +1824,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list):
         if ten_val:
             st.session_state[cv_key].append({
                 "ten":      ten_val,
-                "nguoi":    cv_nv if cv_nv != "-- Chọn nhân viên --" else "",
+                "nhan_vien": cv_nv if cv_nv != "-- Chọn nhân viên --" else "",
                 "deadline": str(cv_dl),
                 "done":     False,
             })
@@ -2198,6 +2255,7 @@ def giao_dien_admin():
                     f"✅ Đã tạo task #{id_moi} thành công! "
                     f"Công ty: **{adm_cong_ty}** | CS: **{adm_cong_so}** | Giao: **{adm_nguoi_giao}**"
                 )
+                lay_danh_sach_cong_viec.clear()
                 st.rerun()
 
     # ══════════════════════════════════════════════
@@ -2658,6 +2716,8 @@ def giao_dien_nhan_vien():
                         f"🎉 Đã tạo task **{nv_ten_task}** thành công! "
                         f"Chuyển sang tab **Công Việc Của Tôi** để xem."
                     )
+                    lay_danh_sach_cong_viec.clear()
+                    st.session_state.pop("_last_nv_load", None)
                     st.rerun()
 
 
