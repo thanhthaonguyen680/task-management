@@ -1984,28 +1984,43 @@ def giao_dien_admin():
             .nv-summary-card {
                 background: white;
                 border: 1px solid #e5e7eb;
-                border-radius: 12px;
-                padding: 14px 18px;
-                margin-bottom: 10px;
+                border-radius: 12px 12px 0 0;
+                padding: 14px 16px 12px 16px;
+                margin-bottom: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            .nv-top-row {
                 display: flex;
                 align-items: center;
-                gap: 16px;
+                gap: 12px;
             }
             .nv-avatar {
-                width: 42px; height: 42px;
+                width: 40px; height: 40px;
                 border-radius: 50%;
                 background: linear-gradient(135deg, #7c3aed, #a78bfa);
                 display: flex; align-items: center; justify-content: center;
-                font-size: 1.2rem; color: white; font-weight: 700;
+                font-size: 1.1rem; color: white; font-weight: 700;
                 flex-shrink: 0;
             }
-            .nv-info { flex: 1; }
             .nv-name { font-weight: 700; font-size: 0.97rem; color: #1e1b4b; }
-            .nv-meta { font-size: 0.8rem; color: #6b7280; margin-top: 2px; }
-            .nv-badge {
-                background: #ede9fe; color: #7c3aed;
-                border-radius: 99px; padding: 3px 10px;
-                font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+            .nv-meta { font-size: 0.78rem; color: #6b7280; }
+            .nv-badge-row {
+                background: #f5f3ff;
+                border: 1px solid #e5e7eb;
+                border-top: none;
+                border-radius: 0 0 12px 12px;
+                padding: 6px 16px;
+                font-size: 0.78rem;
+                color: #7c3aed;
+                font-weight: 600;
+                margin-bottom: 8px;
+            }
+            /* Nút đóng trang chi tiết */
+            button[kind="secondary"][data-testid*="adm_close_nv"] {
+                border-color: #ef4444 !important;
+                color: #ef4444 !important;
             }
             </style>
             """, unsafe_allow_html=True)
@@ -2032,111 +2047,150 @@ def giao_dien_admin():
             st.markdown(f"**Tổng cộng: {len(df_nv_users)} nhân viên**")
             st.markdown("---")
 
-            # Chọn nhân viên để xem chi tiết
-            ds_ten_nv = df_nv_users["HoTen"].tolist()
-            sel_nv = st.selectbox(
-                "🔍 Chọn nhân viên để xem task:",
-                options=["-- Chọn --"] + ds_ten_nv,
-                key="adm_sel_nv",
-            )
+            _ICON_TT_NV = {
+                "Đang Kiểm Tra": "🔵", "Đã Phê Duyệt": "🟢",
+                "Đã Báo Giá": "🟠", "Có Đơn": "🟣", "Chờ Giao": "🟡",
+                "Đã Hoàn Thành - Giao Máy": "✅", "Đã Xuất Hóa Đơn": "⬜",
+                "Bảo Hành - Trả Lại": "🔴",
+                "Chờ Làm": "🔴", "Đang Làm": "🟡", "Hoàn Thành": "🟢",
+            }
 
-            # ── Danh sách card nhân viên ───────────────────────────────
-            for _, u in df_nv_users.iterrows():
-                ho_ten  = u["HoTen"]
-                uname   = u["Username"]
-                ns      = u["NgaySinh"]
-                ngay_tao = u.get("NgayTao", "")[:10]
-                avatar_char = (ho_ten[0] if ho_ten else "?").upper()
-                tc, ts = _dem_task_cua(ho_ten)
-                badge_txt = f"📋 {tc} công việc &nbsp;|&nbsp; 🔹 {ts} việc con"
-                is_selected = (sel_nv == ho_ten)
-                border_style = "border: 2px solid #7c3aed;" if is_selected else ""
+            # ── TRANG CHI TIẾT TASK CỦA NHÂN VIÊN ─────────────────────
+            adm_xem_nv = st.session_state.get("adm_xem_nv")
 
-                st.markdown(f"""
-                <div class="nv-summary-card" style="{border_style}">
-                    <div class="nv-avatar">{avatar_char}</div>
-                    <div class="nv-info">
-                        <div class="nv-name">{ho_ten}</div>
-                        <div class="nv-meta">@{uname} &nbsp;·&nbsp; 🎂 {ns or '—'} &nbsp;·&nbsp; 📅 Tham gia {ngay_tao}</div>
-                    </div>
-                    <div class="nv-badge">{badge_txt}</div>
-                </div>
-                """, unsafe_allow_html=True)
+            if adm_xem_nv:
+                # Nút đóng
+                col_close, col_title = st.columns([1, 5])
+                with col_close:
+                    if st.button("✕ Đóng", key="adm_close_nv", use_container_width=True):
+                        st.session_state.pop("adm_xem_nv", None)
+                        st.rerun()
+                with col_title:
+                    tc_d, ts_d = _dem_task_cua(adm_xem_nv)
+                    st.markdown(f"### 👤 {adm_xem_nv} &nbsp;·&nbsp; 📋 {tc_d} công việc chính &nbsp;·&nbsp; 🔹 {ts_d} việc con")
 
-            # ── Chi tiết task khi chọn nhân viên ──────────────────────
-            if sel_nv != "-- Chọn --":
-                st.markdown(f"---\n#### 📋 Công việc của **{sel_nv}**")
+                st.divider()
 
-                # Task chính
-                df_task_chinh = df_all_tasks[df_all_tasks["Nhân Viên"] == sel_nv].copy() if not df_all_tasks.empty else pd.DataFrame()
+                # Nút làm mới
+                if st.button("🔄 Làm mới dữ liệu", key="adm_nv_detail_refresh"):
+                    lay_danh_sach_cong_viec.clear()
+                    st.rerun()
 
-                # Subtask (trong công việc con của các task khác)
-                ds_subtask_rows = []
+                ds_tt_adm = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
+
+                # ── Task chính ──────────────────────────────────────────
+                df_task_chinh = df_all_tasks[
+                    df_all_tasks["Nhân Viên"].fillna("").str.strip().str.lower() == adm_xem_nv.lower()
+                ].copy() if not df_all_tasks.empty else pd.DataFrame()
+
+                # Lọc theo Công Ty
+                ds_ct_filter = df_task_chinh["Công Ty"].dropna().unique().tolist() if not df_task_chinh.empty else []
+                if ds_ct_filter:
+                    loc_ct = st.multiselect(
+                        "🏢 Lọc theo Công Ty",
+                        options=ds_ct_filter,
+                        placeholder="Hiển thị tất cả...",
+                        key="adm_nv_loc_ct",
+                    )
+                    if loc_ct:
+                        df_task_chinh = df_task_chinh[df_task_chinh["Công Ty"].isin(loc_ct)]
+
+                # ── Subtask được giao ───────────────────────────────────
+                tasks_co_subtask = []
                 if not df_all_tasks.empty:
                     for _, row in df_all_tasks.iterrows():
+                        raw = row.get("Công Việc Con", "") or "[]"
                         try:
-                            ds_cv = json.loads(row.get("Công Việc Con", "") or "[]")
+                            ds_cv = json.loads(raw)
                         except Exception:
                             ds_cv = []
-                        for cv in ds_cv:
-                            if isinstance(cv, dict):
-                                nv_cv = cv.get("nhan_vien", cv.get("Nhân Viên", ""))
-                                if nv_cv == sel_nv:
-                                    ds_subtask_rows.append({
-                                        "ID Task Cha": row.get("ID", ""),
-                                        "Tên Task Cha": row.get("Tên Công Việc", ""),
-                                        "Công Ty": row.get("Công Ty", ""),
-                                        "Tên Việc Con": cv.get("ten", cv.get("Tên", "—")),
-                                        "Deadline": cv.get("deadline", cv.get("Deadline", "—")),
-                                        "Trạng Thái": "✅ Xong" if cv.get("done") else "⏳ Chưa xong",
-                                    })
+                        my_subtasks = [
+                            (i, cv) for i, cv in enumerate(ds_cv)
+                            if isinstance(cv, dict)
+                            and (cv.get("nguoi") or cv.get("nhan_vien") or "").strip().lower() == adm_xem_nv.lower()
+                        ]
+                        if my_subtasks:
+                            tasks_co_subtask.append((row.to_dict(), ds_cv, my_subtasks))
 
-                # ── Tab chính / subtask ─────────────────────────────
-                tab_tc, tab_st = st.tabs([
+                # ── Tabs task chính / việc con ──────────────────────────
+                tab_tc_d, tab_st_d = st.tabs([
                     f"📌 Công Việc Chính ({len(df_task_chinh)})",
-                    f"🔹 Việc Con ({len(ds_subtask_rows)})",
+                    f"🔹 Việc Con ({sum(len(m) for _, _, m in tasks_co_subtask)})",
                 ])
 
-                _ICON_TT = {
-                    "Đang Kiểm Tra": "🔵", "Đã Phê Duyệt": "🟢",
-                    "Đã Báo Giá": "🟠", "Có Đơn": "🟣", "Chờ Giao": "🟡",
-                    "Đã Hoàn Thành - Giao Máy": "✅", "Đã Xuất Hóa Đơn": "⬜",
-                    "Bảo Hành - Trả Lại": "🔴",
-                    "Chờ Làm": "🔴", "Đang Làm": "🟡", "Hoàn Thành": "🟢",
-                }
-
-                with tab_tc:
+                with tab_tc_d:
                     if df_task_chinh.empty:
-                        st.info("Nhân viên này chưa được giao task chính nào.")
+                        st.info("Nhân viên này chưa được giao công việc chính nào.")
                     else:
-                        for _, t in df_task_chinh.iterrows():
-                            tt = t.get("Trạng Thái", "")
-                            icon_tt = _ICON_TT.get(tt, "⚪")
+                        for _, hang in df_task_chinh.iterrows():
+                            task_id    = hang["ID"]
+                            trang_thai = hang.get("Trạng Thái", "Chờ Làm")
+                            icon_tt    = _ICON_TT_NV.get(trang_thai, "⚪")
+                            ten_cv     = hang.get("Tên Công Việc", "")
+                            cong_ty    = hang.get("Công Ty", "")
                             with st.expander(
-                                f"{icon_tt} **#{t.get('ID','')}** — {t.get('Tên Công Việc','—')}  |  {t.get('Công Ty','')}",
-                                expanded=False,
+                                f"{icon_tt} [{cong_ty}]  Task #{task_id}: {ten_cv}  —  {trang_thai}",
+                                expanded=(trang_thai in ["Chờ Làm", "Đang Làm"])
                             ):
-                                col_a, col_b, col_c = st.columns(3)
-                                col_a.markdown(f"**Công Số:** `{t.get('Công Số','—')}`")
-                                col_b.markdown(f"**Hạn:** `{t.get('Hạn Hoàn Thành','—')}`")
-                                col_c.markdown(f"**Trạng Thái:** {icon_tt} {tt}")
-                                if t.get("Mô Tả"):
-                                    st.markdown(f"📝 {t.get('Mô Tả','')}")
-                                # Checklist mini
-                                try:
-                                    cl = json.loads(t.get("Checklist","") or "[]")
-                                except Exception:
-                                    cl = []
-                                if cl:
-                                    xong = sum(1 for c in cl if isinstance(c,dict) and c.get("done"))
-                                    st.markdown(f"☑️ Checklist: **{xong}/{len(cl)}** mục hoàn thành")
+                                _fragment_chi_tiet_task(hang.to_dict(), ds_tt_adm)
 
-                with tab_st:
-                    if not ds_subtask_rows:
+                with tab_st_d:
+                    if not tasks_co_subtask:
                         st.info("Nhân viên này chưa được giao công việc con nào.")
                     else:
-                        df_st = pd.DataFrame(ds_subtask_rows)
-                        st.dataframe(df_st, use_container_width=True, hide_index=True)
+                        st.caption(f"**{sum(len(m) for _,_,m in tasks_co_subtask)} việc con** trong **{len(tasks_co_subtask)} task**")
+                        for hang_dict, ds_cv_full, my_subtasks in tasks_co_subtask:
+                            tid    = hang_dict["ID"]
+                            tt     = hang_dict.get("Trạng Thái", "")
+                            icon   = _ICON_TT_NV.get(tt, "⚪")
+                            cty    = hang_dict.get("Công Ty", "")
+                            ten    = hang_dict.get("Tên Công Việc", "")
+                            nv_chu = hang_dict.get("Nhân Viên", "")
+                            dl     = hang_dict.get("Hạn Hoàn Thành", "") or hang_dict.get("Deadline", "")
+                            mo_ta  = hang_dict.get("Mô Tả", "") or ""
+                            all_done = all(cv.get("done", False) for _, cv in my_subtasks)
+                            badge    = " ✅" if all_done else ""
+                            with st.expander(
+                                f"{icon} [{cty}] Task #{tid}: {ten}  —  {tt}{badge}",
+                                expanded=not all_done
+                            ):
+                                st.markdown(f"**🏢 Công Ty:** {cty}  |  **👤** {nv_chu}  |  **📅** {dl}")
+                                if mo_ta:
+                                    st.markdown(f"**📝 Mô Tả:** {mo_ta}")
+                                for idx_cv, cv in my_subtasks:
+                                    ten_cv_sub = cv.get("ten", cv.get("Tên", "—"))
+                                    done_sub   = cv.get("done", False)
+                                    dl_sub     = cv.get("deadline", cv.get("Deadline", "—"))
+                                    if done_sub:
+                                        st.markdown(f"✅ ~~{ten_cv_sub}~~ &nbsp; `{dl_sub}`")
+                                    else:
+                                        st.markdown(f"⏳ **{ten_cv_sub}** &nbsp; `{dl_sub}`")
+
+            else:
+                # ── DANH SÁCH CARD NHÂN VIÊN ───────────────────────────
+                for _, u in df_nv_users.iterrows():
+                    ho_ten_u  = u["HoTen"]
+                    uname     = u["Username"]
+                    ns        = u["NgaySinh"]
+                    ngay_tao  = u.get("NgayTao", "")[:10]
+                    avatar_char = (ho_ten_u[0] if ho_ten_u else "?").upper()
+                    tc, ts = _dem_task_cua(ho_ten_u)
+
+                    st.markdown(f"""
+                    <div class="nv-summary-card">
+                        <div class="nv-top-row">
+                            <div class="nv-avatar">{avatar_char}</div>
+                            <div class="nv-name">{ho_ten_u}</div>
+                        </div>
+                        <div class="nv-meta">@{uname} &nbsp;·&nbsp; 🎂 {ns or '—'} &nbsp;·&nbsp; 📅 Tham gia {ngay_tao}</div>
+                    </div>
+                    <div class="nv-badge-row">📋 {tc} công việc chính &nbsp;|&nbsp; 🔹 {ts} việc con</div>
+                    """, unsafe_allow_html=True)
+                    if st.button("👁️ Xem chi tiết", key=f"adm_xem_{ho_ten_u}", use_container_width=True):
+                        lay_danh_sach_cong_viec.clear()
+                        st.session_state["adm_xem_nv"] = ho_ten_u
+                        st.rerun()
+                    st.markdown("<div style='margin-bottom:6px'></div>", unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════
     # TAB 3 — TẠO TASK MỚI
@@ -2297,15 +2351,14 @@ def giao_dien_admin():
                 "Chờ Làm": "🔴", "Đang Làm": "🟡", "Hoàn Thành": "🟢",
             }
 
-            # Hàng 1: Tổng + các KPI
+            # KPI cards: 2 cột để hiển thị đẹp trên mobile
             kpi_items = [("📋 TỔNG TASK", len(df))] + [
                 (f"{_ICON_KPI.get(tt, '⚪')} {tt.upper()}", len(df[df["Trạng Thái"] == tt]))
                 for tt in ds_tt_sorted
             ]
-            # Chia thành các nhóm 4 cột
-            for row_start in range(0, len(kpi_items), 4):
-                chunk = kpi_items[row_start:row_start + 4]
-                cols_kpi = st.columns(len(chunk))
+            for row_start in range(0, len(kpi_items), 2):
+                chunk = kpi_items[row_start:row_start + 2]
+                cols_kpi = st.columns(2)
                 for col_kpi, (label, val) in zip(cols_kpi, chunk):
                     col_kpi.metric(label, val)
 
@@ -2318,7 +2371,8 @@ def giao_dien_admin():
                 loc_trang_thai = st.multiselect(
                     "Lọc theo trạng thái",
                     options=all_tt,
-                    default=all_tt,
+                    default=[],
+                    placeholder="Hiển thị tất cả...",
                     key="adm_loc_tt",
                 )
             with col_f2:
@@ -2329,7 +2383,7 @@ def giao_dien_admin():
                 loc_cong_ty  = st.multiselect("🏢 Lọc theo Công Ty", options=danh_sach_ct, key="adm_loc_ct")
 
             df_hien_thi = df.copy()
-            if loc_trang_thai:
+            if loc_trang_thai:  # rỗng = hiển thị tất cả
                 df_hien_thi = df_hien_thi[df_hien_thi["Trạng Thái"].isin(loc_trang_thai)]
             if loc_nhan_vien:
                 df_hien_thi = df_hien_thi[df_hien_thi["Nhân Viên"].isin(loc_nhan_vien)]
