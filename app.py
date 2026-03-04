@@ -1314,66 +1314,68 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     if _anh_key not in st.session_state:
         st.session_state[_anh_key] = doc_danh_sach_anh(str(hang.get("Link Ảnh", "")))
 
-    # ── Hàng trên: thông tin chính + chọn trạng thái ─────────
-    col_left, col_right = st.columns([3, 2])
+    # ── Thông tin chính + trạng thái (full width, không chia cột) ──────────
+    # Trạng thái lên đầu
+    st.markdown(
+        f'<div style="margin:0 0 6px 0">'
+        f'<span class="badge-trang-thai" style="color:{tt_color};background:{tt_bg};border-color:{tt_color}40;">'
+        f'{tt_hien_thi}</span></div>',
+        unsafe_allow_html=True,
+    )
+    idx_hien_tai = ds_trang_thai.index(trang_thai) if trang_thai in ds_trang_thai else 0
+    tt_moi = st.selectbox(
+        "Chọn trạng thái",
+        options=ds_trang_thai,
+        index=idx_hien_tai,
+        key=f"tt_select_{task_id}",
+        label_visibility="collapsed",
+    )
+    if tt_moi != trang_thai:
+        with st.spinner("Đang lưu..."):
+            cap_nhat_trang_thai(task_id, tt_moi)
+            lay_danh_sach_cong_viec.clear()
 
-    with col_left:
-        st.markdown(
-            f"🏢 **Công ty:** `{hang.get('Công Ty', '')}` &nbsp;&nbsp; "
-            f"📄 **Công số:** `{hang.get('Công Số', '')}` &nbsp;&nbsp; "
-            f"📅 **Năm:** `{hang.get('Năm', '')}`"
-        )
-        if hang.get("Người Phê Duyệt"):
-            st.markdown(f"✅ **Người phê duyệt:** `{hang.get('Người Phê Duyệt', '')}`")
-        st.markdown(f"📅 **Hạn hoàn thành:** `{hang.get('Hạn Hoàn Thành', '')}`")
-        st.markdown(f"🕐 **Ngày tạo:** `{hang.get('Ngày Tạo', '')}`")
+    st.markdown("---")
+    # Công ty, Công số, Năm, Hạn, Ngày tạo
+    st.markdown(f"🏢 **Công ty:** `{hang.get('Công Ty', '')}`")
+    st.markdown(
+        f"📄 **Công số:** `{hang.get('Công Số', '')}` &nbsp;·&nbsp; "
+        f"📅 **Năm:** `{hang.get('Năm', '')}`"
+    )
+    if hang.get("Người Phê Duyệt"):
+        st.markdown(f"✅ **Người phê duyệt:** `{hang.get('Người Phê Duyệt', '')}`")
+    st.markdown(f"📅 **Hạn hoàn thành:** `{hang.get('Hạn Hoàn Thành', '')}`")
+    st.markdown(f"🕐 **Ngày tạo:** `{hang.get('Ngày Tạo', '')}`")
 
-        # ── Thông số kỹ thuật / thương mại ───────────────────
-        _thong_so = {
-            "⚙️ Công Đoạn":    hang.get("Công Đoạn", ""),
-            "🔧 Loại Máy":     hang.get("Loại Máy", ""),
-            "🛠️ Tình Trạng":   hang.get("Tình Trạng", ""),
-            "⚡ Công Suất":    hang.get("Công Suất", ""),
-            "🔩 Số Cực":       hang.get("Số Cực", ""),
-            "🏷️ Mã Số":        hang.get("Mã Số", ""),
-            "📄 Số PO Nội Bộ": hang.get("Số PO Nội Bộ", ""),
-            "📋 Số PO KH/HĐ":  hang.get("Số PO KH/HĐ", ""),
-            "💰 Số Báo Giá":   hang.get("Số Báo Giá", ""),
-        }
-        _co_du_lieu = {k: v for k, v in _thong_so.items() if v and str(v).strip()}
-        if _co_du_lieu:
-            st.markdown("---")
-            _items = list(_co_du_lieu.items())
-            for _i in range(0, len(_items), 3):
-                _row_cols = st.columns(3)
-                for _j, (_label, _val) in enumerate(_items[_i:_i+3]):
-                    _row_cols[_j].markdown(f"**{_label}**<br>`{_val}`", unsafe_allow_html=True)
+    # ── Thông số kỹ thuật / thương mại ──────────────────────────────────────
+    _thong_so = {
+        "⚙️ Công Đoạn":    hang.get("Công Đoạn", ""),
+        "🔧 Loại Máy":     hang.get("Loại Máy", ""),
+        "🛠️ Tình Trạng":   hang.get("Tình Trạng", ""),
+        "⚡ Công Suất":    hang.get("Công Suất", ""),
+        "🔩 Số Cực":       hang.get("Số Cực", ""),
+        "🏷️ Mã Số":        hang.get("Mã Số", ""),
+        "📄 Số PO Nội Bộ": hang.get("Số PO Nội Bộ", ""),
+        "📋 Số PO KH/HĐ":  hang.get("Số PO KH/HĐ", ""),
+        "💰 Số Báo Giá":   hang.get("Số Báo Giá", ""),
+    }
+    _co_du_lieu = {k: v for k, v in _thong_so.items() if v and str(v).strip()}
+    if _co_du_lieu:
+        st.markdown("---")
+        _ts_html = "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin:4px 0;'>"
+        for _label, _val in _co_du_lieu.items():
+            _ts_html += (
+                f"<div style='min-width:0;'>"
+                f"<div style='font-size:0.75rem;color:#6b7280;font-weight:600;margin-bottom:2px;'>{_label}</div>"
+                f"<div style='font-size:0.92rem;color:#09ab3b;font-weight:700;word-break:break-word;font-family:monospace;'>{_val}</div>"
+                f"</div>"
+            )
+        _ts_html += "</div>"
+        st.markdown(_ts_html, unsafe_allow_html=True)
 
-        if hang.get("Mô Tả"):
-            with st.expander("📝 Xem mô tả chi tiết"):
-                st.write(hang.get("Mô Tả", ""))
-
-    with col_right:
-        # Badge màu trạng thái hiện tại
-        st.markdown(
-            f'<div style="margin-bottom:8px">'
-            f'<span class="badge-trang-thai" style="color:{tt_color};background:{tt_bg};border-color:{tt_color}40;">'
-            f'{tt_hien_thi}</span></div>',
-            unsafe_allow_html=True,
-        )
-        # Selectbox đổi trạng thái
-        idx_hien_tai = ds_trang_thai.index(trang_thai) if trang_thai in ds_trang_thai else 0
-        tt_moi = st.selectbox(
-            "Chọn trạng thái",
-            options=ds_trang_thai,
-            index=idx_hien_tai,
-            key=f"tt_select_{task_id}",
-            label_visibility="collapsed",
-        )
-        if tt_moi != trang_thai:
-            with st.spinner("Đang lưu..."):
-                cap_nhat_trang_thai(task_id, tt_moi)
-                lay_danh_sach_cong_viec.clear()
+    if hang.get("Mô Tả"):
+        with st.expander("📝 Xem mô tả chi tiết"):
+            st.write(hang.get("Mô Tả", ""))
 
     st.divider()
 
@@ -1682,7 +1684,7 @@ div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
 
 
 @st.fragment
-def _fragment_checklist(key_prefix: str):
+def _fragment_checklist(key_prefix: str, show_done: bool = True):
     cl_key   = f"{key_prefix}_checklist"
     cl_inp_v = f"{key_prefix}_cl_inp_v"
     if cl_key   not in st.session_state: st.session_state[cl_key]   = []
@@ -1718,13 +1720,18 @@ def _fragment_checklist(key_prefix: str):
         )
         # Chỉ hiện nút khi chưa hoàn thành
         if not done_val:
-            col_t, col_d = st.columns(2)
-            with col_t:
-                if st.button("✅ Xong", key=f"{key_prefix}_ck_{i}",
-                             use_container_width=True):
-                    st.session_state[cl_key][i]["done"] = True
-                    st.rerun()
-            with col_d:
+            if show_done:
+                col_t, col_d = st.columns(2)
+                with col_t:
+                    if st.button("✅ Xong", key=f"{key_prefix}_ck_{i}",
+                                 use_container_width=True):
+                        st.session_state[cl_key][i]["done"] = True
+                        st.rerun()
+                with col_d:
+                    if st.button("🗑️ Xóa", key=f"{key_prefix}_cl_del_{i}",
+                                 use_container_width=True):
+                        _xoa = i
+            else:
                 if st.button("🗑️ Xóa", key=f"{key_prefix}_cl_del_{i}",
                              use_container_width=True):
                     _xoa = i
@@ -1754,7 +1761,7 @@ def _fragment_checklist(key_prefix: str):
 
 
 @st.fragment
-def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list):
+def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool = True):
     cv_key   = f"{key_prefix}_cong_viec_con"
     cv_inp_v = f"{key_prefix}_cv_inp_v"
     if cv_key   not in st.session_state: st.session_state[cv_key]   = []
@@ -1788,12 +1795,16 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list):
             unsafe_allow_html=True,
         )
         if not done_val:
-            col_t, col_d = st.columns(2)
-            with col_t:
-                if st.button("✅ Xong", key=f"{key_prefix}_cvt_{i}", use_container_width=True):
-                    st.session_state[cv_key][i]["done"] = True
-                    st.rerun()
-            with col_d:
+            if show_done:
+                col_t, col_d = st.columns(2)
+                with col_t:
+                    if st.button("✅ Xong", key=f"{key_prefix}_cvt_{i}", use_container_width=True):
+                        st.session_state[cv_key][i]["done"] = True
+                        st.rerun()
+                with col_d:
+                    if st.button("🗑️ Xóa", key=f"{key_prefix}_cv_del_{i}", use_container_width=True):
+                        _xoa = i
+            else:
                 if st.button("🗑️ Xóa", key=f"{key_prefix}_cv_del_{i}", use_container_width=True):
                     _xoa = i
 
@@ -2213,9 +2224,9 @@ def giao_dien_admin():
         adm_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai, key="adm_trang_thai")
 
         st.divider()
-        _fragment_checklist(_ADM_PREFIX)
+        _fragment_checklist(_ADM_PREFIX, show_done=False)
         st.divider()
-        _fragment_cong_viec_con(_ADM_PREFIX, ds_nhan_vien)
+        _fragment_cong_viec_con(_ADM_PREFIX, ds_nhan_vien, show_done=False)
         st.divider()
 
         if st.button("✅ Tạo Task", use_container_width=True, type="primary", key="adm_submit_task"):
@@ -2672,10 +2683,10 @@ def giao_dien_nhan_vien():
             nv_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai_nv, key=f"{_nv_prefix}_tt")
 
             st.divider()
-            _fragment_checklist(_nv_prefix)
+            _fragment_checklist(_nv_prefix, show_done=False)
 
             st.divider()
-            _fragment_cong_viec_con(_nv_prefix, ds_nv_nv)
+            _fragment_cong_viec_con(_nv_prefix, ds_nv_nv, show_done=False)
 
             st.divider()
 
@@ -2908,29 +2919,47 @@ def inject_css():
         display: none !important;
     }
 
-    /* Nút đăng xuất nhỏ gọn trên header */
+    /* Logout button bên trong header HTML */
+    .header-logout-btn {
+        background: rgba(255,255,255,0.15);
+        color: white;
+        border: 1.5px solid rgba(255,255,255,0.45);
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.82rem;
+        padding: 0.32rem 0.85rem;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+        font-family: inherit;
+    }
+    .header-logout-btn:hover {
+        background: rgba(239,68,68,0.35);
+        border-color: rgba(239,68,68,0.7);
+    }
+
+    /* ===== NÚT ĐĂNG XUẤT (st.button) ===== */
     .logout-btn-wrap {
         display: flex;
         align-items: center;
+        justify-content: flex-end;
         height: 100%;
         padding-top: 0.35rem;
     }
     .logout-btn-wrap .stButton > button {
-        background: rgba(239,68,68,0.15) !important;
+        background: rgba(239,68,68,0.12) !important;
         color: #ef4444 !important;
         border: 1.5px solid rgba(239,68,68,0.4) !important;
         border-radius: 8px !important;
-        font-weight: 600 !important;
-        font-size: 0.85rem !important;
-        padding: 0.35rem 0.85rem !important;
-        box-shadow: none !important;
-        white-space: nowrap !important;
+        font-size: 1.1rem !important;
+        padding: 0.3rem 0.7rem !important;
+        width: 100% !important;
         transition: all 0.2s ease !important;
     }
     .logout-btn-wrap .stButton > button:hover {
         background: rgba(239,68,68,0.3) !important;
-        border-color: rgba(239,68,68,0.7) !important;
-        transform: none !important;
+        border-color: rgba(239,68,68,0.75) !important;
     }
 
     /* Padding nội dung chính bình thường */
@@ -3127,32 +3156,40 @@ def inject_css():
 
         /* Main content full width, padding bottom cho bottom nav */
         .main .block-container {
-            padding: 0.8rem 0.8rem 90px 0.8rem !important;
+            padding: 0.3rem 0.8rem 90px 0.8rem !important;
             max-width: 100% !important;
             margin-left: 0 !important;
+            margin-top: 0 !important;
+        }
+        section[data-testid="stMain"] > div:first-child {
+            padding-top: 0 !important;
         }
 
-        /* --- Header nhỏ lại --- */
+        /* --- Header nhỏ lại & stack dọc --- */
         .main-header {
-            padding: 0.55rem 0.9rem !important;
+            padding: 0.5rem 0.8rem !important;
             border-radius: 10px !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 0.2rem !important;
         }
         .main-header h1 {
-            font-size: 0.92rem !important;
+            font-size: 0.88rem !important;
+            white-space: normal !important;
+        }
+        .main-header-user {
+            font-size: 0.8rem !important;
+            white-space: normal !important;
+            word-break: break-word !important;
         }
         .main-header p {
             font-size: 0.75rem !important;
         }
 
-        /* --- Columns tự stack dọc --- */
-        [data-testid="stHorizontalBlock"] {
-            flex-direction: column !important;
-            gap: 0 !important;
-        }
-        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        /* --- Form container full width --- */
+        [data-testid="stForm"] {
             width: 100% !important;
-            flex: 1 1 100% !important;
-            min-width: 100% !important;
+            padding: 0 !important;
         }
 
         /* --- Metric cards full width --- */
@@ -3324,19 +3361,19 @@ def main():
     vai_tro   = st.session_state.get("vai_tro", "nhan_vien")
     ho_ten    = st.session_state.get("ho_ten", "")
 
-    # ── Header + nút đăng xuất góc phải ───────────────────────────────────
+    # ── Header + nút đăng xuất ──────────────────────────────────────────────
     role_badge = "🛡️ Admin" if vai_tro == "admin" else "👤"
-    col_header, col_logout = st.columns([5, 1])
-    with col_header:
+    col_hdr, col_out = st.columns([5, 1])
+    with col_hdr:
         st.markdown(f"""
             <div class="main-header">
                 <h1>📋 Quản Lý Công Việc</h1>
                 <div class="main-header-user">{role_badge} &nbsp;<b>{ho_ten}</b></div>
             </div>
         """, unsafe_allow_html=True)
-    with col_logout:
+    with col_out:
         st.markdown('<div class="logout-btn-wrap">', unsafe_allow_html=True)
-        if st.button("🚪 Đăng Xuất", key="topbar_logout", use_container_width=True):
+        if st.button("🚪 Đăng xuất", key="topbar_logout", use_container_width=True):
             cookie_mgr.delete("qlcv_uid",    key="del_uid")
             cookie_mgr.delete("qlcv_uname",  key="del_uname")
             cookie_mgr.delete("qlcv_hoten",  key="del_hoten")
