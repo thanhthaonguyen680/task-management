@@ -522,7 +522,8 @@ def lay_danh_sach_cong_viec() -> pd.DataFrame:
         "Nhân Viên", "Trạng Thái", "Ngày Tạo", "Hạn Hoàn Thành",
         "Link Ảnh", "Người Phê Duyệt", "Checklist", "Công Việc Con", "Công Đoạn",
         "Loại Máy", "Tình Trạng",
-        "Công Suất", "Số Cực", "Mã Số", "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá"
+        "Công Suất", "Số Cực", "Mã Số", "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá",
+        "Ngày Kết Thúc"
     ]
     _N = len(_HEADERS)
     _COT_TRONG = _HEADERS[:11]  # các cột hiển thị chính
@@ -575,7 +576,8 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
                    checklist: list = None, cong_viec_con: list = None,
                    cong_doan: str = "", loai_may: str = "", tinh_trang: str = "",
                    cong_suat: str = "", so_cuc: str = "", ma_so: str = "",
-                   so_po_noi_bo: str = "", so_po_kh: str = "", so_bao_gia: str = "") -> int:
+                   so_po_noi_bo: str = "", so_po_kh: str = "", so_bao_gia: str = "",
+                   ngay_ket_thuc: str = "") -> int:
     """
     Thêm một công việc mới vào cuối sheet.
 
@@ -617,13 +619,14 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
         so_po_noi_bo,                                         # U: Số PO Nội Bộ
         so_po_kh,                                             # V: Số PO KH/HĐ
         so_bao_gia,                                           # W: Số Báo Giá
+        ngay_ket_thuc,                                        # X: Ngày Kết Thúc
     ]
 
     # Tự tính row tiếp theo dựa trên số hàng thực tế — tránh gspread append_row
     # bị lỗi "end of table" detection khi số cột không đồng nhất giữa rows cũ và mới
     _so_hang_hien_co = len(sheet.col_values(1))  # header + data rows
     _dong_moi = _so_hang_hien_co + 1
-    sheet.update(f"A{_dong_moi}:W{_dong_moi}", [hang_moi])
+    sheet.update(f"A{_dong_moi}:X{_dong_moi}", [hang_moi])
     # Clear cả lay_sheet cache để lần đọc tiếp theo dùng connection sạch
     lay_sheet.clear()
     _lay_bang_tinh.clear()
@@ -634,17 +637,22 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
 def cap_nhat_trang_thai(task_id: int, trang_thai_moi: str):
     """
     Cập nhật trạng thái (Status) của công việc theo ID.
-    
-    Args:
-        task_id: ID công việc cần cập nhật
-        trang_thai_moi: Trạng thái mới ('Chờ Làm', 'Đang Làm', hoặc 'Hoàn Thành')
     """
     sheet = lay_sheet()
-    # Tìm ô chứa ID cần tìm (tìm ở cột A)
     o_tim = sheet.find(str(task_id), in_column=1)
     if o_tim:
-        # Cột Status là cột H (8): ID|Cong_Ty|Cong_So|Nam|Task_Name|Description|Assigned_To|Status
         sheet.update_cell(o_tim.row, 8, trang_thai_moi)
+        lay_danh_sach_cong_viec.clear()
+
+
+def cap_nhat_ngay_ket_thuc(task_id: int, ngay_ket_thuc: str):
+    """
+    Cập nhật Ngày Kết Thúc (cột X, cột 24) của công việc theo ID.
+    """
+    sheet = lay_sheet()
+    o_tim = sheet.find(str(task_id), in_column=1)
+    if o_tim:
+        sheet.update_cell(o_tim.row, 24, ngay_ket_thuc)
         lay_danh_sach_cong_viec.clear()
 
 
@@ -1346,6 +1354,25 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         st.markdown(f"✅ **Người phê duyệt:** `{hang.get('Người Phê Duyệt', '')}`")
     st.markdown(f"📅 **Hạn hoàn thành:** `{hang.get('Hạn Hoàn Thành', '')}`")
     st.markdown(f"🕐 **Ngày tạo:** `{hang.get('Ngày Tạo', '')}`")
+
+    # ── Ngày Kết Thúc (nhân viên tự điền) ───────────────────────────────────
+    _nkt_hien_tai = hang.get("Ngày Kết Thúc", "") or ""
+    try:
+        from datetime import date as _date
+        _nkt_default = _date.fromisoformat(_nkt_hien_tai.strip()) if _nkt_hien_tai.strip() else None
+    except Exception:
+        _nkt_default = None
+
+    _nkt_val = st.date_input(
+        "📅 Ngày kết thúc",
+        value=_nkt_default,
+        format="YYYY-MM-DD",
+        key=f"nkt_{task_id}",
+    )
+    _nkt_str = _nkt_val.strftime("%Y-%m-%d") if _nkt_val else ""
+    if _nkt_str != _nkt_hien_tai.strip():
+        with st.spinner("Đang lưu..."):
+            cap_nhat_ngay_ket_thuc(task_id, _nkt_str)
 
     # ── Thông số kỹ thuật / thương mại ──────────────────────────────────────
     _thong_so = {
@@ -2222,9 +2249,9 @@ def giao_dien_admin():
                 key="adm_phe_duyet",
             )
 
-        col_cs, col_nam = st.columns(2)
-        with col_cs:
-            adm_cong_so = st.text_input("Công Số *", placeholder="Ví dụ: CS-2026-001", key="adm_cong_so")
+        col_tt_top, col_nam = st.columns(2)
+        with col_tt_top:
+            adm_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai, key="adm_trang_thai")
         with col_nam:
             adm_nam = st.text_input("Năm *", value=str(datetime.now().year), key="adm_nam")
 
@@ -2275,7 +2302,6 @@ def giao_dien_admin():
 
         adm_ten_task   = st.text_input("📌 Tên công việc *", placeholder="Ví dụ: Sửa chữa động cơ bơm", key="adm_ten_task")
         adm_mo_ta      = st.text_area("📝 Mô tả chi tiết", placeholder="Nhập mô tả, yêu cầu kỹ thuật...", key="adm_mo_ta")
-        adm_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai, key="adm_trang_thai")
 
         st.divider()
         _fragment_checklist(_ADM_PREFIX, show_done=False)
@@ -2288,15 +2314,13 @@ def giao_dien_admin():
                 st.error("⛔ Vui lòng nhập tên công việc!")
             elif not ds_cong_ty:
                 st.error("⛔ Vui lòng thêm ít nhất một công ty trước!")
-            elif not adm_cong_so.strip():
-                st.error("⛔ Vui lòng nhập Công Số!")
             else:
                 phe_duyet_luu = adm_phe_duyet if adm_phe_duyet != "-- Không chọn --" else ""
                 with st.spinner("Đang lưu lên Google Sheets..."):
                     id_moi = them_cong_viec(
                         adm_ten_task.strip(), adm_mo_ta.strip(), adm_nguoi_giao,
                         adm_deadline.strftime("%Y-%m-%d"),
-                        cong_ty=adm_cong_ty, cong_so=adm_cong_so.strip(),
+                        cong_ty=adm_cong_ty, cong_so="",
                         nam=adm_nam.strip(), trang_thai=adm_trang_thai,
                         nguoi_phe_duyet=phe_duyet_luu,
                         checklist=list(st.session_state.get(f"{_ADM_PREFIX}_checklist", [])),
@@ -2314,11 +2338,11 @@ def giao_dien_admin():
                 st.session_state[f"{_ADM_PREFIX}_checklist"] = []
                 st.session_state[f"{_ADM_PREFIX}_cong_viec_con"] = []
                 # Xoá form fields
-                for _k in ["adm_ten_task", "adm_mo_ta", "adm_cong_so"]:
+                for _k in ["adm_ten_task", "adm_mo_ta"]:
                     st.session_state.pop(_k, None)
                 st.session_state["_adm_task_success"] = (
                     f"✅ Đã tạo task #{id_moi} thành công! "
-                    f"Công ty: **{adm_cong_ty}** | CS: **{adm_cong_so}** | Giao: **{adm_nguoi_giao}**"
+                    f"Công ty: **{adm_cong_ty}** | Giao: **{adm_nguoi_giao}**"
                 )
                 lay_danh_sach_cong_viec.clear()
                 st.rerun()
@@ -2682,9 +2706,9 @@ def giao_dien_nhan_vien():
                     key=f"{_nv_prefix}_pd"
                 )
 
-            col_cs2, col_nam2 = st.columns(2)
-            with col_cs2:
-                nv_cong_so = st.text_input("📋 Công Số", placeholder="Ví dụ: CS-001", key=f"{_nv_prefix}_cs")
+            col_tt2, col_nam2 = st.columns(2)
+            with col_tt2:
+                nv_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai_nv, key=f"{_nv_prefix}_tt")
             with col_nam2:
                 nv_nam = st.text_input("📅 Năm", value=str(datetime.now().year), key=f"{_nv_prefix}_nam")
 
@@ -2734,8 +2758,6 @@ def giao_dien_nhan_vien():
             nv_ten_task = st.text_input("📌 Tên Công Việc *", placeholder="Mô tả ngắn công việc cần làm", key=f"{_nv_prefix}_ten")
             nv_mo_ta    = st.text_area("📝 Mô Tả Chi Tiết", placeholder="Mô tả chi tiết về công việc...", key=f"{_nv_prefix}_mo_ta")
 
-            nv_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai_nv, key=f"{_nv_prefix}_tt")
-
             st.divider()
             _fragment_checklist(_nv_prefix, show_done=False)
 
@@ -2756,7 +2778,7 @@ def giao_dien_nhan_vien():
                             nguoi_duoc_giao = ten_nhan_vien,
                             deadline        = str(nv_deadline),
                             cong_ty         = nv_cong_ty,
-                            cong_so         = nv_cong_so.strip(),
+                            cong_so         = "",
                             nam             = nv_nam.strip(),
                             trang_thai      = nv_trang_thai,
                             nguoi_phe_duyet = phe_duyet_nv,
@@ -2775,7 +2797,7 @@ def giao_dien_nhan_vien():
                     st.session_state[_cl_key] = []
                     st.session_state[_cv_key] = []
                     # Xoá form fields
-                    for _k in [f"{_nv_prefix}_ten", f"{_nv_prefix}_mo_ta", f"{_nv_prefix}_cs"]:
+                    for _k in [f"{_nv_prefix}_ten", f"{_nv_prefix}_mo_ta"]:
                         st.session_state.pop(_k, None)
                     st.session_state["_nv_task_success"] = (
                         f"🎉 Đã tạo task **{nv_ten_task}** thành công! "
