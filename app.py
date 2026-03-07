@@ -523,7 +523,7 @@ def lay_danh_sach_cong_viec() -> pd.DataFrame:
         "Link Ảnh", "Người Phê Duyệt", "Checklist", "Công Việc Con", "Công Đoạn",
         "Loại Máy", "Tình Trạng",
         "Công Suất", "Số Cực", "Mã Số", "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá",
-        "Ngày Kết Thúc"
+        "Ngày Kết Thúc", "Ảnh Đo Lường"
     ]
     _N = len(_HEADERS)
     _COT_TRONG = _HEADERS[:11]  # các cột hiển thị chính
@@ -620,13 +620,13 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
         so_po_kh,                                             # V: Số PO KH/HĐ
         so_bao_gia,                                           # W: Số Báo Giá
         ngay_ket_thuc,                                        # X: Ngày Kết Thúc
+        "{}",                                                 # Y: Ảnh Đo Lường (JSON)
     ]
 
-    # Tự tính row tiếp theo dựa trên số hàng thực tế — tránh gspread append_row
-    # bị lỗi "end of table" detection khi số cột không đồng nhất giữa rows cũ và mới
-    _so_hang_hien_co = len(sheet.col_values(1))  # header + data rows
+    # Tự tính row tiếp theo
+    _so_hang_hien_co = len(sheet.col_values(1))
     _dong_moi = _so_hang_hien_co + 1
-    sheet.update(f"A{_dong_moi}:X{_dong_moi}", [hang_moi])
+    sheet.update(f"A{_dong_moi}:Y{_dong_moi}", [hang_moi])
     # Clear cả lay_sheet cache để lần đọc tiếp theo dùng connection sạch
     lay_sheet.clear()
     _lay_bang_tinh.clear()
@@ -653,6 +653,25 @@ def cap_nhat_ngay_ket_thuc(task_id: int, ngay_ket_thuc: str):
     o_tim = sheet.find(str(task_id), in_column=1)
     if o_tim:
         sheet.update_cell(o_tim.row, 24, ngay_ket_thuc)
+        lay_danh_sach_cong_viec.clear()
+
+
+def doc_anh_do_luong(gia_tri: str) -> dict:
+    """Parse JSON ảnh đo lường từ cột Y. Trả về dict {label: [url,...]}."""
+    if not gia_tri or str(gia_tri).strip() in ("", "{}"):
+        return {}
+    try:
+        return json.loads(str(gia_tri).strip())
+    except Exception:
+        return {}
+
+
+def cap_nhat_anh_do_luong(task_id: int, anh_dict: dict):
+    """Ghi toàn bộ dict ảnh đo lường (cột Y = col 25) lên Google Sheets."""
+    sheet = lay_sheet()
+    o_tim = sheet.find(str(task_id), in_column=1)
+    if o_tim:
+        sheet.update_cell(o_tim.row, 25, json.dumps(anh_dict, ensure_ascii=False))
         lay_danh_sach_cong_viec.clear()
 
 
@@ -914,7 +933,9 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
     mo_ta        = str(thong_tin_task.get("Mô Tả", ""))
     nhan_vien    = str(thong_tin_task.get("Nhân Viên", ""))
     ngay_tao_str = str(thong_tin_task.get("Ngày Tạo", ""))
-    ds_anh       = doc_danh_sach_anh(str(thong_tin_task.get("Link Ảnh", "")))
+
+    # Ảnh đo lường theo từng nhãn  {"U1–V1": [url,...], ...}
+    anh_do_luong = doc_anh_do_luong(str(thong_tin_task.get("Ảnh Đo Lường", "") or ""))
 
     # Format ngày
     try:
@@ -1140,10 +1161,15 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
     pdf.set_xy(M_LEFT, M_TOP + BOX_H1 + BOX_H2 + 4)
 
     # ── Hàm vẽ 1 bảng điện trở có ô ảnh ─────────────────────
-    COL_W  = W / 3          # chiều rộng mỗi cột (3 cột đều nhau)
+    # Dùng chiều rộng nguyên để tránh lệch do số thực
+    C1 = int(W / 3)          # cột 1 và 2
+    C2 = int(W / 3)
+    C3 = W - C1 - C2         # cột 3 lấy phần còn lại → tổng luôn = W
     IMG_H  = 55             # chiều cao ô ảnh (mm)
     HDR_H  = 8              # chiều cao dòng tiêu đề
     LBL_H  = 8              # chiều cao dòng nhãn pha
+    _COL_WIDTHS = [C1, C2, C3]
+    _COL_XS     = [M_LEFT, M_LEFT + C1, M_LEFT + C1 + C2]
 
     def _bang_co_anh(ten_en: str, ten_vi: str, nhan_pha: list, danh_sach_anh_bang: list):
         """
@@ -1155,6 +1181,7 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
         y_start = pdf.get_y()
 
         # -- Dòng tiêu đề --
+        pdf.set_xy(M_LEFT, y_start)
         pdf.set_fill_color(*BLUE_HDR)
         pdf.set_text_color(*WHITE)
         pdf.set_font("DejaVu", "B", 9.5)
@@ -1162,21 +1189,22 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
                  border=1, align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
         pdf.set_text_color(*BLACK)
 
-        # -- Dòng nhãn pha --
+        # -- Dòng nhãn pha -- dùng set_xy tuyệt đối cho từng ô
+        y_lbl = pdf.get_y()
         pdf.set_fill_color(*BLUE_CELL)
         pdf.set_font("DejaVu", "B", 9)
         for idx_p, nhan in enumerate(nhan_pha):
-            nx = "LMARGIN" if idx_p == 2 else "END"
-            ny = "NEXT"    if idx_p == 2 else "LAST"
-            pdf.cell(COL_W, LBL_H, nhan, border=1, align="C",
-                     fill=True, new_x=nx, new_y=ny)
+            pdf.set_xy(_COL_XS[idx_p], y_lbl)
+            pdf.cell(_COL_WIDTHS[idx_p], LBL_H, nhan, border=1, align="C", fill=True)
+        pdf.set_xy(M_LEFT, y_lbl + LBL_H)
 
-        # -- Dòng ô ảnh --
+        # -- Dòng ô ảnh -- dùng rect + image với tọa độ tuyệt đối
         y_img = pdf.get_y()
         for idx_a in range(3):
-            x_img = M_LEFT + idx_a * COL_W
+            x_img = _COL_XS[idx_a]
+            cw    = _COL_WIDTHS[idx_a]
             # Vẽ khung ô
-            pdf.rect(x_img, y_img, COL_W, IMG_H)
+            pdf.rect(x_img, y_img, cw, IMG_H)
             # Chèn ảnh nếu có
             if idx_a < len(danh_sach_anh_bang) and danh_sach_anh_bang[idx_a]:
                 duong_dan = danh_sach_anh_bang[idx_a]
@@ -1184,41 +1212,55 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
                     # Fit ảnh vào ô, giữ tỉ lệ, padding 1mm
                     pad = 1
                     pdf.image(duong_dan, x=x_img + pad, y=y_img + pad,
-                              w=COL_W - 2*pad, h=IMG_H - 2*pad)
+                              w=cw - 2*pad, h=IMG_H - 2*pad)
                 except Exception:
                     pass
 
         pdf.set_xy(M_LEFT, y_img + IMG_H)
         pdf.ln(3)
 
-    # ── Tải trước tất cả ảnh về temp files ───────────────────
-    temp_files = []
-    for url in ds_anh:
-        temp_files.append(_tai_anh_tam(url))
+    # ── Tải trước ảnh đo lường về temp files theo từng nhãn ─
+    # Mỗi nhóm 3 slot, mỗi slot lấy ảnh đầu tiên của nhãn đó
+    _NHOM_LABELS = [
+        ["U1–V1", "U1–W1", "V1–W1"],   # Stator 1
+        ["U2–V2", "U2–W2", "V2–W2"],   # Stator 2
+        ["K–L",   "K–M",   "L–M"  ],   # Rotor
+    ]
+    temp_files_nhom = []  # list of 3 groups, each group = list of 3 temp paths
+    all_temps = []        # flat list để dọn dẹp
 
-    # Padding danh sách để đủ 9 slot (3 bảng × 3 cột)
-    while len(temp_files) < 9:
-        temp_files.append(None)
+    for nhom_labels in _NHOM_LABELS:
+        nhom_paths = []
+        for lbl in nhom_labels:
+            urls = anh_do_luong.get(lbl, [])
+            if urls:
+                p = _tai_anh_tam(urls[0])   # chỉ lấy ảnh đầu tiên
+            else:
+                p = None
+            nhom_paths.append(p)
+            if p:
+                all_temps.append(p)
+        temp_files_nhom.append(nhom_paths)
 
     # ── Vẽ 3 bảng ────────────────────────────────────────────
     _bang_co_anh(
         "Stator 1 coil resistance", "Điện trở cuộn dây Stator 1",
         ["U1 – V1", "U1 – W1", "V1 –  W1"],
-        temp_files[0:3]
+        temp_files_nhom[0]
     )
     _bang_co_anh(
         "Stator 2 coil resistance", "Điện trở cuộn dây Stator 2",
         ["U2 – V2", "U2 – W2", "V2 –  W2"],
-        temp_files[3:6]
+        temp_files_nhom[1]
     )
     _bang_co_anh(
         "Rotor coil resistance", "Điện trở cuộn dây Rotor",
         ["K – L", "K – M", "L –  M"],
-        temp_files[6:9]
+        temp_files_nhom[2]
     )
 
     # ── Dọn temp files ────────────────────────────────────────
-    for p in temp_files:
+    for p in all_temps:
         if p and os.path.exists(p):
             try:
                 os.unlink(p)
@@ -1627,6 +1669,61 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                 st.session_state[_anh_key] = list(ds_anh_hien_co) + new_urls
                 st.success(f"✅ Đã upload {len(anh_upload)} ảnh!")
 
+    # ── Ảnh đo lường theo từng nhãn ──────────────────────────
+    st.divider()
+    st.markdown("**📐 Ảnh Đo Lường**")
+
+    _NHOM_DO = [
+        ("Stator 1 — Điện trở cuộn dây Stator 1", ["U1–V1", "U1–W1", "V1–W1"]),
+        ("Stator 2 — Điện trở cuộn dây Stator 2", ["U2–V2", "U2–W2", "V2–W2"]),
+        ("Rotor — Điện trở cuộn dây Rotor",        ["K–L",   "K–M",   "L–M"  ]),
+    ]
+
+    _do_key = f"do_luong_{task_id}"
+    if _do_key not in st.session_state:
+        st.session_state[_do_key] = doc_anh_do_luong(str(hang.get("Ảnh Đo Lường", "") or ""))
+
+    for nhom_title, labels in _NHOM_DO:
+        st.markdown(f"<div style='background:#dbeafe;border-radius:8px 8px 0 0;padding:8px 14px;font-weight:700;font-size:0.88rem;color:#1e3a8a;margin-top:10px;'>{nhom_title}</div>", unsafe_allow_html=True)
+        for label in labels:
+            st.markdown(
+                f"<div style='background:#fef9c3;border:1px solid #e5e7eb;padding:6px 14px;"
+                f"font-weight:600;font-size:0.85rem;margin-top:4px;border-radius:4px;'>"
+                f"📏 {label}</div>",
+                unsafe_allow_html=True,
+            )
+            # Ảnh hiện có cho nhãn này
+            urls_label = st.session_state[_do_key].get(label, [])
+            if urls_label:
+                img_cols = st.columns(min(len(urls_label), 3))
+                for idx_d, url_d in enumerate(urls_label):
+                    with img_cols[idx_d % 3]:
+                        st.image(url_d, use_container_width=True)
+                        if st.button("🗑️", key=f"xoa_do_{task_id}_{label}_{idx_d}", use_container_width=True):
+                            urls_label.remove(url_d)
+                            st.session_state[_do_key][label] = urls_label
+                            cap_nhat_anh_do_luong(task_id, st.session_state[_do_key])
+                            st.session_state[f"expand_{task_id}"] = True
+                            st.rerun()
+            # Upload cho nhãn này
+            _up_done_key = f"up_do_done_{task_id}_{label}"
+            f_do = st.file_uploader(
+                f"Ảnh {label}",
+                type=["jpg", "jpeg", "png"],
+                key=f"up_do_{task_id}_{label}",
+                label_visibility="collapsed",
+            )
+            if f_do is not None:
+                _file_id = f"{f_do.name}_{f_do.size}"
+                if st.session_state.get(_up_done_key) != _file_id:
+                    st.session_state[_up_done_key] = _file_id
+                    with st.spinner("Đang upload..."):
+                        url_new = tai_anh_len_cloudinary(f_do)
+                        st.session_state[_do_key].setdefault(label, []).append(url_new)
+                        cap_nhat_anh_do_luong(task_id, st.session_state[_do_key])
+                    st.session_state[f"expand_{task_id}"] = True
+                    st.rerun()
+
     # PDF
     tt_pdf = st.session_state.get(f"tt_select_{task_id}", trang_thai)
     if tt_pdf == "Đã Hoàn Thành - Giao Máy" or "Hoàn Thành" in tt_pdf:
@@ -1709,12 +1806,44 @@ div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
 </style>
 """
 
+# 12 mục checklist mặc định cho motor repair
+_MAC_DINH_CHECKLIST = [
+    {"text": "Quấn",                      "done": False},
+    {"text": "Thay bạc đạn trước",         "done": False},
+    {"text": "Thay bạc đạn sau",           "done": False},
+    {"text": "Thay phốt",                  "done": False},
+    {"text": "Đóng sơ mi trước",           "done": False},
+    {"text": "Đóng sơ mi sau",             "done": False},
+    {"text": "Thay tụ",                    "done": False},
+    {"text": "Thay cánh quạt",             "done": False},
+    {"text": "Thay dây nguồn/dây điện",    "done": False},
+    {"text": "Thay nắp chụp",              "done": False},
+    {"text": "Đấp cốt",                    "done": False},
+    {"text": "Gia công mới cốt",           "done": False},
+]
+
+# Màu nền theo trạng thái (cho board)
+_STATUS_BG = {
+    "Đang Kiểm Tra":              "#00b4d8",
+    "Đã Phê Duyệt":               "#f44336",
+    "Đã Báo Giá":                 "#f9c74f",
+    "Có Đơn":                     "#4361ee",
+    "Chờ Giao":                   "#f8961e",
+    "Đã Hoàn Thành - Giao Máy":   "#4caf50",
+    "Đã Xuất Hóa Đơn":            "#78909c",
+    "Bảo Hành - Trả Lại":         "#9b5de5",
+    "Chờ Làm":                    "#ef476f",
+    "Đang Làm":                   "#ffd166",
+    "Hoàn Thành":                 "#06d6a0",
+}
+
 
 @st.fragment
-def _fragment_checklist(key_prefix: str, show_done: bool = True):
+def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=None):
     cl_key   = f"{key_prefix}_checklist"
     cl_inp_v = f"{key_prefix}_cl_inp_v"
-    if cl_key   not in st.session_state: st.session_state[cl_key]   = []
+    if cl_key   not in st.session_state:
+        st.session_state[cl_key] = [dict(x) for x in default_items] if default_items else []
     if cl_inp_v not in st.session_state: st.session_state[cl_inp_v] = 0
 
     st.markdown(_FRAGMENT_CSS, unsafe_allow_html=True)
@@ -1878,8 +2007,8 @@ def giao_dien_admin():
     """Giao diện quản lý dành cho Admin — 4 tab ngang: Cài Đặt / Nhân Viên / Tạo Task / Tổng Quan."""
     st.header("🔧 Bảng Điều Khiển Admin")
 
-    tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_tong_quan = st.tabs(
-        ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "📊  Tổng Quan"]
+    tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_tong_quan, tab_board = st.tabs(
+        ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "📊  Tổng Quan", "🗂️  Bảng Quản Lý"]
     )
 
     # ── Helper: render section quản lý 1 field đơn ───────────────────────────
@@ -2155,10 +2284,13 @@ def giao_dien_admin():
                             icon_tt    = _ICON_TT_NV.get(trang_thai, "⚪")
                             ten_cv     = hang.get("Tên Công Việc", "")
                             cong_ty    = hang.get("Công Ty", "")
+                            _force_expand = st.session_state.get(f"expand_{task_id}", False)
                             with st.expander(
                                 f"{icon_tt} [{cong_ty}]  Task #{task_id}: {ten_cv}  —  {trang_thai}",
-                                expanded=(trang_thai in ["Chờ Làm", "Đang Làm"])
+                                expanded=(trang_thai in ["Chờ Làm", "Đang Làm"]) or _force_expand
                             ):
+                                if _force_expand:
+                                    del st.session_state[f"expand_{task_id}"]
                                 _fragment_chi_tiet_task(hang.to_dict(), ds_tt_adm)
 
                 with tab_st_d:
@@ -2304,7 +2436,7 @@ def giao_dien_admin():
         adm_mo_ta      = st.text_area("📝 Mô tả chi tiết", placeholder="Nhập mô tả, yêu cầu kỹ thuật...", key="adm_mo_ta")
 
         st.divider()
-        _fragment_checklist(_ADM_PREFIX, show_done=False)
+        _fragment_checklist(_ADM_PREFIX, show_done=False, default_items=_MAC_DINH_CHECKLIST)
         st.divider()
         _fragment_cong_viec_con(_ADM_PREFIX, ds_nhan_vien, show_done=False)
         st.divider()
@@ -2488,10 +2620,111 @@ def giao_dien_admin():
 
             render_bang_dep(df_hien_thi)
 
+    # ========================================================
+    # Tab 5: Bảng Quản Lý (Kanban board toàn bộ task)
+    # ========================================================
+    with tab_board:
+        st.subheader("🗂️ Bảng Quản Lý Công Việc")
+        col_adm_ref, col_adm_search = st.columns([1, 4])
+        with col_adm_ref:
+            if st.button("🔄 Làm mới", key="adm_board_refresh"):
+                lay_danh_sach_cong_viec.clear()
+                st.rerun()
+        with col_adm_search:
+            adm_q = st.text_input(
+                "🔍",
+                placeholder="Tìm kiếm theo tên công việc...",
+                key="adm_board_search",
+                label_visibility="collapsed",
+            )
 
-# ============================================================
-# GIAO DIỆN NHÂN VIÊN
-# ============================================================
+        with st.spinner("Đang tải..."):
+            df_board = lay_danh_sach_cong_viec()
+
+        if adm_q.strip():
+            df_board = df_board[
+                df_board["Tên Công Việc"].fillna("").str.lower().str.contains(adm_q.strip().lower())
+            ]
+
+        # Bộ lọc nhân viên + công ty
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            ds_nv_f = sorted(df_board["Nhân Viên"].dropna().unique().tolist())
+            loc_nv_b = st.multiselect("👤 Lọc nhân viên", ds_nv_f, key="adm_board_nv", placeholder="Tất cả")
+            if loc_nv_b:
+                df_board = df_board[df_board["Nhân Viên"].isin(loc_nv_b)]
+        with col_f2:
+            ds_ct_f = sorted(df_board["Công Ty"].dropna().unique().tolist())
+            loc_ct_b = st.multiselect("🏢 Lọc công ty", ds_ct_f, key="adm_board_ct", placeholder="Tất cả")
+            if loc_ct_b:
+                df_board = df_board[df_board["Công Ty"].isin(loc_ct_b)]
+
+        ds_tt_board = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
+        ds_tt_adm_b = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
+
+        for tt in ds_tt_board:
+            nhom_b = df_board[df_board["Trạng Thái"] == tt] if not df_board.empty else df_board.iloc[0:0]
+            so_b   = len(nhom_b)
+            mau_bg = _STATUS_BG.get(tt, "#607d8b")
+            mau_fg = "#1a1a1a" if mau_bg in ("#f9c74f", "#ffd166") else "#ffffff"
+            _tkey  = f"adm_board_open_{tt}"
+            if _tkey not in st.session_state:
+                st.session_state[_tkey] = (so_b > 0)
+
+            is_open_b = st.session_state[_tkey]
+            chevron_b = "▼" if is_open_b else "▶"
+            tt_safe_b = tt.replace(" ", "_").replace("-","_")
+            st.markdown(
+                f"""<style>
+                .status-marker-adm-{tt_safe_b} + div button {{
+                    background:{mau_bg} !important;
+                    color:{mau_fg} !important;
+                    font-weight:700 !important;
+                    font-size:0.95rem !important;
+                    border:none !important;
+                    border-radius:8px !important;
+                    margin-top:8px !important;
+                    padding:10px 16px !important;
+                    min-height:42px !important;
+                }}
+                </style>
+                <div class="status-marker-adm-{tt_safe_b}"></div>""",
+                unsafe_allow_html=True,
+            )
+            if st.button(f"{tt.upper()} ({so_b}) {chevron_b}", key=f"adm_toggle_{tt}", use_container_width=True):
+                st.session_state[_tkey] = not is_open_b
+                st.rerun()
+
+            if is_open_b and not nhom_b.empty:
+                for _, hang_b in nhom_b.iterrows():
+                    tid_b  = hang_b["ID"]
+                    ten_b  = hang_b.get("Tên Công Việc", "")
+                    cty_b  = hang_b.get("Công Ty", "")
+                    nv_b   = hang_b.get("Nhân Viên", "")
+                    ngay_b = str(hang_b.get("Ngày Tạo", ""))[:10]
+                    try:
+                        cl_b = json.loads(str(hang_b.get("Checklist", "") or "[]"))
+                        cl_d_b = sum(1 for x in cl_b if isinstance(x, dict) and x.get("done"))
+                    except Exception:
+                        cl_b, cl_d_b = [], 0
+                    anh_b = len(doc_danh_sach_anh(str(hang_b.get("Link Ảnh", "") or "")))
+
+                    lbl_b = f"[{cty_b}]  #{tid_b}: {ten_b}"
+                    _fe_b = st.session_state.get(f"expand_{tid_b}", False)
+                    with st.expander(lbl_b, expanded=_fe_b):
+                        if _fe_b:
+                            del st.session_state[f"expand_{tid_b}"]
+                        meta_b = []
+                        if nv_b:   meta_b.append(f"👤 {nv_b}")
+                        if ngay_b: meta_b.append(f"📅 {ngay_b}")
+                        if anh_b:  meta_b.append(f"📷 {anh_b}")
+                        if cl_b:   meta_b.append(f"☑️ {cl_d_b}/{len(cl_b)}")
+                        if meta_b:
+                            st.caption("  |  ".join(meta_b))
+                        _fragment_chi_tiet_task(hang_b.to_dict(), ds_tt_adm_b)
+
+
+
 def giao_dien_nhan_vien():
     """
     Giao diện dành cho nhân viên:
@@ -2527,7 +2760,7 @@ def giao_dien_nhan_vien():
 
     # ---- Tabs ----
     tab_cong_viec, tab_tao_task = st.tabs([
-        "📋 Công Việc Của Tôi",
+        "�️ Bảng Quản Lý Công Việc",
         "➕ Tạo Công Việc Mới"
     ])
 
@@ -2552,10 +2785,22 @@ def giao_dien_nhan_vien():
         df["_nv_norm"] = df["Nhân Viên"].fillna("").str.strip().str.lower()
         df_cua_toi = df[df["_nv_norm"] == ten_nhan_vien.lower()].copy()
 
+        # ── Search theo tiêu đề ───────────────────────────────
+        q_search = st.text_input(
+            "🔍 Tìm kiếm công việc",
+            placeholder="Nhập tên công việc...",
+            key="nv_search_q",
+            label_visibility="collapsed",
+        )
+        if q_search.strip():
+            df_cua_toi = df_cua_toi[
+                df_cua_toi["Tên Công Việc"].fillna("").str.lower().str.contains(q_search.strip().lower())
+            ]
+
         if df_cua_toi.empty:
             st.success("🎉 Bạn hiện chưa có công việc nào được giao!")
         else:
-            # Bộ lọc theo Công Ty cho nhân viên
+            # Bộ lọc theo Công Ty
             ds_cong_ty_cua_toi = df_cua_toi["Công Ty"].dropna().unique().tolist() if "Công Ty" in df_cua_toi.columns else []
             with col_loc:
                 if ds_cong_ty_cua_toi:
@@ -2567,110 +2812,80 @@ def giao_dien_nhan_vien():
                     if loc_cong_ty:
                         df_cua_toi = df_cua_toi[df_cua_toi["Công Ty"].isin(loc_cong_ty)]
 
-        # Lấy danh sách trạng thái (custom từ admin, hoặc mặc định)
+        # Lấy danh sách trạng thái
         ds_tt = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
-        # Hiển thị từng task chính dưới dạng expander
-        _ICON_TT = {
-            "Đang Kiểm Tra": "🔵", "Đã Phê Duyệt": "🟢", "Đã Báo Giá": "🟠",
-            "Có Đơn": "🟣", "Chờ Giao": "🟡",
-            "Đã Hoàn Thành - Giao Máy": "✅",
-            "Đã Xuất Hóa Đơn": "⬜", "Bảo Hành - Trả Lại": "🔴",
-            "Chờ Làm": "🔴", "Đang Làm": "🟡", "Hoàn Thành": "🟢",
-        }
-        for _, hang in df_cua_toi.iterrows():
-            task_id    = hang["ID"]
-            trang_thai = hang.get("Trạng Thái", "Chờ Làm")
-            icon_tt    = _ICON_TT.get(trang_thai, "⚪")
-            ten_cv     = hang.get("Tên Công Việc", "")
-            cong_ty    = hang.get("Công Ty", "")
+        # ── Board: nhóm theo trạng thái, mỗi nhóm có header màu ─
+        for tt in ds_tt:
+            nhom = df_cua_toi[df_cua_toi["Trạng Thái"] == tt] if not df_cua_toi.empty else df_cua_toi
+            so_luong = len(nhom)
+            mau_bg  = _STATUS_BG.get(tt, "#607d8b")
+            # Chữ đen nếu màu sáng (vàng, cam sáng)
+            mau_fg  = "#1a1a1a" if mau_bg in ("#f9c74f", "#ffd166") else "#ffffff"
+            _toggle_key = f"nv_board_open_{tt}"
+            if _toggle_key not in st.session_state:
+                st.session_state[_toggle_key] = (so_luong > 0)
 
-            with st.expander(
-                f"{icon_tt} [{cong_ty}]  Task #{task_id}: {ten_cv}  —  {trang_thai}",
-                expanded=(trang_thai in ["Chờ Làm", "Đang Làm"])
-            ):
-                _fragment_chi_tiet_task(hang.to_dict(), ds_tt)
+            # Header toggle — nút full-width màu theo trạng thái
+            is_open = st.session_state[_toggle_key]
+            chevron = "▼" if is_open else "▶"
+            tt_safe = tt.replace(" ", "_").replace("-","_")
+            st.markdown(
+                f"""<style>
+                .status-marker-nv-{tt_safe} + div button {{
+                    background:{mau_bg} !important;
+                    color:{mau_fg} !important;
+                    font-weight:700 !important;
+                    font-size:0.95rem !important;
+                    border:none !important;
+                    border-radius:8px !important;
+                    margin-top:8px !important;
+                    padding:10px 16px !important;
+                    min-height:42px !important;
+                }}
+                </style>
+                <div class="status-marker-nv-{tt_safe}"></div>""",
+                unsafe_allow_html=True,
+            )
+            if st.button(f"{tt.upper()} ({so_luong}) {chevron}", key=f"nv_toggle_{tt}", use_container_width=True):
+                st.session_state[_toggle_key] = not is_open
+                st.rerun()
 
-        # ── Công việc con được giao ────────────────────────────────
-        st.divider()
-        st.subheader("📋 Công Việc Con Được Giao")
+            if is_open and not nhom.empty:
+                for _, hang in nhom.iterrows():
+                    task_id = hang["ID"]
+                    ten_cv  = hang.get("Tên Công Việc", "")
+                    cong_ty = hang.get("Công Ty", "")
+                    ngay_tao = str(hang.get("Ngày Tạo", ""))[:10]
+                    # Chỉ số
+                    try:
+                        cl_raw = json.loads(str(hang.get("Checklist", "") or "[]"))
+                        cl_done = sum(1 for x in cl_raw if isinstance(x, dict) and x.get("done"))
+                        cl_total = len(cl_raw)
+                    except Exception:
+                        cl_done = cl_total = 0
+                    try:
+                        cv_raw = json.loads(str(hang.get("Công Việc Con", "") or "[]"))
+                        cv_done = sum(1 for x in cv_raw if isinstance(x, dict) and x.get("done"))
+                        cv_total = len(cv_raw)
+                    except Exception:
+                        cv_done = cv_total = 0
+                    anh_count = len(doc_danh_sach_anh(str(hang.get("Link Ảnh", "") or "")))
 
-        # Tìm tất cả task có subtask giao cho nhân viên này
-        tasks_co_subtask = []
-        for _, row in df.iterrows():
-            raw = row.get("Công Việc Con", "") or "[]"
-            try:
-                ds_cv = json.loads(raw)
-            except Exception:
-                ds_cv = []
-            my_subtasks = [
-                (i, cv) for i, cv in enumerate(ds_cv)
-                if isinstance(cv, dict)
-                and (cv.get("nguoi") or cv.get("nhan_vien") or "").strip().lower() == ten_nhan_vien.lower()
-            ]
-            if my_subtasks:
-                tasks_co_subtask.append((row.to_dict(), ds_cv, my_subtasks))
-
-        if not tasks_co_subtask:
-            st.info("✅ Bạn chưa có công việc con nào được giao.")
-        else:
-            st.caption(f"Bạn được giao **{sum(len(m) for _, _, m in tasks_co_subtask)} công việc con** trong **{len(tasks_co_subtask)} task**")
-            for hang_dict, ds_cv_full, my_subtasks in tasks_co_subtask:
-                tid    = hang_dict["ID"]
-                tt     = hang_dict.get("Trạng Thái", "")
-                icon   = _ICON_TT.get(tt, "⚪")
-                cty    = hang_dict.get("Công Ty", "")
-                ten    = hang_dict.get("Tên Công Việc", "")
-                nv_chu = hang_dict.get("Nhân Viên", "")
-                dl     = hang_dict.get("Deadline", "")
-                mo_ta  = hang_dict.get("Mô Tả", "") or ""
-
-                all_done = all(cv.get("done", False) for _, cv in my_subtasks)
-                badge    = " ✅" if all_done else ""
-
-                with st.expander(
-                    f"{icon} [{cty}] Task #{tid}: {ten}  —  {tt}{badge}",
-                    expanded=not all_done
-                ):
-                    # Thông tin task đầy đủ (stack dọc cho mobile)
-                    st.markdown(f"**🏢 Công Ty:** {cty}  |  **👤** {nv_chu}  |  **📅** {dl}")
-                    if mo_ta:
-                        st.markdown(f"**📝 Mô Tả:** {mo_ta}")
-                    st.divider()
-
-                    # Subtask của nhân viên này với checkbox tick done
-                    st.markdown("**🔧 Công Việc Con Của Bạn:**")
-                    cv_changed_nv = False
-                    for j, cv in my_subtasks:
-                        ten_sub  = cv.get("ten", cv.get("Tên", f"Việc {j+1}"))
-                        dl_sub   = cv.get("deadline", cv.get("Deadline", ""))
-                        done_sub = bool(cv.get("done", False))
-
-                        dl_txt  = f"  📅 {dl_sub}" if dl_sub else ""
-                        chk_lbl = f"{j+1}. {ten_sub}{dl_txt}"
-                        new_done = st.checkbox(
-                            chk_lbl,
-                            value=done_sub,
-                            key=f"nv_sub_{tid}_{j}",
-                        )
-                        if new_done and not done_sub:
-                            # inject done-strike CSS class via empty markdown (CSS targets .sub-done)
-                            pass  # CSS handles via global .sub-done class
-
-                        if new_done != done_sub:
-                            ds_cv_full[j]["done"] = new_done
-                            cv_changed_nv = True
-
-                    if cv_changed_nv:
-                        try:
-                            _sh = lay_sheet()
-                            _o  = _sh.find(str(tid), in_column=1)
-                            if _o:
-                                _sh.update_cell(_o.row, 14, json.dumps(ds_cv_full, ensure_ascii=False))
-                                lay_danh_sach_cong_viec.clear()
-                            st.success("✅ Đã lưu trạng thái!")
-                        except Exception as e:
-                            st.error(f"🔌 Lưu thất bại: {e}")
+                    label_str = f"[{cong_ty}]  #{task_id}: {ten_cv}"
+                    _force_expand = st.session_state.get(f"expand_{task_id}", False)
+                    with st.expander(label_str, expanded=_force_expand):
+                        if _force_expand:
+                            del st.session_state[f"expand_{task_id}"]
+                        # Thông tin tóm tắt trong card
+                        meta_parts = []
+                        if ngay_tao: meta_parts.append(f"📅 {ngay_tao}")
+                        if anh_count: meta_parts.append(f"📷 {anh_count}")
+                        if cl_total: meta_parts.append(f"☑️ {cl_done}/{cl_total}")
+                        if cv_total: meta_parts.append(f"🔹 {cv_done}/{cv_total}")
+                        if meta_parts:
+                            st.caption("  |  ".join(meta_parts))
+                        _fragment_chi_tiet_task(hang.to_dict(), ds_tt)
 
     # ========================================================
     # Tab 2: Tạo Công Việc Mới (nhân viên tự nhập)
@@ -2759,7 +2974,7 @@ def giao_dien_nhan_vien():
             nv_mo_ta    = st.text_area("📝 Mô Tả Chi Tiết", placeholder="Mô tả chi tiết về công việc...", key=f"{_nv_prefix}_mo_ta")
 
             st.divider()
-            _fragment_checklist(_nv_prefix, show_done=False)
+            _fragment_checklist(_nv_prefix, show_done=False, default_items=_MAC_DINH_CHECKLIST)
 
             st.divider()
             _fragment_cong_viec_con(_nv_prefix, ds_nv_nv, show_done=False)
