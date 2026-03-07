@@ -1837,6 +1837,21 @@ _STATUS_BG = {
     "Hoàn Thành":                 "#06d6a0",
 }
 
+# Màu chữ + nền nhạt cho header kanban board (text_color, bg_color)
+_STATUS_HEADER_COLOR = {
+    "Đang Kiểm Tra":              ("#0077a8", "#e0f7fc"),
+    "Đã Phê Duyệt":               ("#b71c1c", "#fce4e4"),
+    "Đã Báo Giá":                 ("#7a5c00", "#fff8dc"),
+    "Có Đơn":                     ("#2b3eb5", "#e8ecff"),
+    "Chờ Giao":                   ("#b35c00", "#fff3e0"),
+    "Đã Hoàn Thành - Giao Máy":   ("#1b5e20", "#e6f4ea"),
+    "Đã Xuất Hóa Đơn":            ("#37474f", "#eceff1"),
+    "Bảo Hành - Trả Lại":         ("#5e1891", "#f3e5ff"),
+    "Chờ Làm":                    ("#b71c1c", "#fce4e4"),
+    "Đang Làm":                   ("#7a5c00", "#fff8dc"),
+    "Hoàn Thành":                 ("#004d40", "#e0f2f1"),
+}
+
 
 @st.fragment
 def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=None):
@@ -2011,9 +2026,11 @@ def _task_dialog(hang_dict, ds_tt):
     tt   = hang_dict.get("Trạng Thái", "")
     mau  = _STATUS_BG.get(tt, "#607d8b")
     mau_fg = "#1a1a1a" if mau in ("#f9c74f", "#ffd166") else "#ffffff"
+    dlg_txt, dlg_bg = _STATUS_HEADER_COLOR.get(tt, ("#37474f", "#eceff1"))
     st.markdown(
-        f"<div style='background:{mau};color:{mau_fg};border-radius:7px;"
-        f"padding:6px 14px;font-weight:700;font-size:0.8rem;margin-bottom:10px;'>"
+        f"<div style='background:{dlg_bg};color:{dlg_txt};border-radius:7px;"
+        f"padding:6px 14px;font-weight:800;font-size:0.85rem;margin-bottom:10px;"
+        f"border:1.5px solid {dlg_txt}44;display:inline-block;'>"
         f"#{tid} · {tt}</div>",
         unsafe_allow_html=True,
     )
@@ -2029,17 +2046,42 @@ def _render_kanban_board(df, ds_tt, board_key="kb"):
     Bấm 📂 → @st.dialog chỉnh sửa.
     """
     import html as _hl
+    import re as _re
     _EXCLUDE   = {"Đã Xuất Hóa Đơn", "Bảo Hành - Trả Lại"}
     _COMPLETED = {"Đã Hoàn Thành - Giao Máy", "Hoàn Thành"}
     ds_show = [t for t in ds_tt if t not in _EXCLUDE]
     today = datetime.now().date()
     COLS  = 4  # card per row
 
+    # ── Inject CSS màu cho từng nút toggle ──────────────────
+    # Dùng selector theo element-container (wrapper thật của Streamlit)
+    css_rules = []
+    for tt2 in ds_show:
+        txt2, bg2 = _STATUS_HEADER_COLOR.get(tt2, ("#37474f", "#eceff1"))
+        safe2     = _re.sub(r"[^a-zA-Z0-9]", "_", tt2)
+        mk        = f"kbtog_{board_key}_{safe2}"
+        # .element-container:has(.mk) + .element-container button
+        sel = (
+            f".element-container:has(.{mk}) + .element-container button,"
+            f".element-container:has(.{mk}) + .element-container button:hover"
+        )
+        css_rules.append(
+            f"{sel} {{ background:{bg2} !important; color:{txt2} !important;"
+            f" border:2px solid {txt2}55 !important; font-weight:800 !important;"
+            f" font-size:0.95rem !important; letter-spacing:0.5px !important;"
+            f" box-shadow: none !important;"
+            f" border-radius:8px !important;"
+            f" text-align:left !important; padding:10px 18px !important; }}"
+        )
+    st.markdown(f"<style>{'  '.join(css_rules)}</style>", unsafe_allow_html=True)
+
     for tt in ds_show:
         nhom   = df[df["Trạng Thái"] == tt] if not df.empty else df.iloc[0:0]
         so     = len(nhom)
         mau_bg = _STATUS_BG.get(tt, "#607d8b")
         mau_fg = "#1a1a1a" if mau_bg in ("#f9c74f", "#ffd166") else "#ffffff"
+        # màu header nhạt có chữ đậm màu
+        hdr_txt, hdr_bg = _STATUS_HEADER_COLOR.get(tt, ("#37474f", "#eceff1"))
 
         # ── Toggle state ──────────────────────────────────────
         _sk = f"{board_key}_open_{tt}"
@@ -2048,26 +2090,16 @@ def _render_kanban_board(df, ds_tt, board_key="kb"):
 
         is_open = st.session_state[_sk]
         chevron = "▼" if is_open else "▶"
+        safe_tt = _re.sub(r"[^a-zA-Z0-9]", "_", tt)
+        mk      = f"kbtog_{board_key}_{safe_tt}"
 
-        # ── Header: div màu + nút toggle ─────────────────────
-        col_hdr, col_btn = st.columns([9, 1], gap="small")
-        with col_hdr:
-            st.markdown(
-                f"<div style='background:{mau_bg};color:{mau_fg};border-radius:8px;"
-                f"padding:8px 14px;font-weight:700;font-size:0.78rem;letter-spacing:0.5px;"
-                f"text-transform:uppercase;margin-top:10px;"
-                f"display:flex;justify-content:space-between;align-items:center;'>"
-                f"<span>{_hl.escape(tt)}</span>"
-                f"<span style='background:rgba(255,255,255,0.28);border-radius:12px;"
-                f"padding:1px 10px;font-size:0.95rem;font-weight:900'>{so}</span></div>",
-                unsafe_allow_html=True,
-            )
-        with col_btn:
-            st.markdown("<div style='margin-top:10px'>", unsafe_allow_html=True)
-            if st.button(chevron, key=f"{board_key}_tog_{tt}", help="Thu/Mở nhóm"):
-                st.session_state[_sk] = not is_open
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+        # ── Header: marker div + full-width button (CSS tô màu) ──
+        st.markdown(f"<div class='{mk}' style='display:none'></div>",
+                    unsafe_allow_html=True)
+        btn_label = f"{chevron}  {tt}  ({so})"
+        if st.button(btn_label, key=f"{board_key}_tog_{tt}", use_container_width=True):
+            st.session_state[_sk] = not is_open
+            st.rerun()
 
         if not is_open:
             continue
@@ -2779,6 +2811,7 @@ def giao_dien_admin():
             ]
 
         col_f1, col_f2 = st.columns(2)
+        col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
             ds_nv_f = sorted(df_board["Nhân Viên"].dropna().unique().tolist())
             loc_nv_b = st.multiselect("👤 Lọc nhân viên", ds_nv_f, key="adm_board_nv", placeholder="Tất cả")
@@ -2789,6 +2822,18 @@ def giao_dien_admin():
             loc_ct_b = st.multiselect("🏢 Lọc công ty", ds_ct_f, key="adm_board_ct", placeholder="Tất cả")
             if loc_ct_b:
                 df_board = df_board[df_board["Công Ty"].isin(loc_ct_b)]
+        with col_f3:
+            ds_nam_f = sorted(
+                [str(y) for y in df_board["Năm"].dropna().unique() if str(y).strip() != ""],
+                reverse=True,
+            ) if "Năm" in df_board.columns else []
+            loc_nam_b = st.selectbox(
+                "📅 Lọc năm",
+                options=["Tất cả"] + ds_nam_f,
+                key="adm_board_nam",
+            ) if ds_nam_f else "Tất cả"
+            if loc_nam_b != "Tất cả":
+                df_board = df_board[df_board["Năm"].astype(str) == loc_nam_b]
 
         ds_tt_board = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
@@ -2865,12 +2910,26 @@ def giao_dien_nhan_vien():
                 df_cua_toi["Tên Công Việc"].fillna("").str.lower().str.contains(q_search.strip().lower())
             ]
 
-        # Bộ lọc Công Ty
-        ds_ct_nv = df_cua_toi["Công Ty"].dropna().unique().tolist() if "Công Ty" in df_cua_toi.columns else []
-        if ds_ct_nv:
-            loc_ct_nv = st.multiselect("🏢 Lọc công ty", ds_ct_nv, key="nv_loc_ct", placeholder="Tất cả")
-            if loc_ct_nv:
-                df_cua_toi = df_cua_toi[df_cua_toi["Công Ty"].isin(loc_ct_nv)]
+        # Bộ lọc Năm + Công Ty cùng hàng
+        col_loc_nam, col_loc_ct = st.columns(2)
+        with col_loc_nam:
+            ds_nam_nv = sorted(
+                [str(y) for y in df_cua_toi["Năm"].dropna().unique() if str(y).strip() != ""],
+                reverse=True,
+            ) if "Năm" in df_cua_toi.columns else []
+            loc_nam_nv = st.selectbox(
+                "📅 Lọc theo năm",
+                options=["Tất cả"] + ds_nam_nv,
+                key="nv_loc_nam",
+            ) if ds_nam_nv else "Tất cả"
+            if loc_nam_nv != "Tất cả":
+                df_cua_toi = df_cua_toi[df_cua_toi["Năm"].astype(str) == loc_nam_nv]
+        with col_loc_ct:
+            ds_ct_nv = df_cua_toi["Công Ty"].dropna().unique().tolist() if "Công Ty" in df_cua_toi.columns else []
+            if ds_ct_nv:
+                loc_ct_nv = st.multiselect("🏢 Lọc công ty", ds_ct_nv, key="nv_loc_ct", placeholder="Tất cả")
+                if loc_ct_nv:
+                    df_cua_toi = df_cua_toi[df_cua_toi["Công Ty"].isin(loc_ct_nv)]
 
         ds_tt = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
@@ -3588,6 +3647,31 @@ def inject_css():
         [data-testid="stAlert"] {
             font-size: 0.88rem !important;
             padding: 0.7rem 0.9rem !important;
+        }
+
+        /* --- Kanban cards: cuộn ngang thay vì xếp chồng --- */
+        /* Chỉ áp dụng cho row có 3+ cột (kanban 4 cards), không ảnh hưởng filter 2 cột */
+        [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(3)) {
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            gap: 10px !important;
+            padding-bottom: 10px !important;
+            scroll-snap-type: x mandatory !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(3))
+            > [data-testid="stColumn"] {
+            min-width: 230px !important;
+            flex: 0 0 230px !important;
+            scroll-snap-align: start !important;
+        }
+        /* Ẩn scrollbar nhưng vẫn scroll được */
+        [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(3))::-webkit-scrollbar {
+            height: 4px !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(3))::-webkit-scrollbar-thumb {
+            background: #c4b5fd !important;
+            border-radius: 4px !important;
         }
     }
 
