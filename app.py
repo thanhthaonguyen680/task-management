@@ -2024,9 +2024,9 @@ def _task_dialog(hang_dict, ds_tt):
     _fragment_chi_tiet_task(hang_dict, ds_tt)
 
 
-def _render_kanban_board(df, ds_tt):
-    """Kanban board: header HTML màu + cards dạng st.container(border=True), 4 card/hàng.
-    Bấm vào card → @st.dialog to chỉnh sửa.
+def _render_kanban_board(df, ds_tt, board_key="kb"):
+    """Kanban board: header màu + toggle thu/mở, cards 4 cột/hàng.
+    Bấm 📂 → @st.dialog chỉnh sửa.
     """
     import html as _hl
     _EXCLUDE   = {"Đã Xuất Hóa Đơn", "Bảo Hành - Trả Lại"}
@@ -2041,17 +2041,36 @@ def _render_kanban_board(df, ds_tt):
         mau_bg = _STATUS_BG.get(tt, "#607d8b")
         mau_fg = "#1a1a1a" if mau_bg in ("#f9c74f", "#ffd166") else "#ffffff"
 
-        # Header màu cho mỗi trạng thái
-        st.markdown(
-            f"<div style='background:{mau_bg};color:{mau_fg};border-radius:8px;"
-            f"padding:8px 14px;font-weight:700;font-size:0.78rem;letter-spacing:0.5px;"
-            f"text-transform:uppercase;margin-top:14px;margin-bottom:4px;"
-            f"display:flex;justify-content:space-between;align-items:center;'>"
-            f"<span>{_hl.escape(tt)}</span>"
-            f"<span style='background:rgba(255,255,255,0.28);border-radius:12px;"
-            f"padding:1px 10px;font-size:0.95rem;font-weight:900'>{so}</span></div>",
-            unsafe_allow_html=True,
-        )
+        # ── Toggle state ──────────────────────────────────────
+        _sk = f"{board_key}_open_{tt}"
+        if _sk not in st.session_state:
+            st.session_state[_sk] = True   # mặc định mở
+
+        is_open = st.session_state[_sk]
+        chevron = "▼" if is_open else "▶"
+
+        # ── Header: div màu + nút toggle ─────────────────────
+        col_hdr, col_btn = st.columns([9, 1], gap="small")
+        with col_hdr:
+            st.markdown(
+                f"<div style='background:{mau_bg};color:{mau_fg};border-radius:8px;"
+                f"padding:8px 14px;font-weight:700;font-size:0.78rem;letter-spacing:0.5px;"
+                f"text-transform:uppercase;margin-top:10px;"
+                f"display:flex;justify-content:space-between;align-items:center;'>"
+                f"<span>{_hl.escape(tt)}</span>"
+                f"<span style='background:rgba(255,255,255,0.28);border-radius:12px;"
+                f"padding:1px 10px;font-size:0.95rem;font-weight:900'>{so}</span></div>",
+                unsafe_allow_html=True,
+            )
+        with col_btn:
+            st.markdown("<div style='margin-top:10px'>", unsafe_allow_html=True)
+            if st.button(chevron, key=f"{board_key}_tog_{tt}", help="Thu/Mở nhóm"):
+                st.session_state[_sk] = not is_open
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        if not is_open:
+            continue
 
         if nhom.empty:
             st.caption("— Không có công việc nào —")
@@ -2774,7 +2793,7 @@ def giao_dien_admin():
         ds_tt_board = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
         # ── KANBAN BOARD ──────────────────────────────────────────
-        _render_kanban_board(df_board, ds_tt_board)
+        _render_kanban_board(df_board, ds_tt_board, board_key="adm_kb")
 
 
 def giao_dien_nhan_vien():
@@ -2859,7 +2878,7 @@ def giao_dien_nhan_vien():
             st.success("🎉 Bạn hiện chưa có công việc nào được giao!")
         else:
             # ── KANBAN BOARD ────────────────────────────────────
-            _render_kanban_board(df_cua_toi, ds_tt)
+            _render_kanban_board(df_cua_toi, ds_tt, board_key="nv_kb")
 
     # ========================================================
     # Tab 2: Tạo Công Việc Mới (nhân viên tự nhập)
