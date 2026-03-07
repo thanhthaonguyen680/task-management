@@ -1633,96 +1633,17 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     st.divider()
 
     # ── Upload ảnh + xuất PDF ─────────────────────────────────
-    ds_anh_hien_co = st.session_state[_anh_key]
-
-    st.markdown("**📸 Ảnh Nghiệm Thu**")
-    if ds_anh_hien_co:
-        st.caption(f"{len(ds_anh_hien_co)} ảnh đã upload")
-        cols_anh = st.columns(min(len(ds_anh_hien_co), 3))
-        for idx_a, url_a in enumerate(ds_anh_hien_co):
-            with cols_anh[idx_a % 3]:
-                st.image(url_a, caption=f"Ảnh {idx_a + 1}", use_container_width=True)
-                if st.button(f"🗑️ Xoá", key=f"xoa_anh_{task_id}_{idx_a}", use_container_width=True):
-                    with st.spinner("Đang xoá..."):
-                        xoa_url_anh(task_id, url_a)
-                    st.session_state[_anh_key] = [u for u in ds_anh_hien_co if u != url_a]
-    else:
-        st.caption("Chưa có ảnh nghiệm thu.")
-
-    with st.form(key=f"form_upload_{task_id}"):
-        anh_upload = st.file_uploader(
-            "Thêm ảnh (JPG, PNG)",
-            type=["jpg", "jpeg", "png"],
-            accept_multiple_files=True,
-            label_visibility="collapsed",
-        )
-        if st.form_submit_button("📤 Upload ảnh"):
-            if not anh_upload:
-                st.warning("⚠️ Chọn ít nhất một file ảnh!")
-            else:
-                with st.spinner(f"Đang upload {len(anh_upload)} ảnh..."):
-                    new_urls = []
-                    for f in anh_upload:
-                        url = tai_anh_len_cloudinary(f)
-                        cap_nhat_url_anh(task_id, url)
-                        new_urls.append(url)
-                st.session_state[_anh_key] = list(ds_anh_hien_co) + new_urls
-                st.success(f"✅ Đã upload {len(anh_upload)} ảnh!")
+    _fragment_upload_anh_nghiem_thu(task_id, _anh_key)
 
     # ── Ảnh đo lường theo từng nhãn ──────────────────────────
     st.divider()
     st.markdown("**📐 Ảnh Đo Lường**")
 
-    _NHOM_DO = [
-        ("Stator 1 — Điện trở cuộn dây Stator 1", ["U1–V1", "U1–W1", "V1–W1"]),
-        ("Stator 2 — Điện trở cuộn dây Stator 2", ["U2–V2", "U2–W2", "V2–W2"]),
-        ("Rotor — Điện trở cuộn dây Rotor",        ["K–L",   "K–M",   "L–M"  ]),
-    ]
-
     _do_key = f"do_luong_{task_id}"
     if _do_key not in st.session_state:
         st.session_state[_do_key] = doc_anh_do_luong(str(hang.get("Ảnh Đo Lường", "") or ""))
 
-    for nhom_title, labels in _NHOM_DO:
-        st.markdown(f"<div style='background:#dbeafe;border-radius:8px 8px 0 0;padding:8px 14px;font-weight:700;font-size:0.88rem;color:#1e3a8a;margin-top:10px;'>{nhom_title}</div>", unsafe_allow_html=True)
-        for label in labels:
-            st.markdown(
-                f"<div style='background:#fef9c3;border:1px solid #e5e7eb;padding:6px 14px;"
-                f"font-weight:600;font-size:0.85rem;margin-top:4px;border-radius:4px;'>"
-                f"📏 {label}</div>",
-                unsafe_allow_html=True,
-            )
-            # Ảnh hiện có cho nhãn này
-            urls_label = st.session_state[_do_key].get(label, [])
-            if urls_label:
-                img_cols = st.columns(min(len(urls_label), 3))
-                for idx_d, url_d in enumerate(urls_label):
-                    with img_cols[idx_d % 3]:
-                        st.image(url_d, use_container_width=True)
-                        if st.button("🗑️", key=f"xoa_do_{task_id}_{label}_{idx_d}", use_container_width=True):
-                            urls_label.remove(url_d)
-                            st.session_state[_do_key][label] = urls_label
-                            cap_nhat_anh_do_luong(task_id, st.session_state[_do_key])
-                            st.session_state[f"expand_{task_id}"] = True
-                            st.rerun()
-            # Upload cho nhãn này
-            _up_done_key = f"up_do_done_{task_id}_{label}"
-            f_do = st.file_uploader(
-                f"Ảnh {label}",
-                type=["jpg", "jpeg", "png"],
-                key=f"up_do_{task_id}_{label}",
-                label_visibility="collapsed",
-            )
-            if f_do is not None:
-                _file_id = f"{f_do.name}_{f_do.size}"
-                if st.session_state.get(_up_done_key) != _file_id:
-                    st.session_state[_up_done_key] = _file_id
-                    with st.spinner("Đang upload..."):
-                        url_new = tai_anh_len_cloudinary(f_do)
-                        st.session_state[_do_key].setdefault(label, []).append(url_new)
-                        cap_nhat_anh_do_luong(task_id, st.session_state[_do_key])
-                    st.session_state[f"expand_{task_id}"] = True
-                    st.rerun()
+    _fragment_upload_do_luong(task_id, _do_key)
 
     # PDF
     tt_pdf = st.session_state.get(f"tt_select_{task_id}", trang_thai)
@@ -1788,6 +1709,23 @@ div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
     width: 50% !important;
 }
 .cl-btn-row { margin: 0 0 10px 0; gap: 6px; display: flex; }
+/* Nút icon nhỏ trong checklist (row có checkbox) */
+[data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"]) .stButton > button {
+    background: transparent !important;
+    border: 1.5px solid #e5e7eb !important;
+    box-shadow: none !important;
+    color: #6b7280 !important;
+    font-size: 1rem !important;
+    padding: 3px 6px !important;
+    min-height: 32px !important;
+    border-radius: 8px !important;
+}
+[data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"]) .stButton > button:hover {
+    background: #f3f4f6 !important;
+    border-color: #9ca3af !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
 /* CVC card */
 .cvc-card {
     border: 1.5px solid #e5e7eb; border-radius: 12px;
@@ -1866,49 +1804,100 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
 
     items = st.session_state[cl_key]
 
-    # Progress bar
-    if items:
-        done_cnt = sum(1 for it in items if it.get("done"))
-        st.progress(done_cnt / len(items),
-                    text=f"{done_cnt}/{len(items)} hoàn thành")
-
     _xoa = None
+
+    # CSS dùng :has() với marker bên trong cột — đây là cách duy nhất hoạt động
+    # vì st.markdown div KHÔNG wrap st.columns trong DOM thực tế
+    mk = f"clm{key_prefix}"  # class marker ngắn
+    st.markdown(f"""<style>
+    /* Row chứa marker → luôn nằm ngang, không wrap */
+    [data-testid="stHorizontalBlock"]:has(.{mk}) {{
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }}
+    /* Cột checkbox: cố định 36px */
+    [data-testid="stHorizontalBlock"]:has(.{mk}) > [data-testid="stColumn"]:first-child {{
+        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
+        overflow: visible !important;
+    }}
+    /* Cột text: chiếm phần còn lại */
+    [data-testid="stHorizontalBlock"]:has(.{mk}) > [data-testid="stColumn"]:nth-child(2) {{
+        flex: 1 1 0% !important; min-width: 0 !important; overflow: hidden !important;
+    }}
+    /* Cột xóa: cố định 36px */
+    [data-testid="stHorizontalBlock"]:has(.{mk}) > [data-testid="stColumn"]:last-child {{
+        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
+    }}
+    /* Text input trông như plain text */
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stTextInput"] input {{
+        border: 1.5px solid transparent !important;
+        background: transparent !important; box-shadow: none !important;
+        padding: 3px 6px !important; font-size: 0.93rem !important;
+        color: #1e1b4b !important; min-height: 32px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stTextInput"] input:focus {{
+        border-color: #7c3aed !important; background: white !important;
+        border-radius: 6px !important;
+        box-shadow: 0 0 0 2px rgba(124,58,237,0.12) !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stTextInput"] > div {{
+        border: none !important; box-shadow: none !important; background: transparent !important;
+    }}
+    /* Nút xóa: transparent, đỏ */
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stColumn"]:last-child button {{
+        background: transparent !important; border: none !important;
+        box-shadow: none !important; color: #ef4444 !important;
+        font-size: 1.1rem !important; padding: 2px 4px !important;
+        min-height: 32px !important; transform: none !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stColumn"]:last-child button:hover {{
+        background: #fee2e2 !important; border-radius: 6px !important;
+        box-shadow: none !important; transform: none !important;
+    }}
+    /* Bỏ margin thừa của checkbox */
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stCheckbox"] {{
+        margin: 0 !important;
+    }}
+    </style>""", unsafe_allow_html=True)
+
+    def _save_cl(i):
+        val = st.session_state.get(f"{key_prefix}_cl_txt_{i}", "").strip()
+        if val:
+            st.session_state[cl_key][i]["text"] = val
+
     for i, item in enumerate(items):
-        txt = item.get("text", "") or ""
+        txt      = item.get("text", "") or f"Mục {i+1}"
         done_val = bool(item.get("done", False))
-        nguoi = item.get("nhan_vien", item.get("nguoi", "")) or ""
-        dl    = item.get("deadline", "") or ""
-        cls  = "cl-card cl-done" if done_val else "cl-card"
-        badge = "<span class='cl-badge'>✅ Xong</span>" if done_val else ""
-        txt_show = txt if txt and txt.lower() != "none" else f"Mục {i+1}"
-        # HTML card
-        st.markdown(
-            f"<div class='{cls}'>"
-            f"<span class='cl-num'>{i+1}</span>"
-            f"<span class='cl-txt'>{txt_show}</span>"
-            f"{badge}</div>",
-            unsafe_allow_html=True,
-        )
-        # Chỉ hiện nút khi chưa hoàn thành
-        if not done_val:
-            if show_done:
-                col_t, col_d = st.columns(2)
-                with col_t:
-                    if st.button("✅ Xong", key=f"{key_prefix}_ck_{i}",
-                                 use_container_width=True):
-                        st.session_state[cl_key][i]["done"] = True
-                        st.rerun()
-                with col_d:
-                    if st.button("🗑️ Xóa", key=f"{key_prefix}_cl_del_{i}",
-                                 use_container_width=True):
-                        _xoa = i
-            else:
-                if st.button("🗑️ Xóa", key=f"{key_prefix}_cl_del_{i}",
-                             use_container_width=True):
-                    _xoa = i
+
+        col_ck, col_txt, col_del = st.columns([0.6, 8.5, 0.7], gap="small")
+        with col_ck:
+            # Marker ở đây để CSS :has() tìm đúng HorizontalBlock này
+            st.markdown(f"<span class='{mk}' style='display:none'></span>", unsafe_allow_html=True)
+            new_done = st.checkbox(
+                "", value=done_val,
+                key=f"{key_prefix}_ck_{i}",
+                label_visibility="collapsed",
+            )
+            if new_done != done_val:
+                st.session_state[cl_key][i]["done"] = new_done
+                st.rerun()
+        with col_txt:
+            st.text_input(
+                "", value=txt,
+                key=f"{key_prefix}_cl_txt_{i}",
+                label_visibility="collapsed",
+                on_change=_save_cl, args=(i,),
+            )
+        with col_del:
+            if st.button("🗑️", key=f"{key_prefix}_cl_del_{i}", use_container_width=True):
+                _xoa = i
 
     if _xoa is not None:
         st.session_state[cl_key].pop(_xoa)
+        for k in list(st.session_state.keys()):
+            if k.startswith(f"{key_prefix}_cl_txt_"):
+                del st.session_state[k]
         st.rerun()
 
     st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
@@ -1933,85 +1922,352 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
 
 @st.fragment
 def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool = True):
-    cv_key   = f"{key_prefix}_cong_viec_con"
-    cv_inp_v = f"{key_prefix}_cv_inp_v"
-    if cv_key   not in st.session_state: st.session_state[cv_key]   = []
-    if cv_inp_v not in st.session_state: st.session_state[cv_inp_v] = 0
+    cv_key      = f"{key_prefix}_cong_viec_con"
+    cv_inp_v    = f"{key_prefix}_cv_inp_v"
+    cv_seeded   = f"{key_prefix}_cv_seeded"
+
+    # Lần đầu: seed tất cả công đoạn sẵn vào danh sách
+    if cv_seeded not in st.session_state:
+        ds_cd = lay_ten_cac_cong_doan()
+        st.session_state[cv_key]    = [{"ten": cd, "nhan_vien": "", "done": False} for cd in ds_cd]
+        st.session_state[cv_inp_v]  = 0
+        st.session_state[cv_seeded] = True
+    else:
+        if cv_key   not in st.session_state: st.session_state[cv_key]   = []
+        if cv_inp_v not in st.session_state: st.session_state[cv_inp_v] = 0
 
     st.markdown(_FRAGMENT_CSS, unsafe_allow_html=True)
     st.markdown("**📋 Công Việc Con**")
 
-    items_cv = st.session_state[cv_key]
-    if items_cv:
-        done_cnt = sum(1 for cv in items_cv if cv.get("done"))
-        st.progress(done_cnt / len(items_cv),
-                    text=f"{done_cnt}/{len(items_cv)} hoàn thành")
+    # CSS dùng :has() với marker bên trong cột — không bị override bởi Streamlit mobile wrap
+    mk_cv = f"cvcm{key_prefix}"
+    nv_opts = ["-- Không chọn --"] + ds_nhan_vien
+    st.markdown(f"""<style>
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) {{
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:first-child {{
+        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:nth-child(2) {{
+        flex: 1 1 0% !important; min-width: 0 !important; overflow: hidden !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:nth-child(3) {{
+        flex: 0 0 130px !important; min-width: 100px !important; max-width: 160px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:last-child {{
+        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
+    }}
+    /* Tên công việc trông như plain text */
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] input {{
+        border: 1.5px solid transparent !important;
+        background: transparent !important; box-shadow: none !important;
+        padding: 3px 6px !important; font-size: 0.93rem !important;
+        color: #1e1b4b !important; min-height: 32px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] input:focus {{
+        border-color: #7c3aed !important; background: white !important;
+        border-radius: 6px !important;
+        box-shadow: 0 0 0 2px rgba(124,58,237,0.12) !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] > div {{
+        border: none !important; box-shadow: none !important; background: transparent !important;
+    }}
+    /* Selectbox nhân viên nhỏ gọn */
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stSelectbox"] > div > div {{
+        font-size: 0.78rem !important; padding: 2px 6px !important;
+        border-color: #e0d7ff !important; background: #f5f3ff !important;
+        color: #4c1d95 !important; min-height: 30px !important;
+    }}
+    /* Nút xóa: transparent đỏ */
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stColumn"]:last-child button {{
+        background: transparent !important; border: none !important;
+        box-shadow: none !important; color: #ef4444 !important;
+        font-size: 1.1rem !important; padding: 2px 4px !important;
+        min-height: 32px !important; transform: none !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stColumn"]:last-child button:hover {{
+        background: #fee2e2 !important; border-radius: 6px !important;
+        box-shadow: none !important; transform: none !important;
+    }}
+    </style>""", unsafe_allow_html=True)
 
     _xoa = None
+    items_cv = st.session_state[cv_key]
+
+    def _save_cv_ten(i):
+        val = st.session_state.get(f"{key_prefix}_cv_txt_{i}", "").strip()
+        if val:
+            st.session_state[cv_key][i]["ten"] = val
+
+    def _save_cv_nv(i):
+        val = st.session_state.get(f"{key_prefix}_cv_nv_sel_{i}", "-- Không chọn --")
+        st.session_state[cv_key][i]["nhan_vien"] = "" if val == "-- Không chọn --" else val
+
     for i, cv in enumerate(items_cv):
         done_val = bool(cv.get("done", False))
-        ten = cv.get("ten", "") or f"Việc {i+1}"
+        ten   = cv.get("ten", "") or f"Việc {i+1}"
         nguoi = cv.get("nhan_vien", cv.get("nguoi", "")) or ""
-        dl    = cv.get("deadline", "") or ""
-        cls   = "cvc-card cvc-done" if done_val else "cvc-card"
-        meta_parts = []
-        if nguoi and nguoi.lower() != "none": meta_parts.append(f"👤 {nguoi}")
-        if dl    and dl.lower()    != "none": meta_parts.append(f"📅 {dl}")
-        meta_html = f"<div class='cvc-meta'>{'&nbsp;&nbsp;│&nbsp;&nbsp;'.join(meta_parts)}</div>" if meta_parts else ""
-        badge = "<div class='cvc-badge'>✅ Hoàn thành</div>" if done_val else ""
-        st.markdown(
-            f"<div class='{cls}'>"
-            f"<div class='cvc-title'>{i+1}. {ten}</div>"
-            f"{meta_html}{badge}</div>",
-            unsafe_allow_html=True,
-        )
-        if not done_val:
-            if show_done:
-                col_t, col_d = st.columns(2)
-                with col_t:
-                    if st.button("✅ Xong", key=f"{key_prefix}_cvt_{i}", use_container_width=True):
-                        st.session_state[cv_key][i]["done"] = True
-                        st.rerun()
-                with col_d:
-                    if st.button("🗑️ Xóa", key=f"{key_prefix}_cv_del_{i}", use_container_width=True):
-                        _xoa = i
-            else:
-                if st.button("🗑️ Xóa", key=f"{key_prefix}_cv_del_{i}", use_container_width=True):
-                    _xoa = i
+        nv_idx = nv_opts.index(nguoi) if nguoi in nv_opts else 0
+
+        col_ck, col_txt, col_nv, col_del = st.columns([0.5, 6, 3.5, 0.5], gap="small")
+        with col_ck:
+            st.markdown(f"<span class='{mk_cv}' style='display:none'></span>", unsafe_allow_html=True)
+            new_done = st.checkbox(
+                "", value=done_val,
+                key=f"{key_prefix}_cv_ck_{i}",
+                label_visibility="collapsed",
+            )
+            if new_done != done_val:
+                st.session_state[cv_key][i]["done"] = new_done
+                st.rerun()
+        with col_txt:
+            st.text_input(
+                "", value=ten,
+                key=f"{key_prefix}_cv_txt_{i}",
+                label_visibility="collapsed",
+                on_change=_save_cv_ten, args=(i,),
+            )
+        with col_nv:
+            st.selectbox(
+                "", options=nv_opts,
+                index=nv_idx,
+                key=f"{key_prefix}_cv_nv_sel_{i}",
+                label_visibility="collapsed",
+                on_change=_save_cv_nv, args=(i,),
+            )
+        with col_del:
+            if st.button("🗑️", key=f"{key_prefix}_cv_del_{i}", use_container_width=True):
+                _xoa = i
 
     if _xoa is not None:
         st.session_state[cv_key].pop(_xoa)
+        for k in list(st.session_state.keys()):
+            if k.startswith(f"{key_prefix}_cv_txt_") or k.startswith(f"{key_prefix}_cv_nv_sel_"):
+                del st.session_state[k]
         st.rerun()
 
-    st.divider()
-    st.text_input(
-        "", placeholder="Tên công việc con...",
-        key=f"{key_prefix}_cv_ten_{st.session_state[cv_inp_v]}",
-        label_visibility="collapsed",
-    )
-    st.selectbox(
-        "👤 Nhân viên",
-        options=["-- Chọn nhân viên --"] + ds_nhan_vien,
-        key=f"{key_prefix}_cv_nv_{st.session_state[cv_inp_v]}",
-    )
-    st.date_input("📅 Deadline", key=f"{key_prefix}_cv_dl")
-
+    # Thêm thủ công một mục mới
+    st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
+    col_inp, col_nv_inp = st.columns([3, 2])
+    with col_inp:
+        st.text_input(
+            "", placeholder="Tên công việc con...",
+            key=f"{key_prefix}_cv_ten_{st.session_state[cv_inp_v]}",
+            label_visibility="collapsed",
+        )
+    with col_nv_inp:
+        st.selectbox(
+            "", options=nv_opts,
+            key=f"{key_prefix}_cv_nv_{st.session_state[cv_inp_v]}",
+            label_visibility="collapsed",
+        )
     if st.button("＋ Thêm công việc con", key=f"{key_prefix}_cv_add",
                  use_container_width=True):
         ten_val = st.session_state.get(
             f"{key_prefix}_cv_ten_{st.session_state[cv_inp_v]}", "").strip()
-        cv_nv = st.session_state.get(
-            f"{key_prefix}_cv_nv_{st.session_state[cv_inp_v]}", "-- Chọn nhân viên --")
-        cv_dl = st.session_state.get(f"{key_prefix}_cv_dl", "")
+        cv_nv   = st.session_state.get(
+            f"{key_prefix}_cv_nv_{st.session_state[cv_inp_v]}", "-- Không chọn --")
         if ten_val:
             st.session_state[cv_key].append({
-                "ten":      ten_val,
-                "nhan_vien": cv_nv if cv_nv != "-- Chọn nhân viên --" else "",
-                "deadline": str(cv_dl),
-                "done":     False,
+                "ten":       ten_val,
+                "nhan_vien": "" if cv_nv == "-- Không chọn --" else cv_nv,
+                "done":      False,
             })
             st.session_state[cv_inp_v] += 1
             st.rerun()
+
+
+    # CSS dùng :has() với marker bên trong cột — không bị override bởi Streamlit mobile wrap
+    mk_cv = f"cvcm{key_prefix}"
+    nv_opts = ["-- Không chọn --"] + ds_nhan_vien
+    st.markdown(f"""<style>
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) {{
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:first-child {{
+        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:nth-child(2) {{
+        flex: 1 1 0% !important; min-width: 0 !important; overflow: hidden !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:nth-child(3) {{
+        flex: 0 0 110px !important; min-width: 90px !important; max-width: 140px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:last-child {{
+        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
+    }}
+    /* Tên công việc trông như plain text */
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] input {{
+        border: 1.5px solid transparent !important;
+        background: transparent !important; box-shadow: none !important;
+        padding: 3px 6px !important; font-size: 0.93rem !important;
+        color: #1e1b4b !important; min-height: 32px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] input:focus {{
+        border-color: #7c3aed !important; background: white !important;
+        border-radius: 6px !important;
+        box-shadow: 0 0 0 2px rgba(124,58,237,0.12) !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] > div {{
+        border: none !important; box-shadow: none !important; background: transparent !important;
+    }}
+    /* Selectbox nhân viên nhỏ gọn */
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stSelectbox"] > div > div {{
+        font-size: 0.78rem !important; padding: 2px 6px !important;
+        border-color: #e0d7ff !important; background: #f5f3ff !important;
+        color: #4c1d95 !important; min-height: 30px !important;
+    }}
+    /* Nút xóa: transparent đỏ */
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stColumn"]:last-child button {{
+        background: transparent !important; border: none !important;
+        box-shadow: none !important; color: #ef4444 !important;
+        font-size: 1.1rem !important; padding: 2px 4px !important;
+        min-height: 32px !important; transform: none !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stColumn"]:last-child button:hover {{
+        background: #fee2e2 !important; border-radius: 6px !important;
+        box-shadow: none !important; transform: none !important;
+    }}
+    </style>""", unsafe_allow_html=True)
+
+
+
+# ============================================================
+# FRAGMENT: UPLOAD ẢNH (dùng trong dialog để tránh đóng dialog khi rerun)
+# ============================================================
+
+def _cb_xoa_anh_nt(task_id, anh_key, url_a):
+    """Callback xóa ảnh — chạy trước khi re-render, không cần st.rerun()"""
+    xoa_url_anh(task_id, url_a)
+    st.session_state[anh_key] = [u for u in st.session_state.get(anh_key, []) if u != url_a]
+
+
+def _cb_upload_anh_nt(task_id, anh_key, up_key):
+    """Callback upload ảnh — chạy trước khi re-render, không cần st.rerun()"""
+    files = st.session_state.get(up_key) or []
+    if not files:
+        return
+    new_urls = []
+    for f in files:
+        url = tai_anh_len_cloudinary(f)
+        cap_nhat_url_anh(task_id, url)
+        new_urls.append(url)
+    st.session_state[anh_key] = st.session_state.get(anh_key, []) + new_urls
+    st.session_state[f"_nt_msg_{task_id}"] = f"✅ Đã upload {len(new_urls)} ảnh!"
+
+
+@st.fragment
+def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
+    """Upload ảnh nghiệm thu — dùng callback thay vì st.rerun() để dialog không đóng."""
+    up_key = f"up_anh_nt_{task_id}"
+    ds_anh = st.session_state.get(anh_key, [])
+    st.markdown("**📸 Ảnh Nghiệm Thu**")
+    if ds_anh:
+        st.caption(f"{len(ds_anh)} ảnh đã upload")
+        cols_anh = st.columns(min(len(ds_anh), 3))
+        for idx_a, url_a in enumerate(ds_anh):
+            with cols_anh[idx_a % 3]:
+                st.image(url_a, caption=f"Ảnh {idx_a + 1}", use_container_width=True)
+                st.button(
+                    "🗑️ Xoá", key=f"xoa_anh_{task_id}_{idx_a}",
+                    use_container_width=True,
+                    on_click=_cb_xoa_anh_nt, args=(task_id, anh_key, url_a),
+                )
+    else:
+        st.caption("Chưa có ảnh nghiệm thu.")
+
+    msg = st.session_state.pop(f"_nt_msg_{task_id}", None)
+    if msg:
+        st.success(msg)
+
+    st.file_uploader(
+        "Thêm ảnh (JPG, PNG)",
+        type=["jpg", "jpeg", "png"],
+        accept_multiple_files=True,
+        label_visibility="collapsed",
+        key=up_key,
+    )
+    st.button(
+        "📤 Upload ảnh", key=f"btn_up_nt_{task_id}",
+        use_container_width=True,
+        on_click=_cb_upload_anh_nt, args=(task_id, anh_key, up_key),
+    )
+
+
+_NHOM_DO = [
+    ("Stator 1 — Điện trở cuộn dây Stator 1", ["U1–V1", "U1–W1", "V1–W1"]),
+    ("Stator 2 — Điện trở cuộn dây Stator 2", ["U2–V2", "U2–W2", "V2–W2"]),
+    ("Rotor — Điện trở cuộn dây Rotor",        ["K–L",   "K–M",   "L–M"  ]),
+]
+
+
+def _cb_xoa_do(task_id, do_key, label, url_d):
+    """Callback xóa ảnh đo lường — không cần st.rerun()"""
+    cur = st.session_state[do_key].get(label, [])
+    if url_d in cur:
+        cur.remove(url_d)
+    st.session_state[do_key][label] = cur
+    cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+
+
+def _cb_upload_do(task_id, do_key, label, up_key, done_key):
+    """Callback upload ảnh đo lường — không cần st.rerun()"""
+    f_do = st.session_state.get(up_key)
+    if f_do is None:
+        return
+    _file_id = f"{f_do.name}_{f_do.size}"
+    if st.session_state.get(done_key) == _file_id:
+        return
+    st.session_state[done_key] = _file_id
+    url_new = tai_anh_len_cloudinary(f_do)
+    st.session_state[do_key].setdefault(label, []).append(url_new)
+    cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+
+
+@st.fragment
+def _fragment_upload_do_luong(task_id, do_key: str):
+    """Upload ảnh đo lường — dùng callback thay vì st.rerun() để dialog không đóng."""
+    for nhom_title, labels in _NHOM_DO:
+        st.markdown(
+            f"<div style='background:#dbeafe;border-radius:8px 8px 0 0;padding:8px 14px;"
+            f"font-weight:700;font-size:0.88rem;color:#1e3a8a;margin-top:10px;'>"
+            f"{nhom_title}</div>",
+            unsafe_allow_html=True,
+        )
+        for label in labels:
+            st.markdown(
+                f"<div style='background:#fef9c3;border:1px solid #e5e7eb;padding:6px 14px;"
+                f"font-weight:600;font-size:0.85rem;margin-top:4px;border-radius:4px;'>"
+                f"📏 {label}</div>",
+                unsafe_allow_html=True,
+            )
+            urls_label = st.session_state[do_key].get(label, [])
+            if urls_label:
+                img_cols = st.columns(min(len(urls_label), 3))
+                for idx_d, url_d in enumerate(urls_label):
+                    with img_cols[idx_d % 3]:
+                        st.image(url_d, use_container_width=True)
+                        st.button(
+                            "🗑️", key=f"xoa_do_{task_id}_{label}_{idx_d}",
+                            use_container_width=True,
+                            on_click=_cb_xoa_do,
+                            args=(task_id, do_key, label, url_d),
+                        )
+            up_key   = f"up_do_{task_id}_{label}"
+            done_key = f"up_do_done_{task_id}_{label}"
+            st.file_uploader(
+                f"Ảnh {label}",
+                type=["jpg", "jpeg", "png"],
+                key=up_key,
+                label_visibility="collapsed",
+                on_change=_cb_upload_do,
+                args=(task_id, do_key, label, up_key, done_key),
+            )
 
 
 # ============================================================
@@ -2557,13 +2813,6 @@ def giao_dien_admin():
         with col_dl:
             adm_deadline = st.date_input("📅 Hạn hoàn thành", key="adm_deadline")
 
-        ds_cong_doan_adm = lay_ten_cac_cong_doan()
-        adm_cong_doan = st.selectbox(
-            "⚙️ Công Đoạn",
-            options=["-- Không chọn --"] + ds_cong_doan_adm,
-            key="adm_cong_doan",
-        )
-
         col_lm_adm, col_tt_adm = st.columns(2)
         with col_lm_adm:
             ds_loai_may_adm = lay_ten_cac_loai_may()
@@ -2621,7 +2870,7 @@ def giao_dien_admin():
                         nguoi_phe_duyet=phe_duyet_luu,
                         checklist=list(st.session_state.get(f"{_ADM_PREFIX}_checklist", [])),
                         cong_viec_con=list(st.session_state.get(f"{_ADM_PREFIX}_cong_viec_con", [])),
-                        cong_doan=adm_cong_doan if adm_cong_doan != "-- Không chọn --" else "",
+                        cong_doan="",
                         loai_may=adm_loai_may if adm_loai_may != "-- Không chọn --" else "",
                         tinh_trang=adm_tinh_trang if adm_tinh_trang != "-- Không chọn --" else "",
                         cong_suat=adm_cong_suat.strip(),
@@ -2983,13 +3232,6 @@ def giao_dien_nhan_vien():
             st.markdown(f"**👤 Nhân viên thực hiện:** `{ten_nhan_vien}` *(tự động)*")
             nv_deadline = st.date_input("📅 Hạn Hoàn Thành", key=f"{_nv_prefix}_dl")
 
-            ds_cong_doan_nv = lay_ten_cac_cong_doan()
-            nv_cong_doan = st.selectbox(
-                "⚙️ Công Đoạn",
-                options=["-- Không chọn --"] + ds_cong_doan_nv,
-                key=f"{_nv_prefix}_cong_doan",
-            )
-
             col_lm_nv, col_tt_nv = st.columns(2)
             with col_lm_nv:
                 ds_loai_may_nv = lay_ten_cac_loai_may()
@@ -3051,7 +3293,7 @@ def giao_dien_nhan_vien():
                             nguoi_phe_duyet = phe_duyet_nv,
                             checklist       = list(st.session_state[_cl_key]),
                             cong_viec_con   = list(st.session_state[_cv_key]),
-                            cong_doan       = nv_cong_doan if nv_cong_doan != "-- Không chọn --" else "",
+                            cong_doan       = "",
                             loai_may        = nv_loai_may if nv_loai_may != "-- Không chọn --" else "",
                             tinh_trang      = nv_tinh_trang if nv_tinh_trang != "-- Không chọn --" else "",
                             cong_suat       = nv_cong_suat.strip(),
