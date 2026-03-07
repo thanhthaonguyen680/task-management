@@ -2003,105 +2003,97 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
 # KANBAN BOARD HELPER
 # ============================================================
 def _render_kanban_board(df, ds_tt):
-    """Render kanban board dạng HTML – cột ngang scroll, card ảnh thumbnail."""
-    import html as _hl
+    """Kanban board: Streamlit-native columns, mỗi card là expander chứa chi tiết inline."""
+    # Bỏ 2 cột không cần thiết trên board
+    _EXCLUDE = {"Đã Xuất Hóa Đơn", "Bảo Hành - Trả Lại"}
+    _COMPLETED = {"Đã Hoàn Thành - Giao Máy", "Hoàn Thành"}
+    ds_show = [t for t in ds_tt if t not in _EXCLUDE]
     today = datetime.now().date()
-    _COMPLETED = {"Đã Hoàn Thành - Giao Máy", "Hoàn Thành", "Đã Xuất Hóa Đơn", "Đã Báo Giá"}
 
-    css = """
-<style>
-.kboard-wrap{overflow-x:auto;overflow-y:hidden;padding-bottom:10px;}
-.kboard{display:flex;gap:12px;align-items:flex-start;min-width:max-content;padding:4px 2px 8px 2px;}
-.kcol{width:230px;min-width:230px;border-radius:12px;background:#f0f0f5;overflow:hidden;flex-shrink:0;}
-.kcol-hdr{padding:10px 14px;font-weight:700;font-size:0.8rem;letter-spacing:0.6px;text-transform:uppercase;}
-.kcol-body{padding:8px;display:flex;flex-direction:column;gap:8px;max-height:70vh;overflow-y:auto;}
-.kcol-empty{text-align:center;color:#aaa;font-size:0.78rem;padding:20px 0;}
-.kcard{background:#fff;border-radius:10px;padding:10px 11px 9px;box-shadow:0 1px 5px rgba(0,0,0,0.08);border-left:3px solid #e0e0e0;}
-.kcard.overdue{border-left-color:#ef4444;background:#fff8f8;}
-.kcard-badge{display:inline-block;background:#fecaca;color:#b91c1c;border-radius:4px;padding:1px 6px;font-size:0.68rem;font-weight:700;margin-bottom:5px;}
-.kcard img{width:100%;height:108px;object-fit:cover;border-radius:7px;margin-bottom:7px;display:block;}
-.kcard-title{font-weight:600;font-size:0.82rem;color:#1e1e2e;line-height:1.35;word-break:break-word;margin-bottom:3px;}
-.kcard-sub{font-size:0.71rem;color:#6b7280;margin-bottom:5px;}
-.kcard-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;}
-.ktag{background:#f0f0f7;border-radius:4px;padding:2px 6px;font-size:0.69rem;color:#555;}
-</style>"""
+    # Chia thành nhóm tối đa 4 cột / hàng
+    MAX_COLS = 4
+    chunks = [ds_show[i:i + MAX_COLS] for i in range(0, len(ds_show), MAX_COLS)]
 
-    board_html = ""
-    for tt in ds_tt:
-        nhom = df[df["Trạng Thái"] == tt] if not df.empty else df.iloc[0:0]
-        so = len(nhom)
-        mau_bg = _STATUS_BG.get(tt, "#607d8b")
-        mau_fg = "#1a1a1a" if mau_bg in ("#f9c74f", "#ffd166") else "#ffffff"
+    for chunk in chunks:
+        st_cols = st.columns(len(chunk), gap="small")
+        for col_i, tt in enumerate(chunk):
+            nhom = df[df["Trạng Thái"] == tt] if not df.empty else df.iloc[0:0]
+            so = len(nhom)
+            mau_bg = _STATUS_BG.get(tt, "#607d8b")
+            mau_fg = "#1a1a1a" if mau_bg in ("#f9c74f", "#ffd166") else "#ffffff"
 
-        cards = ""
-        for _, h in nhom.iterrows():
-            ten   = _hl.escape(str(h.get("Tên Công Việc", "") or ""))
-            cty   = _hl.escape(str(h.get("Công Ty", "") or ""))
-            nv    = _hl.escape(str(h.get("Nhân Viên", "") or ""))
-            ngay  = str(h.get("Ngày Tạo", ""))[:10]
+            with st_cols[col_i]:
+                # Header màu
+                st.markdown(
+                    f"<div style='background:{mau_bg};color:{mau_fg};border-radius:8px;"
+                    f"padding:8px 10px;font-weight:700;font-size:0.75rem;letter-spacing:0.5px;"
+                    f"text-transform:uppercase;margin-bottom:6px;text-align:center'>"
+                    f"{tt}<br><span style='font-size:1.2rem;font-weight:900'>{so}</span></div>",
+                    unsafe_allow_html=True,
+                )
 
-            # Quá hạn?
-            is_over = False
-            try:
-                dl = str(h.get("Ngày Kết Thúc", "") or "")[:10]
-                if dl and tt not in _COMPLETED:
-                    import datetime as _dt
-                    is_over = _dt.date.fromisoformat(dl) < today
-            except Exception:
-                pass
+                if nhom.empty:
+                    st.caption("— Trống —")
+                    continue
 
-            # Thumbnail
-            anh_lst = doc_danh_sach_anh(str(h.get("Link Ảnh", "") or ""))
-            img_html = ""
-            if anh_lst:
-                src = _hl.escape(anh_lst[0])
-                img_html = f'<img src="{src}" onerror="this.style.display=\'none\'">'
+                for _, h in nhom.iterrows():
+                    task_id   = h["ID"]
+                    ten_cv    = str(h.get("Tên Công Việc", "") or "")
+                    cong_ty   = str(h.get("Công Ty", "") or "")
+                    nhan_vien = str(h.get("Nhân Viên", "") or "")
+                    ngay_tao  = str(h.get("Ngày Tạo", ""))[:10]
 
-            # Stats
-            try:
-                cl = json.loads(str(h.get("Checklist", "") or "[]"))
-                cl_d = sum(1 for x in cl if isinstance(x, dict) and x.get("done"))
-                cl_t = len(cl)
-            except Exception:
-                cl_d = cl_t = 0
-            try:
-                cv = json.loads(str(h.get("Công Việc Con", "") or "[]"))
-                cv_d = sum(1 for x in cv if isinstance(x, dict) and x.get("done"))
-                cv_t = len(cv)
-            except Exception:
-                cv_d = cv_t = 0
-            anh_c = len(anh_lst)
+                    # Kiểm tra quá hạn
+                    is_over = False
+                    try:
+                        dl = str(h.get("Ngày Kết Thúc", "") or "")[:10]
+                        if dl and tt not in _COMPLETED:
+                            import datetime as _dt
+                            is_over = _dt.date.fromisoformat(dl) < today
+                    except Exception:
+                        pass
 
-            tags = ""
-            if ngay: tags += f'<span class="ktag">📅 {ngay}</span>'
-            if nv:   tags += f'<span class="ktag">👤 {nv}</span>'
-            if anh_c: tags += f'<span class="ktag">📷 {anh_c}</span>'
-            if cl_t:  tags += f'<span class="ktag">☑️ {cl_d}/{cl_t}</span>'
-            if cv_t:  tags += f'<span class="ktag">🔹 {cv_d}/{cv_t}</span>'
+                    anh_lst = doc_danh_sach_anh(str(h.get("Link Ảnh", "") or ""))
+                    try:
+                        cl = json.loads(str(h.get("Checklist", "") or "[]"))
+                        cl_d = sum(1 for x in cl if isinstance(x, dict) and x.get("done"))
+                        cl_t = len(cl)
+                    except Exception:
+                        cl_d = cl_t = 0
+                    try:
+                        cv = json.loads(str(h.get("Công Việc Con", "") or "[]"))
+                        cv_t = len(cv)
+                    except Exception:
+                        cv_t = 0
 
-            badge = '<span class="kcard-badge">⚠️ Quá hạn</span>' if is_over else ""
-            card_cls = "kcard overdue" if is_over else "kcard"
-            sub = cty if not nv else (f"{cty} · {nv}" if cty else nv)
+                    prefix = "🔴 " if is_over else ""
+                    short = ten_cv[:32] + ("…" if len(ten_cv) > 32 else "")
+                    exp_label = f"{prefix}#{task_id}: {short}"
 
-            cards += f"""<div class="{card_cls}">
-{badge}{img_html}
-<div class="kcard-title">{ten}</div>
-<div class="kcard-sub">{_hl.escape(sub)}</div>
-<div class="kcard-tags">{tags}</div>
-</div>"""
+                    _force_exp = st.session_state.get(f"expand_{task_id}", False)
+                    with st.expander(exp_label, expanded=_force_exp):
+                        if _force_exp:
+                            st.session_state.pop(f"expand_{task_id}", None)
 
-        if not cards:
-            cards = '<div class="kcol-empty">— Không có —</div>'
+                        # Thumbnail ảnh đầu tiên
+                        if anh_lst:
+                            st.image(anh_lst[0], use_container_width=True)
 
-        board_html += f"""<div class="kcol">
-<div class="kcol-hdr" style="background:{mau_bg};color:{mau_fg}">{_hl.escape(tt)} ({so})</div>
-<div class="kcol-body">{cards}</div>
-</div>"""
+                        # Meta
+                        meta = []
+                        if cong_ty:   meta.append(f"🏢 {cong_ty}")
+                        if nhan_vien: meta.append(f"👤 {nhan_vien}")
+                        if ngay_tao:  meta.append(f"📅 {ngay_tao}")
+                        if anh_lst:   meta.append(f"📷 {len(anh_lst)}")
+                        if cl_t:      meta.append(f"☑️ {cl_d}/{cl_t}")
+                        if cv_t:      meta.append(f"🔹 {cv_t}")
+                        if meta:
+                            st.caption(" · ".join(meta))
+                        if is_over:
+                            st.error("⚠️ Quá hạn!", icon="🔴")
 
-    st.markdown(
-        f'{css}<div class="kboard-wrap"><div class="kboard">{board_html}</div></div>',
-        unsafe_allow_html=True,
-    )
+                        st.divider()
+                        _fragment_chi_tiet_task(h.to_dict(), ds_tt)
 
 
 # ============================================================
@@ -2767,25 +2759,6 @@ def giao_dien_admin():
         # ── KANBAN BOARD ──────────────────────────────────────────
         _render_kanban_board(df_board, ds_tt_board)
 
-        # ── Chi tiết (expanders) ──────────────────────────────────
-        if not df_board.empty:
-            st.divider()
-            st.markdown("#### 📝 Chi tiết & Chỉnh sửa công việc")
-            for tt in ds_tt_board:
-                nhom_b = df_board[df_board["Trạng Thái"] == tt]
-                if nhom_b.empty:
-                    continue
-                for _, hang_b in nhom_b.iterrows():
-                    tid_b = hang_b["ID"]
-                    ten_b = hang_b.get("Tên Công Việc", "")
-                    cty_b = hang_b.get("Công Ty", "")
-                    lbl_b = f"[{cty_b}]  #{tid_b}: {ten_b}"
-                    _fe_b = st.session_state.get(f"expand_{tid_b}", False)
-                    with st.expander(lbl_b, expanded=_fe_b):
-                        if _fe_b:
-                            del st.session_state[f"expand_{tid_b}"]
-                        _fragment_chi_tiet_task(hang_b.to_dict(), ds_tt_board)
-
 
 
 def giao_dien_nhan_vien():
@@ -2871,25 +2844,6 @@ def giao_dien_nhan_vien():
         else:
             # ── KANBAN BOARD ────────────────────────────────────
             _render_kanban_board(df_cua_toi, ds_tt)
-
-        # ── Chi tiết (expanders để chỉnh sửa) ──────────────────
-        if not df_cua_toi.empty:
-            st.divider()
-            st.markdown("#### 📝 Chi tiết & Chỉnh sửa công việc")
-            for tt in ds_tt:
-                nhom = df_cua_toi[df_cua_toi["Trạng Thái"] == tt]
-                if nhom.empty:
-                    continue
-                for _, hang in nhom.iterrows():
-                    task_id = hang["ID"]
-                    ten_cv  = hang.get("Tên Công Việc", "")
-                    cong_ty = hang.get("Công Ty", "")
-                    label_str = f"[{cong_ty}]  #{task_id}: {ten_cv}"
-                    _force_expand = st.session_state.get(f"expand_{task_id}", False)
-                    with st.expander(label_str, expanded=_force_expand):
-                        if _force_expand:
-                            del st.session_state[f"expand_{task_id}"]
-                        _fragment_chi_tiet_task(hang.to_dict(), ds_tt)
 
     # ========================================================
     # Tab 2: Tạo Công Việc Mới (nhân viên tự nhập)
