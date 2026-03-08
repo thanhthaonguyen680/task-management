@@ -1045,221 +1045,325 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
     pdf.cell(W, 6, "II. Hạng mục sửa chữa / Hạng mục sửa chữa",
              new_x="LMARGIN", new_y="NEXT")
 
+    # ── Kích thước cố định bảng Section II ──────────────────
     W_STT  = 15
     W_DATE = 35
     W_PASS = 38
-    W_HM   = W - W_STT - W_DATE - W_PASS
+    W_HM   = W - W_STT - W_DATE - W_PASS   # 190-15-35-38 = 102
 
-    # Header bảng – nền xanh
-    pdf.set_fill_color(*BLUE_CELL)
-    pdf.set_font("DejaVu", "B", 8.5)
-    HDR_H = 9
-    y_hdr = pdf.get_y()
-    # Vẽ 4 ô header bằng rect để kiểm soát chính xác
-    pdf.rect(M_LEFT,                    y_hdr, W_STT,  HDR_H)
-    pdf.rect(M_LEFT + W_STT,            y_hdr, W_HM,   HDR_H)
-    pdf.rect(M_LEFT + W_STT + W_HM,     y_hdr, W_DATE, HDR_H)
-    pdf.rect(M_LEFT + W_STT + W_HM + W_DATE, y_hdr, W_PASS, HDR_H)
-    # Fill màu
-    pdf.set_fill_color(*BLUE_CELL)
-    pdf.set_xy(M_LEFT, y_hdr)
-    pdf.cell(W_STT,  HDR_H, "",                                border=0, fill=True, new_x="END",    new_y="LAST")
-    pdf.cell(W_HM,   HDR_H, "",                                border=0, fill=True, new_x="END",    new_y="LAST")
-    pdf.cell(W_DATE, HDR_H, "",                                border=0, fill=True, new_x="END",    new_y="LAST")
-    pdf.cell(W_PASS, HDR_H, "",                                border=0, fill=True, new_x="LMARGIN", new_y="NEXT")
-    # Text header
-    pdf.set_xy(M_LEFT, y_hdr + 0.5)
-    pdf.set_font("DejaVu", "B", 8.5)
-    pdf.cell(W_STT, HDR_H - 1, "STT", align="C", new_x="END", new_y="LAST")
-    pdf.cell(W_HM,  HDR_H - 1, "Repair catalog / Hạng mục sửa chữa", align="C", new_x="END", new_y="LAST")
-    pdf.cell(W_DATE,HDR_H - 1, "Date / Ngày", align="C", new_x="END", new_y="LAST")
-    # "Passed / Thông qua" — 2 dòng nhỏ
-    x_pass = M_LEFT + W_STT + W_HM + W_DATE
-    pdf.set_xy(x_pass, y_hdr + 0.5)
-    pdf.set_font("DejaVu", "B", 8)
-    pdf.cell(W_PASS, 4.5, "Passed /", align="C", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_xy(x_pass, y_hdr + 4.5)
-    pdf.cell(W_PASS, 4.5, "Thông qua", align="C", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_xy(M_LEFT, y_hdr + HDR_H)
-
-    # 12 dòng hạng mục
-    pdf.set_fill_color(*WHITE)
-    pdf.set_font("DejaVu", "", 8.5)
+    HDR_H  = 9
     ROW_H2 = 7
+
+    # Tọa độ x tuyệt đối — tính 1 lần, dùng cho cả header lẫn rows
+    xSTT  = M_LEFT                          # 10
+    xHM   = xSTT  + W_STT                  # 25
+    xDATE = xHM   + W_HM                   # 127
+    xPASS = xDATE + W_DATE                 # 162
+
+    y_hdr = pdf.get_y()
+
+    # ── Header: vẽ nền trước bằng rect, rồi viền, rồi text ──
+    # 1) Fill toàn bộ hàng header một lần
+    pdf.set_fill_color(*BLUE_CELL)
+    pdf.rect(xSTT, y_hdr, W, HDR_H, style="F")
+
+    # 2) Vẽ viền từng ô bằng rect (không fill, chỉ border)
+    pdf.rect(xSTT,  y_hdr, W_STT,  HDR_H)
+    pdf.rect(xHM,   y_hdr, W_HM,   HDR_H)
+    pdf.rect(xDATE, y_hdr, W_DATE, HDR_H)
+    pdf.rect(xPASS, y_hdr, W_PASS, HDR_H)
+
+    # 3) Text header — border=0, set_xy rõ ràng cho từng ô
+    pdf.set_font("DejaVu", "B", 8.5)
+    pdf.set_text_color(*BLACK)
+
+    pdf.set_xy(xSTT, y_hdr)
+    pdf.cell(W_STT, HDR_H, "STT", border=0, align="C")
+
+    pdf.set_xy(xHM, y_hdr)
+    pdf.cell(W_HM, HDR_H, "Repair catalog / Hạng mục sửa chữa", border=0, align="C")
+
+    pdf.set_xy(xDATE, y_hdr)
+    pdf.cell(W_DATE, HDR_H, "Date / Ngày", border=0, align="C")
+
+    # "Passed / Thông qua" — 2 dòng, không có đường ngăn giữa
+    pdf.set_font("DejaVu", "B", 8)
+    pdf.set_xy(xPASS, y_hdr + 0.5)
+    pdf.cell(W_PASS, HDR_H / 2, "Passed /", border=0, align="C")
+    pdf.set_xy(xPASS, y_hdr + HDR_H / 2)
+    pdf.cell(W_PASS, HDR_H / 2, "Thông qua", border=0, align="C")
+
+    # ── 12 dòng hạng mục ─────────────────────────────────────
+    pdf.set_font("DejaVu", "", 8.5)
     for i in range(1, 13):
         noi_dung = hang_muc[i - 1] if (i - 1) < len(hang_muc) else ""
-        y_r = pdf.get_y()
-        # Vẽ khung bằng rect
-        pdf.rect(M_LEFT,                         y_r, W_STT,  ROW_H2)
-        pdf.rect(M_LEFT + W_STT,                 y_r, W_HM,   ROW_H2)
-        pdf.rect(M_LEFT + W_STT + W_HM,          y_r, W_DATE, ROW_H2)
-        pdf.rect(M_LEFT + W_STT + W_HM + W_DATE, y_r, W_PASS, ROW_H2)
-        # Text
-        pdf.set_xy(M_LEFT, y_r + 0.5)
-        pdf.cell(W_STT,  ROW_H2 - 1, f"{i} -",  align="C", new_x="END",    new_y="LAST")
-        pdf.cell(W_HM,   ROW_H2 - 1, noi_dung,  align="L", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_xy(M_LEFT, y_r + ROW_H2)
+        y_r = y_hdr + HDR_H + (i - 1) * ROW_H2
 
-    # ── Footer box trang 1 (absolute, sát đáy trang) ─────────
-    y_footer = 267
+        # Viền từng ô
+        pdf.rect(xSTT,  y_r, W_STT,  ROW_H2)
+        pdf.rect(xHM,   y_r, W_HM,   ROW_H2)
+        pdf.rect(xDATE, y_r, W_DATE, ROW_H2)
+        pdf.rect(xPASS, y_r, W_PASS, ROW_H2)
+
+        # Text
+        pdf.set_xy(xSTT, y_r + 1)
+        pdf.cell(W_STT, ROW_H2 - 1, f"{i} -", border=0, align="C")
+
+        pdf.set_xy(xHM, y_r + 1)
+        pdf.cell(W_HM, ROW_H2 - 1, noi_dung, border=0, align="L")
+
+    # Đặt cursor xuống dưới bảng
+    pdf.set_xy(M_LEFT, y_hdr + HDR_H + 12 * ROW_H2)
+
+    # Định nghĩa W1/W2/W3 dùng chung cho _draw_img_hdr
     BOX_H1 = 8
     BOX_H2 = 8
-    pdf.set_xy(M_LEFT, y_footer)
-    W1 = 16   # logo placeholder
+    W1 = 16   # logo
     W2 = int((W - W1) / 3)
     W3 = W - W1 - W2 - W2
 
-    # Hàng 1: logo + Quotation | Engine number | Order number
-    pdf.set_font("DejaVu", "B", 8)
-    pdf.cell(W1, BOX_H1, "NT", border=1, align="C", new_x="END", new_y="LAST")
-    pdf.set_font("DejaVu", "", 7.5)
-    pdf.cell(W2, BOX_H1, "Quotation / Báo giá :", border=1, new_x="END", new_y="LAST")
-    pdf.cell(W2, BOX_H1, "Engine number / Số máy :", border=1, new_x="END", new_y="LAST")
-    pdf.cell(W3, BOX_H1, f"Order number / Số đơn hàng : {cong_so}", border=1, new_x="LMARGIN", new_y="NEXT")
-
-    # Hàng 2: logo span + Management doc | Edition date | Page
-    y2 = y_footer + BOX_H1
-    pdf.rect(M_LEFT,              y2, W1, BOX_H2)
-    pdf.rect(M_LEFT + W1,         y2, W2, BOX_H2)
-    pdf.rect(M_LEFT + W1 + W2,    y2, W2, BOX_H2)
-    pdf.rect(M_LEFT + W1 + W2*2,  y2, W3, BOX_H2)
-    pdf.set_font("DejaVu", "", 7)
-    # Management doc — 2 dòng
-    pdf.set_xy(M_LEFT + W1,      y2 + 0.5);  pdf.cell(W2, 4, "Management document / Tài liệu quản lý :", align="C")
-    pdf.set_xy(M_LEFT + W1,      y2 + 4);    pdf.cell(W2, 4, "QT-NT-029-1A", align="C")
-    # Edition date
-    pdf.set_xy(M_LEFT + W1 + W2, y2 + 1.5);  pdf.cell(W2, 5, "Edition date / Ngày xuất bản :", align="C")
-    # Page — 2 dòng
-    pdf.set_xy(M_LEFT + W1 + W2*2, y2 + 0.5); pdf.cell(W3, 4, "Page / Trang:", align="C")
-    pdf.set_xy(M_LEFT + W1 + W2*2, y2 + 4);   pdf.cell(W3, 4, "1/11", align="C")
-
     # ========================================================= #
-    #  TRANG 2: bảng điện trở + ảnh trong ô                    #
+    #  TRANG ẢNH 1/5 → 5/5                                     #
     # ========================================================= #
-    pdf.add_page()
 
-    # ── Header doc trang 2 ────────────────────────────────────
-    pdf.set_xy(M_LEFT, M_TOP)
-    pdf.set_font("DejaVu", "", 7.5)
-    pdf.cell(W1, BOX_H1, "NT", border=1, align="C",
-             new_x="END", new_y="LAST")
-    pdf.cell(W2, BOX_H1, "Quotation / Báo giá :", border=1, new_x="END", new_y="LAST")
-    pdf.cell(W2, BOX_H1, "Engine number / Số máy :", border=1, new_x="END", new_y="LAST")
-    pdf.cell(W3, BOX_H1, f"Order number / Số đơn hàng : {cong_so}", border=1, new_x="LMARGIN", new_y="NEXT")
+    # ── Hàm vẽ header tài liệu cho mỗi trang ảnh ─────────
+    def _draw_img_hdr(page_str: str):
+        """Vẽ header box 2 hàng bằng nhau, NT span 2 hàng, giống mẫu Excel.
+        Dùng rect() cho tất cả viền để đảm bảo thẳng hàng tuyệt đối."""
+        RH = BOX_H1   # chiều cao mỗi hàng = 8mm
+        y1 = M_TOP
+        y2 = M_TOP + RH
 
-    y2p = M_TOP + BOX_H1
-    pdf.rect(M_LEFT,              y2p, W1, BOX_H2)
-    pdf.rect(M_LEFT + W1,         y2p, W2, BOX_H2)
-    pdf.rect(M_LEFT + W1 + W2,    y2p, W2, BOX_H2)
-    pdf.rect(M_LEFT + W1 + W2*2,  y2p, W3, BOX_H2)
-    pdf.set_font("DejaVu", "", 7)
-    pdf.set_xy(M_LEFT + W1,       y2p + 0.5); pdf.cell(W2, 4, "Management document / Tài liệu quản lý :", align="C")
-    pdf.set_xy(M_LEFT + W1,       y2p + 4);   pdf.cell(W2, 4, "QT-NT-029-1A", align="C")
-    pdf.set_xy(M_LEFT + W1 + W2,  y2p + 1.5); pdf.cell(W2, 5, "Edition date / Ngày xuất bản :", align="C")
-    pdf.set_xy(M_LEFT + W1+W2*2,  y2p + 0.5); pdf.cell(W3, 4, "Page / Trang:", align="C")
-    pdf.set_xy(M_LEFT + W1+W2*2,  y2p + 4);   pdf.cell(W3, 4, "1/11", align="C")
-    pdf.set_xy(M_LEFT, M_TOP + BOX_H1 + BOX_H2 + 4)
+        # Tọa độ x cố định cho 4 cột
+        xA = M_LEFT           # NT logo
+        xB = M_LEFT + W1      # Quotation / Management doc
+        xC = M_LEFT + W1 + W2 # Engine number / Edition date
+        xD = M_LEFT + W1 + W2 * 2  # Order number / Page
 
-    # ── Hàm vẽ 1 bảng điện trở có ô ảnh ─────────────────────
-    # Dùng chiều rộng nguyên để tránh lệch do số thực
-    C1 = int(W / 3)          # cột 1 và 2
-    C2 = int(W / 3)
-    C3 = W - C1 - C2         # cột 3 lấy phần còn lại → tổng luôn = W
-    IMG_H  = 55             # chiều cao ô ảnh (mm)
-    HDR_H  = 8              # chiều cao dòng tiêu đề
-    LBL_H  = 8              # chiều cao dòng nhãn pha
-    _COL_WIDTHS = [C1, C2, C3]
-    _COL_XS     = [M_LEFT, M_LEFT + C1, M_LEFT + C1 + C2]
+        # ── Vẽ tất cả viền bằng rect() ──────────────────────────
+        pdf.rect(xA, y1, W1, RH * 2)   # NT logo span 2 hàng
+        pdf.rect(xB, y1, W2, RH)        # Quotation (hàng 1)
+        pdf.rect(xC, y1, W2, RH)        # Engine number (hàng 1)
+        pdf.rect(xD, y1, W3, RH)        # Order number (hàng 1)
+        pdf.rect(xB, y2, W2, RH)        # Management doc (hàng 2)
+        pdf.rect(xC, y2, W2, RH)        # Edition date (hàng 2)
+        pdf.rect(xD, y2, W3, RH)        # Page (hàng 2)
 
-    def _bang_co_anh(ten_en: str, ten_vi: str, nhan_pha: list, danh_sach_anh_bang: list):
+        # ── NT logo — canh giữa theo chiều dọc 2 hàng ──
+        pdf.set_font("DejaVu", "B", 9)
+        pdf.set_xy(xA, y1 + RH - 3)
+        pdf.cell(W1, 6, "NT", border=0, align="C")
+
+        # ── Hàng 1 — text canh giữa ô ──
+        pdf.set_font("DejaVu", "", 7)
+        # Quotation
+        pdf.set_xy(xB, y1)
+        pdf.cell(W2, RH, "Quotation / Báo giá :", border=0, align="C")
+        # Engine number
+        pdf.set_xy(xC, y1)
+        pdf.cell(W2, RH, "Engine number / Số máy :", border=0, align="C")
+        # Order number (có giá trị)
+        pdf.set_xy(xD, y1)
+        pdf.cell(W3, RH, f"Order number / Số ĐH: {cong_so}", border=0, align="C")
+
+        # ── Hàng 2 — mỗi ô chia 2 dòng nhỏ bằng multi_cell ──
+        sub_h = RH / 2  # 4mm mỗi sub-row
+
+        # Management doc
+        pdf.set_font("DejaVu", "", 6.5)
+        pdf.set_xy(xB, y2)
+        pdf.cell(W2, sub_h, "Management document / Tài liệu quản lý:", border=0, align="C")
+        pdf.set_xy(xB, y2 + sub_h)
+        pdf.cell(W2, sub_h, "QT-NT-029-1A", border=0, align="C")
+
+        # Edition date
+        pdf.set_xy(xC, y2)
+        pdf.cell(W2, sub_h, "Edition date / Ngày ban hành:", border=0, align="C")
+        pdf.set_xy(xC, y2 + sub_h)
+        pdf.cell(W2, sub_h, "24/04/2025", border=0, align="C")
+
+        # Page
+        pdf.set_xy(xD, y2)
+        pdf.cell(W3, sub_h, "Page / Trang:", border=0, align="C")
+        pdf.set_xy(xD, y2 + sub_h)
+        pdf.cell(W3, sub_h, page_str, border=0, align="C")
+
+        # Đặt cursor sau header
+        pdf.set_xy(M_LEFT, M_TOP + RH * 2 + 4)
+
+    # ── Hàm vẽ 1 bảng có ô ảnh ─────────────────────────────
+    def _bang_co_anh(ten_en: str, ten_vi: str, nhan_pha_display: list,
+                     danh_sach_anh_bang: list, img_h: int = 55):
         """
-        Vẽ bảng 3 cột có:
-          - Dòng 1: tiêu đề full width (nền xanh đậm, chữ trắng)
-          - Dòng 2: 3 nhãn pha (nền xanh nhạt)
-          - Dòng 3: 3 ô ảnh (hoặc trống nếu không có ảnh)
+        Vẽ bảng n cột:
+          - Dòng 1: tiêu đề full width (xanh đậm/trắng) — bỏ qua nếu ten_en rỗng
+          - Dòng 2: n nhãn cột (xanh nhạt)
+          - Dòng 3: n ô ảnh (hoặc trống)
+        img_h : chiều cao vùng ảnh (mm), điều chỉnh theo số bảng/trang.
         """
+        HDR_H  = 8
+        LBL_H  = 8
+        n = len(nhan_pha_display)
+        if n == 0:
+            return
+        base_w = int(W / n)
+        col_ws = [base_w] * (n - 1) + [W - base_w * (n - 1)]
+        col_xs = [M_LEFT + sum(col_ws[:i]) for i in range(n)]
+
         y_start = pdf.get_y()
 
-        # -- Dòng tiêu đề --
-        pdf.set_xy(M_LEFT, y_start)
-        pdf.set_fill_color(*BLUE_HDR)
-        pdf.set_text_color(*WHITE)
-        pdf.set_font("DejaVu", "B", 9.5)
-        pdf.cell(W, HDR_H, f"{ten_en} / {ten_vi}",
-                 border=1, align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
-        pdf.set_text_color(*BLACK)
+        # -- Dòng tiêu đề (chỉ vẽ nếu có tên) --
+        if ten_en:
+            pdf.set_xy(M_LEFT, y_start)
+            pdf.set_fill_color(*BLUE_HDR)
+            pdf.set_text_color(*WHITE)
+            pdf.set_font("DejaVu", "B", 9.5)
+            hdr_txt = f"{ten_en} / {ten_vi}" if ten_vi else ten_en
+            pdf.cell(W, HDR_H, hdr_txt, border=1, align="C", fill=True,
+                     new_x="LMARGIN", new_y="NEXT")
+            pdf.set_text_color(*BLACK)
+            y_lbl = pdf.get_y()
+        else:
+            y_lbl = y_start
 
-        # -- Dòng nhãn pha -- dùng set_xy tuyệt đối cho từng ô
-        y_lbl = pdf.get_y()
+        # -- Dòng nhãn --
         pdf.set_fill_color(*BLUE_CELL)
         pdf.set_font("DejaVu", "B", 9)
-        for idx_p, nhan in enumerate(nhan_pha):
-            pdf.set_xy(_COL_XS[idx_p], y_lbl)
-            pdf.cell(_COL_WIDTHS[idx_p], LBL_H, nhan, border=1, align="C", fill=True)
+        for idx_p, nhan in enumerate(nhan_pha_display):
+            pdf.set_xy(col_xs[idx_p], y_lbl)
+            pdf.cell(col_ws[idx_p], LBL_H, nhan, border=1, align="C", fill=True)
         pdf.set_xy(M_LEFT, y_lbl + LBL_H)
 
-        # -- Dòng ô ảnh -- dùng rect + image với tọa độ tuyệt đối
+        # -- Dòng ô ảnh --
         y_img = pdf.get_y()
-        for idx_a in range(3):
-            x_img = _COL_XS[idx_a]
-            cw    = _COL_WIDTHS[idx_a]
-            # Vẽ khung ô
-            pdf.rect(x_img, y_img, cw, IMG_H)
-            # Chèn ảnh nếu có
+        for idx_a in range(n):
+            x_img = col_xs[idx_a]
+            cw    = col_ws[idx_a]
+            pdf.rect(x_img, y_img, cw, img_h)
             if idx_a < len(danh_sach_anh_bang) and danh_sach_anh_bang[idx_a]:
-                duong_dan = danh_sach_anh_bang[idx_a]
                 try:
-                    # Fit ảnh vào ô, giữ tỉ lệ, padding 1mm
                     pad = 1
-                    pdf.image(duong_dan, x=x_img + pad, y=y_img + pad,
-                              w=cw - 2*pad, h=IMG_H - 2*pad)
+                    pdf.image(danh_sach_anh_bang[idx_a],
+                              x=x_img + pad, y=y_img + pad,
+                              w=cw - 2*pad, h=img_h - 2*pad)
                 except Exception:
                     pass
+        pdf.set_xy(M_LEFT, y_img + img_h)
+        pdf.ln(4)
 
-        pdf.set_xy(M_LEFT, y_img + IMG_H)
-        pdf.ln(3)
+    # ── Nhóm theo trang ảnh (trang X/5) ────────────────────
+    # Cấu trúc mỗi phần tử: (page_str, img_h, [(ten_en, ten_vi, display_labels, storage_keys)])
+    # ten_en = "" → không vẽ header xanh đậm (dùng cho nhóm tiếp theo cùng section)
+    IMAGE_PAGES = [
+        # Trang 1/5 — Stator + Temperature sensor
+        ("1/5", 55, [
+            ("Stator 1 coil resistance",
+             "Điện trở cuộn dây Stator 1",
+             ["U1 – U2", "V1 – V2", "W1 –  W2"],
+             ["U1–U2",   "V1–V2",   "W1–W2"]),
 
-    # ── Tải trước ảnh đo lường về temp files theo từng nhãn ─
-    # Mỗi nhóm 3 slot, mỗi slot lấy ảnh đầu tiên của nhãn đó
-    _NHOM_LABELS = [
-        ["U1–V1", "U1–W1", "V1–W1"],   # Stator 1
-        ["U2–V2", "U2–W2", "V2–W2"],   # Stator 2
-        ["K–L",   "K–M",   "L–M"  ],   # Rotor
+            ("Resistance of the temperature sensor",
+             "điện trở của cảm biến nhiệt độ",
+             ["PTC", "PT100", "HEATER"],
+             ["PTC", "PT100", "HEATER"]),
+        ]),
+
+        # Trang 2/5 — No-load test (3 sub-bảng chung 1 header xanh đầu)
+        ("2/5", 50, [
+            ("No-load test",
+             "Kiểm tra không tải",
+             ["Frequency / Tần số", "Voltage /  Voltage", "Current / Dòng điện"],
+             ["Tần số",              "Voltage",             "Dòng điện"]),
+
+            ("",   # không vẽ lại header
+             "",
+             ["Radial ↔ DE / AS", "Radial ↕ DE / AS", "Axial (X) DE / AS"],
+             ["Radial ↔ DE / AS", "Radial ↑ DE / AS", "Axial (X) DE / AS"]),
+
+            ("",
+             "",
+             ["Radial ↔ NDE / AS", "Radial ↕ NDE / AS", "Axial (X) NDE / AS"],
+             ["Radial ↔ NDE / AS", "Radial ↑ NDE / AS", "Axial (X) NDE / AS"]),
+        ]),
+
+        # Trang 3/5 — Engine overview + Nắp
+        ("3/5", 55, [
+            ("Engine overview",
+             "Tổng quan động cơ",
+             ["Engine / Động cơ", "Nameplate / Bảng tên", "Quạt làm mát / Cooling fan"],
+             ["Engine / Động cơ", "Nameplate / Bảng tên", "Quạt làm mát / Cooling fan"]),
+
+            ("Nắp động cơ", "",
+             ["DE", "NDE"],
+             ["Nắp DE", "Nắp NDE"]),
+        ]),
+
+        # Trang 4/5 — Trục, Phớt, Bearing (4 bảng → img_h nhỏ hơn)
+        ("4/5", 42, [
+            ("Trục động cơ", "",
+             ["Bạc đạn DE", "Bạc đạn NDE"],
+             ["Bạc đạn DE", "Bạc đạn NDE"]),
+
+            ("",  "",
+             ["Phớt", "Đầu ren , chốt lavet", "Cánh quạt làm mát"],
+             ["Phớt", "Đầu ren, chốt lavet",  "Cánh quạt làm mát"]),
+
+            ("Phớt chặn", "",
+             ["Phớt 1", "Phớt 2"],
+             ["Phớt chặn 1", "Phớt chặn 2"]),
+
+            ("Bearing / Vòng bi", "",
+             ["DE", "NDE"],
+             ["Vòng bi DE", "Vòng bi NDE"]),
+        ]),
+
+        # Trang 5/5 — Grease pump, Coil, Cân bằng
+        ("5/5", 50, [
+            ("Grease pump",
+             "Bơm mỡ bôi trơn",
+             ["Bearing / Vòng bi", "Grease cap / Mặt gam"],
+             ["Vòng bi bơm mỡ",    "Mặt gam"]),
+
+            ("Coil",
+             "Cuộn dây",
+             ["Vào dây", "Đai đấu"],
+             ["Vào dây", "Đai đầu"]),
+
+            ("Cân bằng động", "",
+             ["Gá lên máy", "Sau khi cân"],
+             ["Gá lên máy", "Sau khi cân"]),
+        ]),
     ]
-    temp_files_nhom = []  # list of 3 groups, each group = list of 3 temp paths
-    all_temps = []        # flat list để dọn dẹp
 
-    for nhom_labels in _NHOM_LABELS:
+    # ── Tải toàn bộ ảnh về temp files ───────────────────────
+    # Làm phẳng IMAGE_PAGES thành danh sách bảng + map index
+    _all_tables = []
+    for _, _, tables in IMAGE_PAGES:
+        for t in tables:
+            _all_tables.append(t)
+
+    temp_files_all = []
+    all_temps = []
+    for _, _, _, storage_keys in _all_tables:
         nhom_paths = []
-        for lbl in nhom_labels:
+        for lbl in storage_keys:
             urls = anh_do_luong.get(lbl, [])
-            if urls:
-                p = _tai_anh_tam(urls[0])   # chỉ lấy ảnh đầu tiên
-            else:
-                p = None
+            p = _tai_anh_tam(urls[0]) if urls else None
             nhom_paths.append(p)
             if p:
                 all_temps.append(p)
-        temp_files_nhom.append(nhom_paths)
+        temp_files_all.append(nhom_paths)
 
-    # ── Vẽ 3 bảng ────────────────────────────────────────────
-    _bang_co_anh(
-        "Stator 1 coil resistance", "Điện trở cuộn dây Stator 1",
-        ["U1 – V1", "U1 – W1", "V1 –  W1"],
-        temp_files_nhom[0]
-    )
-    _bang_co_anh(
-        "Stator 2 coil resistance", "Điện trở cuộn dây Stator 2",
-        ["U2 – V2", "U2 – W2", "V2 –  W2"],
-        temp_files_nhom[1]
-    )
-    _bang_co_anh(
-        "Rotor coil resistance", "Điện trở cuộn dây Rotor",
-        ["K – L", "K – M", "L –  M"],
-        temp_files_nhom[2]
-    )
+    # ── Vẽ từng trang ảnh ───────────────────────────────────
+    tbl_idx = 0
+    for page_str, img_h, tables in IMAGE_PAGES:
+        pdf.add_page()
+        _draw_img_hdr(page_str)
+        for ten_en, ten_vi, display_labels, _ in tables:
+            _bang_co_anh(ten_en, ten_vi, display_labels, temp_files_all[tbl_idx], img_h)
+            tbl_idx += 1
 
-    # ── Dọn temp files ────────────────────────────────────────
+    # ── Dọn temp files ───────────────────────────────────────
     for p in all_temps:
         if p and os.path.exists(p):
             try:
@@ -1418,7 +1522,6 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
 
     # ── Thông số kỹ thuật / thương mại ──────────────────────────────────────
     _thong_so = {
-        "⚙️ Công Đoạn":    hang.get("Công Đoạn", ""),
         "🔧 Loại Máy":     hang.get("Loại Máy", ""),
         "🛠️ Tình Trạng":   hang.get("Tình Trạng", ""),
         "⚡ Công Suất":    hang.get("Công Suất", ""),
@@ -1457,73 +1560,60 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
 
     _cl_key = f"cl_editable_{task_id}"
     if _cl_key not in st.session_state:
-        st.session_state[_cl_key] = _cl_parsed
-    checklist = st.session_state[_cl_key]
+        st.session_state[_cl_key] = [
+            ({"text": x, "done": False} if isinstance(x, str) else x)
+            for x in _cl_parsed
+        ]
+    _checklist = st.session_state[_cl_key]
 
-    so_xong = sum(1 for item in checklist if isinstance(item, dict) and item.get("done"))
-    pct     = int(so_xong / len(checklist) * 100) if checklist else 0
+    so_xong = sum(1 for it in _checklist if isinstance(it, dict) and it.get("done"))
     st.markdown(
-        f"""**☑️ Checklist** &nbsp;<span style='color:#6b7280;font-size:0.82rem;'>{so_xong}/{len(checklist)} mục</span>
-        <div style='background:#e5e7eb;border-radius:99px;height:6px;margin:4px 0 10px 0;'>
-        <div style='background:#7c3aed;width:{pct}%;height:6px;border-radius:99px;transition:width .3s'></div>
-        </div>""",
+        f"**☑️ Checklist** &nbsp;<span style='color:#6b7280;font-size:0.82rem;'>{so_xong}/{len(_checklist)} mục</span>",
         unsafe_allow_html=True,
     )
 
-    import pandas as _pd
-    st.markdown(_FRAGMENT_CSS, unsafe_allow_html=True)
-    if checklist:
-        _done_cnt0 = sum(1 for it in checklist if (it.get("done") if isinstance(it, dict) else False))
-        st.progress(_done_cnt0 / len(checklist), text=f"{_done_cnt0}/{len(checklist)} hoàn thành")
-    _cl_xoa2   = None
-    _cl_changed = False
-    for _ci, _cit in enumerate(checklist):
+    _mk_cl = f"dlgcl{task_id}"
+    st.markdown(f"""<style>
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) {{
+        flex-wrap: nowrap !important; align-items: center !important; gap: 6px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) > [data-testid="stColumn"]:first-child {{
+        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) > [data-testid="stColumn"]:last-child {{
+        flex: 1 1 0% !important; min-width: 0 !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) [data-testid="stCheckbox"] {{ margin:0 !important; }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) p {{
+        margin: 0 !important; font-size: 0.93rem !important; color: #1e1b4b;
+        padding: 4px 2px;
+    }}
+    </style>""", unsafe_allow_html=True)
+
+    def _cb_cl_done(idx):
+        val = st.session_state.get(f"dlg_ck_{task_id}_{idx}", False)
+        st.session_state[_cl_key][idx]["done"] = val
+        cap_nhat_checklist(task_id, st.session_state[_cl_key])
+
+    for _ci, _cit in enumerate(_checklist):
         if isinstance(_cit, str):
             _cit = {"text": _cit, "done": False}
-            checklist[_ci] = _cit
+            _checklist[_ci] = _cit
         _done_v = bool(_cit.get("done", False))
         _txt0   = _cit.get("text", "") or f"Mục {_ci+1}"
-        _cls0   = "cl-card cl-done" if _done_v else "cl-card"
-        _badge0 = "<span class='cl-badge'>✅ Xong</span>" if _done_v else ""
-        st.markdown(
-            f"<div class='{_cls0}'>"
-            f"<span class='cl-num'>{_ci+1}</span>"
-            f"<span class='cl-txt'>{_txt0}</span>"
-            f"{_badge0}</div>",
-            unsafe_allow_html=True,
-        )
-        if not _done_v:
-            _ct1, _ct2 = st.columns(2)
-            with _ct1:
-                if st.button("✅ Xong", key=f"cl_{task_id}_{_ci}", use_container_width=True):
-                    checklist[_ci]["done"] = True
-                    _cl_changed = True
-            with _ct2:
-                if st.button("🗑️ Xóa", key=f"cl_del_{task_id}_{_ci}", use_container_width=True):
-                    _cl_xoa2 = _ci
-    if _cl_xoa2 is not None:
-        checklist.pop(_cl_xoa2)
-        st.session_state[_cl_key] = checklist
-        cap_nhat_checklist(task_id, checklist)
-    elif _cl_changed:
-        st.session_state[_cl_key] = checklist
-        cap_nhat_checklist(task_id, checklist)
+        col_ck, col_txt = st.columns([0.5, 9], gap="small")
+        with col_ck:
+            st.markdown(f"<span class='{_mk_cl}' style='display:none'></span>", unsafe_allow_html=True)
+            st.checkbox("", value=_done_v, key=f"dlg_ck_{task_id}_{_ci}",
+                        label_visibility="collapsed",
+                        on_change=_cb_cl_done, args=(_ci,))
+        with col_txt:
+            if _done_v:
+                st.markdown(f"<p style='text-decoration:line-through;color:#9ca3af'>{_txt0}</p>",
+                            unsafe_allow_html=True)
+            else:
+                st.markdown(f"<p>{_txt0}</p>", unsafe_allow_html=True)
 
-    # Form thêm checklist
-    _cl_add_cnt = st.session_state.get(f"cl_add_cnt_{task_id}", 0)
-    _cc1, _cc2 = st.columns([5, 2])
-    with _cc1:
-        cl_moi = st.text_input(
-            "", placeholder="Nhập mục checklist...",
-            key=f"cl_inp_{task_id}_{_cl_add_cnt}", label_visibility="collapsed",
-        )
-    with _cc2:
-        if st.button("＋ Thêm", key=f"cl_add_{task_id}", use_container_width=True):
-            if cl_moi.strip():
-                _cur = st.session_state.get(_cl_key, []) + [{"text": cl_moi.strip(), "done": False}]
-                st.session_state[_cl_key] = _cur
-                st.session_state[f"cl_add_cnt_{task_id}"] = _cl_add_cnt + 1
-                cap_nhat_checklist(task_id, _cur)
     st.divider()
 
     # ── Công việc con ─────────────────────────────────────────
@@ -1535,109 +1625,154 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
 
     _cv_key = f"cv_editable_{task_id}"
     if _cv_key not in st.session_state:
-        # Normalize keys về lowercase khi load lần đầu
-        _cv_parsed_norm = [
+        st.session_state[_cv_key] = [
             {
                 "ten":       cv.get("ten", cv.get("Tên", "")),
                 "nhan_vien": cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))),
-                "deadline":  cv.get("deadline", cv.get("Deadline", "")),
                 "done":      bool(cv.get("done", False)),
             }
             for cv in _cv_parsed if isinstance(cv, dict)
         ]
-        st.session_state[_cv_key] = _cv_parsed_norm
     ds_cv_con = st.session_state[_cv_key]
+    _ds_nv_cv = ["-- Không chọn --"] + lay_danh_sach_nhan_vien()
 
-    st.markdown("**📋 Công Việc Con**")
-    if ds_cv_con:
-        _done_cnt1 = sum(1 for cv in ds_cv_con if isinstance(cv, dict) and cv.get("done"))
-        st.progress(_done_cnt1 / len(ds_cv_con), text=f"{_done_cnt1}/{len(ds_cv_con)} hoàn thành")
 
-    _cv_xoa2 = None
-    _cv_ch2  = False
+
+    _done_cv = sum(1 for cv in ds_cv_con if cv.get("done"))
+    st.markdown(
+        f"**📋 Công Việc Con** &nbsp;<span style='color:#6b7280;font-size:0.82rem;'>{_done_cv}/{len(ds_cv_con)} hoàn thành</span>",
+        unsafe_allow_html=True,
+    )
+
+    _mk_cv = f"dlgcv{task_id}"
+    st.markdown(f"""<style>
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) {{
+        flex-wrap: nowrap !important; align-items: center !important; gap: 6px !important;
+        margin-bottom: 2px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) > [data-testid="stColumn"]:nth-child(1) {{
+        flex: 0 0 32px !important; min-width: 32px !important; max-width: 32px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) > [data-testid="stColumn"]:nth-child(2) {{
+        flex: 3 1 0% !important; min-width: 0 !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) > [data-testid="stColumn"]:nth-child(3) {{
+        flex: 5 1 0% !important; min-width: 0 !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) > [data-testid="stColumn"]:nth-child(4) {{
+        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stCheckbox"] {{ margin: 0 !important; }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) p {{
+        margin: 0 !important; font-size: 0.93rem !important; font-weight: 600;
+        color: #1e1b4b; padding: 2px 0;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stSelectbox"] > div > div {{
+        font-size: 0.85rem !important; border-color: #e0d7ff !important;
+        background: #f5f3ff !important; color: #4c1d95 !important;
+        min-height: 32px !important; padding: 2px 8px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stColumn"]:nth-child(4) button {{
+        background: transparent !important; border: none !important;
+        box-shadow: none !important; color: #ef4444 !important;
+        font-size: 1.1rem !important; padding: 2px 4px !important; min-height: 32px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stColumn"]:nth-child(4) button:hover {{
+        background: #fee2e2 !important; border-radius: 6px !important;
+    }}
+    .cv-item-wrap-{task_id} {{
+        border-bottom: 1px solid #f3f4f6;
+        padding: 2px 0; margin-bottom: 0;
+    }}
+    .cv-item-wrap-{task_id}.done {{ opacity: 0.6; }}
+    </style>""", unsafe_allow_html=True)
+
+    def _cb_cv_done(i):
+        val = st.session_state.get(f"dlg_cv_ck_{task_id}_{i}", False)
+        st.session_state[_cv_key][i]["done"] = val
+        _save_cv_to_sheet(task_id, _cv_key)
+
+    def _cb_cv_nv(i):
+        val = st.session_state.get(f"dlg_cv_nv_{task_id}_{i}", "-- Không chọn --")
+        st.session_state[_cv_key][i]["nhan_vien"] = "" if val == "-- Không chọn --" else val
+        _save_cv_to_sheet(task_id, _cv_key)
+
+    def _cb_cv_del(i):
+        if 0 <= i < len(st.session_state[_cv_key]):
+            st.session_state[_cv_key].pop(i)
+            for k in list(st.session_state.keys()):
+                if k.startswith(f"dlg_cv_nv_{task_id}_"):
+                    del st.session_state[k]
+            _save_cv_to_sheet(task_id, _cv_key)
+
     for _cvi, cv in enumerate(ds_cv_con):
         if not isinstance(cv, dict): continue
-        _tcv  = cv.get("ten",       cv.get("Tên",       f"Việc {_cvi+1}"))
-        _nvcv = cv.get("nhan_vien", cv.get("Nhân Viên", "")) or ""
-        _dlcv = cv.get("deadline",  cv.get("Deadline",  "")) or ""
+        _tcv  = cv.get("ten", f"Việc {_cvi+1}")
+        _nvcv = cv.get("nhan_vien", "") or ""
         _dcv  = bool(cv.get("done", False))
-        _cls1 = "cvc-card cvc-done" if _dcv else "cvc-card"
-        _mpx  = []
-        if _nvcv and _nvcv.lower() != "none": _mpx.append(f"👤 {_nvcv}")
-        if _dlcv and _dlcv.lower() != "none": _mpx.append(f"📅 {_dlcv}")
-        _mhtml = f"<div class='cvc-meta'>{'&nbsp;&nbsp;│&nbsp;&nbsp;'.join(_mpx)}</div>" if _mpx else ""
-        _badge1 = "<div class='cvc-badge'>✅ Hoàn thành</div>" if _dcv else ""
-        st.markdown(
-            f"<div class='{_cls1}'>"
-            f"<div class='cvc-title'>{_cvi+1}. {_tcv}</div>"
-            f"{_mhtml}{_badge1}</div>",
-            unsafe_allow_html=True,
-        )
-        if not _dcv:
-            _cv1, _cv2 = st.columns(2)
-            with _cv1:
-                if st.button("✅ Xong", key=f"cv_{task_id}_{_cvi}", use_container_width=True):
-                    ds_cv_con[_cvi]["done"] = True
-                    _cv_ch2 = True
-            with _cv2:
-                if st.button("🗑️ Xóa", key=f"cv_del_{task_id}_{_cvi}", use_container_width=True):
-                    _cv_xoa2 = _cvi
-    _cv_changed2 = _cv_ch2
-    _cv_xoa = _cv_xoa2
+        _nv_idx = _ds_nv_cv.index(_nvcv) if _nvcv in _ds_nv_cv else 0
+        _wrap_cls = f"cv-item-wrap-{task_id}" + (" done" if _dcv else "")
 
-    # Form thêm công việc con
-    _ds_nv_cv = lay_danh_sach_nhan_vien()
-    _cv_add_cnt = st.session_state.get(f"cv_add_cnt_{task_id}", 0)
-    st.markdown("---")
-    cv_ten_moi = st.text_input(
-        "Tên việc", placeholder="Ví dụ: Tháo máy",
-        key=f"cv_inp_ten_{task_id}_{_cv_add_cnt}", label_visibility="collapsed",
-    )
-    cv_nv_moi = st.selectbox(
-        "👤 Nhân viên", options=["-- Chọn --"] + _ds_nv_cv,
-        key=f"cv_inp_nv_{task_id}_{_cv_add_cnt}",
-    )
-    cv_dl_moi = st.date_input("📅 Deadline", key=f"cv_inp_dl_{task_id}_{_cv_add_cnt}")
-    if st.button("➕ Thêm công việc con", key=f"cv_add_{task_id}", use_container_width=True):
-        if cv_ten_moi.strip():
-            nv_luu = cv_nv_moi if cv_nv_moi != "-- Chọn --" else ""
-            ds_cv_con.append({
-                "ten": cv_ten_moi.strip(),
-                "nhan_vien": nv_luu,
-                "deadline": str(cv_dl_moi),
-                "done": False,
-            })
-            st.session_state[_cv_key] = ds_cv_con
-            st.session_state[f"cv_add_cnt_{task_id}"] = _cv_add_cnt + 1
-            _sh = lay_sheet()
-            _o  = _sh.find(str(task_id), in_column=1)
-            if _o:
-                _sh.update_cell(_o.row, 14, json.dumps(ds_cv_con, ensure_ascii=False))
-                lay_danh_sach_cong_viec.clear()
+        st.markdown(f"<div class='{_wrap_cls}'>", unsafe_allow_html=True)
+        col_ck, col_txt, col_nv, col_del = st.columns([0.4, 3, 5.5, 0.5], gap="small")
+        with col_ck:
+            st.markdown(f"<span class='{_mk_cv}' style='display:none'></span>", unsafe_allow_html=True)
+            st.checkbox("", value=_dcv, key=f"dlg_cv_ck_{task_id}_{_cvi}",
+                        label_visibility="collapsed",
+                        on_change=_cb_cv_done, args=(_cvi,))
+        with col_txt:
+            if _dcv:
+                st.markdown(f"<p style='text-decoration:line-through;color:#9ca3af;font-weight:400'>{_tcv}</p>",
+                            unsafe_allow_html=True)
+            else:
+                st.markdown(f"<p>{_tcv}</p>", unsafe_allow_html=True)
+        with col_nv:
+            st.selectbox("", options=_ds_nv_cv, index=_nv_idx,
+                         key=f"dlg_cv_nv_{task_id}_{_cvi}",
+                         label_visibility="collapsed",
+                         format_func=lambda x: x if x.startswith("-- ") else x.strip().split()[-1],
+                         on_change=_cb_cv_nv, args=(_cvi,))
+        with col_del:
+            st.button("🗑️", key=f"dlg_cv_del_{task_id}_{_cvi}",
+                      use_container_width=True,
+                      on_click=_cb_cv_del, args=(_cvi,))
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    if _cv_xoa2 is not None:
-        ds_cv_con.pop(_cv_xoa2)
-        st.session_state[_cv_key] = ds_cv_con
-        _sh = lay_sheet()
-        _o  = _sh.find(str(task_id), in_column=1)
-        if _o:
-            _sh.update_cell(_o.row, 14, json.dumps(ds_cv_con, ensure_ascii=False))
-            lay_danh_sach_cong_viec.clear()
-    elif _cv_changed2:
-        st.session_state[_cv_key] = ds_cv_con
-        _sh = lay_sheet()
-        _o  = _sh.find(str(task_id), in_column=1)
-        if _o:
-            _sh.update_cell(_o.row, 14, json.dumps(ds_cv_con, ensure_ascii=False))
-            lay_danh_sach_cong_viec.clear()
+    # ── Thêm công việc con từ danh sách ──────────────────────
+    _ds_cd_all = ["-- Chọn công đoạn --"] + lay_ten_cac_cong_doan()
+    _cv_add_v  = f"dlg_cv_add_v_{task_id}"
+    if _cv_add_v not in st.session_state: st.session_state[_cv_add_v] = 0
+    _v = st.session_state[_cv_add_v]
+
+    col_cd, col_nv_add, col_btn_add = st.columns([3, 3, 1], vertical_alignment="bottom")
+    with col_cd:
+        st.selectbox("Công đoạn", options=_ds_cd_all,
+                     key=f"dlg_cv_new_cd_{task_id}_{_v}",
+                     label_visibility="visible")
+    with col_nv_add:
+        st.selectbox("Nhân viên", options=_ds_nv_cv,
+                     key=f"dlg_cv_new_nv_{task_id}_{_v}",
+                     label_visibility="visible")
+    with col_btn_add:
+        def _cb_cv_add():
+            cd_v  = st.session_state.get(f"dlg_cv_new_cd_{task_id}_{_v}", "-- Chọn công đoạn --")
+            nv_v  = st.session_state.get(f"dlg_cv_new_nv_{task_id}_{_v}", "-- Không chọn --")
+            if cd_v and cd_v != "-- Chọn công đoạn --":
+                st.session_state[_cv_key].append({
+                    "ten":       cd_v,
+                    "nhan_vien": "" if nv_v == "-- Không chọn --" else nv_v,
+                    "done":      False,
+                })
+                st.session_state[_cv_add_v] += 1
+                _save_cv_to_sheet(task_id, _cv_key)
+        st.button("＋", key=f"dlg_cv_add_{task_id}",
+                  use_container_width=True, on_click=_cb_cv_add)
+
     st.divider()
-
-    # ── Upload ảnh + xuất PDF ─────────────────────────────────
-    _fragment_upload_anh_nghiem_thu(task_id, _anh_key)
 
     # ── Ảnh đo lường theo từng nhãn ──────────────────────────
-    st.divider()
     st.markdown("**📐 Ảnh Đo Lường**")
+
 
     _do_key = f"do_luong_{task_id}"
     if _do_key not in st.session_state:
@@ -1955,7 +2090,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         flex: 1 1 0% !important; min-width: 0 !important; overflow: hidden !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:nth-child(3) {{
-        flex: 0 0 130px !important; min-width: 100px !important; max-width: 160px !important;
+        flex: 1 1 0% !important; min-width: 0 !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:last-child {{
         flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
@@ -2012,7 +2147,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         nguoi = cv.get("nhan_vien", cv.get("nguoi", "")) or ""
         nv_idx = nv_opts.index(nguoi) if nguoi in nv_opts else 0
 
-        col_ck, col_txt, col_nv, col_del = st.columns([0.5, 6, 3.5, 0.5], gap="small")
+        col_ck, col_txt, col_nv, col_del = st.columns([0.5, 4.5, 4.5, 0.5], gap="small")
         with col_ck:
             st.markdown(f"<span class='{mk_cv}' style='display:none'></span>", unsafe_allow_html=True)
             new_done = st.checkbox(
@@ -2036,6 +2171,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 index=nv_idx,
                 key=f"{key_prefix}_cv_nv_sel_{i}",
                 label_visibility="collapsed",
+                format_func=lambda x: x if x.startswith("-- ") else x.strip().split()[-1],
                 on_change=_save_cv_nv, args=(i,),
             )
         with col_del:
@@ -2161,7 +2297,6 @@ def _cb_upload_anh_nt(task_id, anh_key, up_key):
     st.session_state[f"_nt_msg_{task_id}"] = f"✅ Đã upload {len(new_urls)} ảnh!"
 
 
-@st.fragment
 def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
     """Upload ảnh nghiệm thu — dùng callback thay vì st.rerun() để dialog không đóng."""
     up_key = f"up_anh_nt_{task_id}"
@@ -2200,9 +2335,40 @@ def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
 
 
 _NHOM_DO = [
-    ("Stator 1 — Điện trở cuộn dây Stator 1", ["U1–V1", "U1–W1", "V1–W1"]),
-    ("Stator 2 — Điện trở cuộn dây Stator 2", ["U2–V2", "U2–W2", "V2–W2"]),
-    ("Rotor — Điện trở cuộn dây Rotor",        ["K–L",   "K–M",   "L–M"  ]),
+    # Hình 1
+    ("Stator 1 coil resistance / Điện trở cuộn dây Stator 1",
+     ["U1–U2", "V1–V2", "W1–W2"]),
+
+    # Hình 2
+    ("Resistance of the temperature sensor / Điện trở cảm biến nhiệt độ",
+     ["PTC", "PT100", "HEATER"]),
+    ("No-load test / Kiểm tra không tải",
+     ["Tần số", "Voltage", "Dòng điện",
+      "Radial ↔ DE / AS", "Radial ↑ DE / AS", "Axial (X) DE / AS",
+      "Radial ↔ NDE / AS", "Radial ↑ NDE / AS", "Axial (X) NDE / AS"]),
+
+    # Hình 3
+    ("Engine overview / Tổng quan động cơ",
+     ["Engine / Động cơ", "Nameplate / Bảng tên", "Quạt làm mát / Cooling fan"]),
+    ("Nắp động cơ",
+     ["Nắp DE", "Nắp NDE"]),
+
+    # Hình 4
+    ("Trục động cơ",
+     ["Bạc đạn DE", "Bạc đạn NDE",
+      "Phớt", "Đầu ren, chốt lavet", "Cánh quạt làm mát"]),
+    ("Phớt chặn",
+     ["Phớt chặn 1", "Phớt chặn 2"]),
+    ("Bearing / Vòng bi",
+     ["Vòng bi DE", "Vòng bi NDE"]),
+
+    # Hình 5
+    ("Grease pump / Bơm mỡ bôi trơn",
+     ["Vòng bi bơm mỡ", "Mặt gam"]),
+    ("Coil / Cuộn dây",
+     ["Vào dây", "Đai đầu"]),
+    ("Cân bằng động",
+     ["Gá lên máy", "Sau khi cân"]),
 ]
 
 
@@ -2229,7 +2395,6 @@ def _cb_upload_do(task_id, do_key, label, up_key, done_key):
     cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
 
 
-@st.fragment
 def _fragment_upload_do_luong(task_id, do_key: str):
     """Upload ảnh đo lường — dùng callback thay vì st.rerun() để dialog không đóng."""
     for nhom_title, labels in _NHOM_DO:
@@ -2248,10 +2413,12 @@ def _fragment_upload_do_luong(task_id, do_key: str):
             )
             urls_label = st.session_state[do_key].get(label, [])
             if urls_label:
-                img_cols = st.columns(min(len(urls_label), 3))
+                # Hiển thị thumbnail nhỏ theo hàng ngang
+                N_COLS = min(len(urls_label), 6)
+                img_cols = st.columns(N_COLS, gap="small")
                 for idx_d, url_d in enumerate(urls_label):
-                    with img_cols[idx_d % 3]:
-                        st.image(url_d, use_container_width=True)
+                    with img_cols[idx_d % N_COLS]:
+                        st.image(url_d, width=90)
                         st.button(
                             "🗑️", key=f"xoa_do_{task_id}_{label}_{idx_d}",
                             use_container_width=True,
@@ -2268,6 +2435,19 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                 on_change=_cb_upload_do,
                 args=(task_id, do_key, label, up_key, done_key),
             )
+
+
+# ─── helper: lưu công việc con về sheet ───────────────────────────────────────
+def _save_cv_to_sheet(task_id, cv_key):
+    data = st.session_state.get(cv_key, [])
+    try:
+        _sh = lay_sheet()
+        _o  = _sh.find(str(task_id), in_column=1)
+        if _o:
+            _sh.update_cell(_o.row, 14, json.dumps(data, ensure_ascii=False))
+            lay_danh_sach_cong_viec.clear()
+    except Exception:
+        pass
 
 
 # ============================================================
