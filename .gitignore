@@ -11,3 +11,6 @@ venv/
 
 # macOS
 .DS_Store
+
+# Google Drive service account key
+gdrive_key.json

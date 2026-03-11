@@ -256,34 +256,98 @@ def _lay_sheet_fresh():
 
 
 # ============================================================
-# CẤU HÌNH CLOUDINARY (lưu trữ ảnh nghiệm thu)
+# GOOGLE DRIVE (lưu trữ ảnh nghiệm thu) — dùng requests thay httplib2
 # ============================================================
-def cau_hinh_cloudinary():
-    """Khởi tạo cấu hình kết nối Cloudinary từ Streamlit Secrets."""
-    cloudinary.config(
-        cloud_name=st.secrets["cloudinary"]["cloud_name"],
-        api_key=st.secrets["cloudinary"]["api_key"],
-        api_secret=st.secrets["cloudinary"]["api_secret"]
+GDRIVE_FOLDER_ID = "1-o1gny8zFKQ5NejyUjeinLVdmDpKfWgH"
+_DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
+
+
+def _lay_drive_session():
+    """Tạo AuthorizedSession mới mỗi lần — dùng requests, không dùng httplib2."""
+    from google.oauth2.service_account import Credentials as SACredentials
+    from google.auth.transport.requests import AuthorizedSession
+    try:
+        info = dict(st.secrets["gdrive_service_account"])
+        if "private_key" in info:
+            info["private_key"] = info["private_key"].replace("\\n", "\n")
+        creds = SACredentials.from_service_account_info(info, scopes=_DRIVE_SCOPES)
+    except Exception:
+        _base = os.path.dirname(os.path.abspath(__file__))
+        creds = SACredentials.from_service_account_file(
+            os.path.join(_base, "gdrive_key.json"), scopes=_DRIVE_SCOPES
+        )
+    return AuthorizedSession(creds)
+
+
+def tai_anh_len_drive(file_anh) -> str:
+    """Upload ảnh lên Google Drive qua requests, set public, trả về thumbnail URL."""
+    import io, json as _json
+    session = _lay_drive_session()
+    file_anh.seek(0)
+    content = file_anh.read()
+    mime = getattr(file_anh, "type", "image/jpeg")
+    name = getattr(file_anh, "name", "image.jpg")
+
+    # Multipart upload trực tiếp — không qua httplib2
+    metadata = _json.dumps({"name": name, "parents": [GDRIVE_FOLDER_ID]})
+    resp = session.post(
+        "https://www.googleapis.com/upload/drive/v3/files"
+        "?uploadType=multipart&supportsAllDrives=true&fields=id",
+        files={
+            "metadata": ("metadata", metadata, "application/json; charset=UTF-8"),
+            "file": (name, io.BytesIO(content), mime),
+        },
+        timeout=60,
     )
+    resp.raise_for_status()
+    file_id = resp.json()["id"]
+
+    # Set public read
+    session.post(
+        f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions"
+        "?supportsAllDrives=true",
+        json={"type": "anyone", "role": "reader"},
+        timeout=30,
+    )
+    # thumbnail URL — lưu vào DB, dùng file_id để fetch khi hiển thị
+    return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
+
+
+@st.cache_data(ttl=3600)
+def _lay_bytes_anh_drive(file_id: str) -> bytes:
+    """Fetch bytes ảnh từ Drive qua service account (cache 1 giờ)."""
+    session = _lay_drive_session()
+    resp = session.get(
+        f"https://www.googleapis.com/drive/v3/files/{file_id}"
+        f"?alt=media&supportsAllDrives=true",
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.content
+
+
+def _hien_thi_anh_drive(url: str, **kwargs):
+    """Hiển thị ảnh Drive: fetch bytes qua service account thay vì URL trực tiếp."""
+    import re
+    m = re.search(r"[?&]id=([^&]+)", url)
+    if m:
+        try:
+            data = _lay_bytes_anh_drive(m.group(1))
+            st.image(data, **kwargs)
+            return
+        except Exception:
+            pass
+    st.image(url, **kwargs)
+
+
+def cau_hinh_cloudinary():
+    """Giữ lại để tương thích — không dùng nữa."""
+    pass
 
 
 def tai_anh_len_cloudinary(file_anh) -> str:
-    """
-    Tải ảnh lên Cloudinary và trả về URL công khai (secure_url).
-    
-    Args:
-        file_anh: File object từ st.file_uploader
-    
-    Returns:
-        str: URL ảnh trên Cloudinary
-    """
-    cau_hinh_cloudinary()
-    ket_qua = cloudinary.uploader.upload(
-        file_anh,
-        folder="quan_ly_cong_viec",   # Thư mục lưu trên Cloudinary
-        resource_type="image"
-    )
-    return ket_qua["secure_url"]
+    """Wrapper gọi sang Drive (giữ tên cũ để không cần đổi call sites)."""
+    return tai_anh_len_drive(file_anh)
 
 
 # ============================================================
@@ -1427,11 +1491,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         padding-bottom: 4px;
     }
     .cv-con-meta span { display:inline-flex; align-items:center; gap:3px; }
-    /* Checklist done: strikethrough */
-    div[data-testid="stCheckbox"]:has(:checked) label p {
-        text-decoration: line-through !important;
-        color: #9ca3af !important;
-    }
+    /* Checklist done: giữ nguyên chữ, chỉ tick màu đỏ */
     /* Ghost delete button */
     button[title="Xóa"], button[title="Xóa công việc này"] {
         background: transparent !important;
@@ -1608,11 +1668,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                         label_visibility="collapsed",
                         on_change=_cb_cl_done, args=(_ci,))
         with col_txt:
-            if _done_v:
-                st.markdown(f"<p style='text-decoration:line-through;color:#9ca3af'>{_txt0}</p>",
-                            unsafe_allow_html=True)
-            else:
-                st.markdown(f"<p>{_txt0}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p>{_txt0}</p>", unsafe_allow_html=True)
 
     st.divider()
 
@@ -1721,11 +1777,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                         label_visibility="collapsed",
                         on_change=_cb_cv_done, args=(_cvi,))
         with col_txt:
-            if _dcv:
-                st.markdown(f"<p style='text-decoration:line-through;color:#9ca3af;font-weight:400'>{_tcv}</p>",
-                            unsafe_allow_html=True)
-            else:
-                st.markdown(f"<p>{_tcv}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p>{_tcv}</p>", unsafe_allow_html=True)
         with col_nv:
             st.selectbox("", options=_ds_nv_cv, index=_nv_idx,
                          key=f"dlg_cv_nv_{task_id}_{_cvi}",
@@ -1780,6 +1832,10 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
 
     _fragment_upload_do_luong(task_id, _do_key)
 
+    # ── Ảnh Nghiệm Thu ───────────────────────────────────────
+    st.divider()
+    _fragment_upload_anh_nghiem_thu(task_id, _anh_key)
+
     # PDF
     tt_pdf = st.session_state.get(f"tt_select_{task_id}", trang_thai)
     if tt_pdf == "Đã Hoàn Thành - Giao Máy" or "Hoàn Thành" in tt_pdf:
@@ -1826,7 +1882,7 @@ _FRAGMENT_CSS = """
     flex: 1; font-size: 0.9rem; color: #1e293b; word-break: break-word;
 }
 .cl-card.cl-done .cl-txt {
-    text-decoration: line-through; color: #94a3b8;
+    color: #1e293b;
 }
 .cl-badge {
     flex-shrink: 0; font-size: 0.68rem; font-weight: 700;
@@ -1869,7 +1925,7 @@ div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
 }
 .cvc-card.cvc-done { background: #f0fdf4; border-color: #86efac; }
 .cvc-title { font-size: 0.9rem; font-weight: 700; color: #1e293b; }
-.cvc-card.cvc-done .cvc-title { text-decoration: line-through; color: #94a3b8; }
+.cvc-card.cvc-done .cvc-title { color: #1e293b; }
 .cvc-meta { font-size: 0.78rem; color: #64748b; margin-top: 3px; }
 .cvc-badge {
     display: inline-block; font-size: 0.68rem; font-weight: 700;
@@ -2298,7 +2354,7 @@ def _cb_upload_anh_nt(task_id, anh_key, up_key):
 
 
 def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
-    """Upload ảnh nghiệm thu — dùng callback thay vì st.rerun() để dialog không đóng."""
+    """Upload ảnh nghiệm thu — explicit button + spinner để hiện ảnh ngay."""
     up_key = f"up_anh_nt_{task_id}"
     ds_anh = st.session_state.get(anh_key, [])
     st.markdown("**📸 Ảnh Nghiệm Thu**")
@@ -2307,7 +2363,7 @@ def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
         cols_anh = st.columns(min(len(ds_anh), 3))
         for idx_a, url_a in enumerate(ds_anh):
             with cols_anh[idx_a % 3]:
-                st.image(url_a, caption=f"Ảnh {idx_a + 1}", use_container_width=True)
+                _hien_thi_anh_drive(url_a, caption=f"Ảnh {idx_a + 1}", use_container_width=True)
                 st.button(
                     "🗑️ Xoá", key=f"xoa_anh_{task_id}_{idx_a}",
                     use_container_width=True,
@@ -2316,10 +2372,6 @@ def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
     else:
         st.caption("Chưa có ảnh nghiệm thu.")
 
-    msg = st.session_state.pop(f"_nt_msg_{task_id}", None)
-    if msg:
-        st.success(msg)
-
     st.file_uploader(
         "Thêm ảnh (JPG, PNG)",
         type=["jpg", "jpeg", "png"],
@@ -2327,11 +2379,19 @@ def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
         label_visibility="collapsed",
         key=up_key,
     )
-    st.button(
-        "📤 Upload ảnh", key=f"btn_up_nt_{task_id}",
-        use_container_width=True,
-        on_click=_cb_upload_anh_nt, args=(task_id, anh_key, up_key),
-    )
+    if st.button("📤 Upload ảnh", key=f"btn_up_nt_{task_id}", use_container_width=True):
+        files = st.session_state.get(up_key) or []
+        if files:
+            with st.spinner("Đang upload..."):
+                new_urls = []
+                for f in files:
+                    url = tai_anh_len_cloudinary(f)
+                    cap_nhat_url_anh(task_id, url)
+                    new_urls.append(url)
+            st.session_state[anh_key] = st.session_state.get(anh_key, []) + new_urls
+            st.rerun(scope="fragment")
+        else:
+            st.warning("Chưa chọn file!")
 
 
 _NHOM_DO = [
@@ -2413,28 +2473,42 @@ def _fragment_upload_do_luong(task_id, do_key: str):
             )
             urls_label = st.session_state[do_key].get(label, [])
             if urls_label:
-                # Hiển thị thumbnail nhỏ theo hàng ngang
-                N_COLS = min(len(urls_label), 6)
-                img_cols = st.columns(N_COLS, gap="small")
-                for idx_d, url_d in enumerate(urls_label):
-                    with img_cols[idx_d % N_COLS]:
-                        st.image(url_d, width=90)
-                        st.button(
-                            "🗑️", key=f"xoa_do_{task_id}_{label}_{idx_d}",
-                            use_container_width=True,
-                            on_click=_cb_xoa_do,
-                            args=(task_id, do_key, label, url_d),
-                        )
-            up_key   = f"up_do_{task_id}_{label}"
-            done_key = f"up_do_done_{task_id}_{label}"
-            st.file_uploader(
-                f"Ảnh {label}",
-                type=["jpg", "jpeg", "png"],
-                key=up_key,
-                label_visibility="collapsed",
-                on_change=_cb_upload_do,
-                args=(task_id, do_key, label, up_key, done_key),
-            )
+                # Đã có ảnh — hiển thị + nút xoá, ẩn uploader
+                url_d = urls_label[0]
+                col_img, col_del = st.columns([3, 1], gap="small")
+                with col_img:
+                    _hien_thi_anh_drive(url_d, width=120)
+                with col_del:
+                    st.button(
+                        "🗑️ Xoá", key=f"xoa_do_{task_id}_{label}_0",
+                        use_container_width=True,
+                        on_click=_cb_xoa_do,
+                        args=(task_id, do_key, label, url_d),
+                    )
+            else:
+                # Chưa có ảnh — hiển thị uploader (1 file duy nhất)
+                up_key   = f"up_do_{task_id}_{label}"
+                done_key = f"up_do_done_{task_id}_{label}"
+                st.file_uploader(
+                    f"Ảnh {label}",
+                    type=["jpg", "jpeg", "png"],
+                    key=up_key,
+                    label_visibility="collapsed",
+                    accept_multiple_files=False,
+                )
+                if st.button("📤 Upload", key=f"btn_do_{task_id}_{label}", use_container_width=True):
+                    f_do = st.session_state.get(up_key)
+                    if f_do:
+                        _fid = f"{f_do.name}_{f_do.size}"
+                        if not st.session_state.get(f"{done_key}_{_fid}"):
+                            with st.spinner("Đang upload..."):
+                                st.session_state[f"{done_key}_{_fid}"] = True
+                                url_new = tai_anh_len_cloudinary(f_do)
+                                st.session_state[do_key][label] = [url_new]
+                            cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+                            st.rerun(scope="fragment")
+                    else:
+                        st.warning("Chưa chọn file!")
 
 
 # ─── helper: lưu công việc con về sheet ───────────────────────────────────────
