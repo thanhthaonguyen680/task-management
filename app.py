@@ -2541,7 +2541,7 @@ def _task_dialog(hang_dict, ds_tt):
         f"<div style='background:{dlg_bg};color:{dlg_txt};border-radius:7px;"
         f"padding:6px 14px;font-weight:800;font-size:0.85rem;margin-bottom:10px;"
         f"border:1.5px solid {dlg_txt}44;display:inline-block;'>"
-        f"#{tid} · {tt}</div>",
+        f"{tt}</div>",
         unsafe_allow_html=True,
     )
     st.markdown(f"#### {ten}")
@@ -2656,7 +2656,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb"):
                         if anh_lst:
                             st.image(anh_lst[0], use_container_width=True)
                         short = ten_cv[:40] + ("…" if len(ten_cv) > 40 else "")
-                        st.markdown(f"**#{task_id}: {short}**")
+                        st.markdown(f"**{short}**")
                         meta = []
                         if cong_ty:   meta.append(f"🏢 {cong_ty}")
                         if nhan_vien: meta.append(f"👤 {nhan_vien}")
@@ -2960,7 +2960,7 @@ def giao_dien_admin():
                             cong_ty    = hang.get("Công Ty", "")
                             _force_expand = st.session_state.get(f"expand_{task_id}", False)
                             with st.expander(
-                                f"{icon_tt} [{cong_ty}]  Task #{task_id}: {ten_cv}  —  {trang_thai}",
+                                f"{icon_tt} [{cong_ty}]  {ten_cv}  —  {trang_thai}",
                                 expanded=(trang_thai in ["Chờ Làm", "Đang Làm"]) or _force_expand
                             ):
                                 if _force_expand:
@@ -2984,7 +2984,7 @@ def giao_dien_admin():
                             all_done = all(cv.get("done", False) for _, cv in my_subtasks)
                             badge    = " ✅" if all_done else ""
                             with st.expander(
-                                f"{icon} [{cty}] Task #{tid}: {ten}  —  {tt}{badge}",
+                                f"{icon} [{cty}] {ten}  —  {tt}{badge}",
                                 expanded=not all_done
                             ):
                                 st.markdown(f"**🏢 Công Ty:** {cty}  |  **👤** {nv_chu}  |  **📅** {dl}")
@@ -3632,6 +3632,7 @@ def giao_dien_dang_nhap(cookie_mgr=None):
                     st.session_state["username"]       = user["username"]
                     st.session_state["ho_ten"]         = user["ho_ten"]
                     st.session_state["vai_tro"]        = user["vai_tro"]
+                    st.session_state.pop("manual_logout", None)
                     # Lưu vào cookie để giữ đăng nhập khi reload
                     if cookie_mgr is not None:
                         expires = datetime.now() + timedelta(days=7)
@@ -4196,12 +4197,24 @@ def main():
 
     # ── Khôi phục session từ cookie nếu chưa đăng nhập ───────────────────
     if not st.session_state.get("dang_nhap"):
-        uid = cookie_mgr.get("qlcv_uid")
+        # Nếu vừa bấm đăng xuất thủ công → giữ màn login, không đọc cookie
+        if st.session_state.get("manual_logout"):
+            giao_dien_dang_nhap(cookie_mgr)
+            return
+
+        # get_all() trả về None khi JS component chưa sẵn sàng, trả về dict khi đã load
+        all_cookies = cookie_mgr.get_all()
+        if all_cookies is None:
+            # Component chưa init xong → chờ thêm 1 cycle
+            st.stop()
+
+        uid = (all_cookies or {}).get("qlcv_uid")
+
         if uid:
             # Re-fetch thông tin user từ DB để đảm bảo ho_ten khớp chính xác
             # với tên đã lưu trong cột Nhân Viên của Tasks sheet
-            ho_ten_cookie = cookie_mgr.get("qlcv_hoten") or ""
-            vai_tro_cookie = cookie_mgr.get("qlcv_vaitro") or "nhan_vien"
+            ho_ten_cookie  = (all_cookies or {}).get("qlcv_hoten") or ""
+            vai_tro_cookie = (all_cookies or {}).get("qlcv_vaitro") or "nhan_vien"
             try:
                 df_users = lay_danh_sach_users()
                 if not df_users.empty:
@@ -4214,7 +4227,7 @@ def main():
                 pass  # Nếu lỗi kết nối, dùng giá trị từ cookie
             st.session_state["dang_nhap"] = True
             st.session_state["user_id"]   = uid
-            st.session_state["username"]  = cookie_mgr.get("qlcv_uname") or ""
+            st.session_state["username"]  = (all_cookies or {}).get("qlcv_uname") or ""
             st.session_state["ho_ten"]    = ho_ten_cookie
             st.session_state["vai_tro"]   = vai_tro_cookie
             st.rerun()
@@ -4244,6 +4257,7 @@ def main():
             cookie_mgr.delete("qlcv_vaitro", key="del_vaitro")
             for k in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro"]:
                 st.session_state.pop(k, None)
+            st.session_state["manual_logout"] = True
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
