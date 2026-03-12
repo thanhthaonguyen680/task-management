@@ -365,8 +365,22 @@ def lay_sheet_cong_ty():
         try:
             sheet = bang_tinh.worksheet("Companies")
         except gspread.exceptions.WorksheetNotFound:
-            sheet = bang_tinh.add_worksheet(title="Companies", rows=200, cols=4)
-            sheet.append_row(["ID", "Tên Công Ty", "Ngày Tạo"])
+            sheet = bang_tinh.add_worksheet(title="Companies", rows=200, cols=7)
+            sheet.append_row(["ID", "Tên Công Ty", "Địa Chỉ", "Mã Khách Hàng", "Mã Số Thuế", "Ngày Tạo"])
+            return sheet
+        # Migration: thêm các cột mới nếu chưa có
+        headers = sheet.row_values(1)
+        if "Địa Chỉ" not in headers:
+            sheet.insert_cols([["Địa Chỉ"]], col=3)
+            headers = sheet.row_values(1)
+        if "Mã Khách Hàng" not in headers:
+            # Chèn trước "Ngày Tạo"
+            ngay_col = headers.index("Ngày Tạo") + 1 if "Ngày Tạo" in headers else len(headers)
+            sheet.insert_cols([["Mã Khách Hàng"]], col=ngay_col)
+            headers = sheet.row_values(1)
+        if "Mã Số Thuế" not in headers:
+            ngay_col = headers.index("Ngày Tạo") + 1 if "Ngày Tạo" in headers else len(headers)
+            sheet.insert_cols([["Mã Số Thuế"]], col=ngay_col)
         return sheet
     except (ConnectionError, OSError, Exception) as e:
         raise ConnectionError(_xoa_cache_va_thong_bao(e)) from e
@@ -375,7 +389,7 @@ def lay_sheet_cong_ty():
 @st.cache_data(ttl=60)
 def lay_danh_sach_cong_ty() -> pd.DataFrame:
     """Lấy toàn bộ danh sách công ty từ sheet 'Companies'."""
-    _COT = ["ID", "Tên Công Ty", "Ngày Tạo"]
+    _COT = ["ID", "Tên Công Ty", "Địa Chỉ", "Mã Khách Hàng", "Mã Số Thuế", "Ngày Tạo"]
     try:
         sheet = lay_sheet_cong_ty()
     except ConnectionError:
@@ -387,19 +401,31 @@ def lay_danh_sach_cong_ty() -> pd.DataFrame:
         return pd.DataFrame(columns=_COT)
     if len(allvals) <= 1:
         return pd.DataFrame(columns=_COT)
-    headers = [v.strip() for v in allvals[0][:len(_COT)]]
-    rows = [r[:len(_COT)] for r in allvals[1:] if any(r[:len(_COT)])]
-    df = pd.DataFrame(rows, columns=headers)
+    # Dùng header thực tế từ sheet
+    actual_headers = [v.strip() for v in allvals[0]]
+    rows = []
+    for r in allvals[1:]:
+        padded = (r + [""] * len(actual_headers))[:len(actual_headers)]
+        if any(padded):
+            rows.append(padded)
+    df = pd.DataFrame(rows, columns=actual_headers)
     df.rename(columns={"Cong_Ty": "Tên Công Ty", "Created_Date": "Ngày Tạo"}, inplace=True)
-    return df
+    # Đảm bảo đủ cột theo thứ tự chuẩn
+    for c in _COT:
+        if c not in df.columns:
+            df[c] = ""
+    return df[_COT]
 
 
-def them_cong_ty(ten_cong_ty: str) -> int:
+def them_cong_ty(ten_cong_ty: str, dia_chi: str = "", ma_kh: str = "", ma_so_thue: str = "") -> int:
     """
     Thêm công ty mới vào sheet 'Companies'.
 
     Args:
         ten_cong_ty: Tên công ty khách hàng
+        dia_chi: Địa chỉ công ty
+        ma_kh: Mã khách hàng
+        ma_so_thue: Mã số thuế
 
     Returns:
         int: ID vừa tạo
@@ -407,7 +433,7 @@ def them_cong_ty(ten_cong_ty: str) -> int:
     sheet = lay_sheet_cong_ty()
     id_moi = len(sheet.col_values(1))  # cột A: header + các hàng dữ liệu
     ngay_tao = datetime.now().strftime("%Y-%m-%d")
-    sheet.append_row([id_moi, ten_cong_ty, ngay_tao])
+    sheet.append_row([id_moi, ten_cong_ty, dia_chi, ma_kh, ma_so_thue, ngay_tao])
     lay_danh_sach_cong_ty.clear()
     lay_ten_cac_cong_ty.clear()
     return id_moi
@@ -2729,12 +2755,40 @@ def giao_dien_admin():
     # TAB 1 — CÀI ĐẶT
     # ══════════════════════════════════════════════
     with tab_cai_dat:
-        _section_don_gian(
-            "🏢 Quản Lý Công Ty", "cong_ty",
-            lay_danh_sach_cong_ty, them_cong_ty, "Tên Công Ty",
-            placeholder="Ví dụ: Công Ty TNHH ABC",
-            mo_ta_them="Tên Công Ty *", expanded=True,
-        )
+        with st.expander("🏢 Quản Lý Công Ty", expanded=True):
+            with st.form("form_cong_ty", clear_on_submit=True):
+                ten_ct_inp = st.text_input("Tên Công Ty *", placeholder="Ví dụ: Công Ty TNHH ABC")
+                dc_inp = st.text_input("Địa Chỉ", placeholder="Ví dụ: 123 Nguyễn Văn Linh, Q.7, TP.HCM")
+                col_mkh, col_mst = st.columns(2)
+                with col_mkh:
+                    ma_kh_inp = st.text_input("Mã Khách Hàng", placeholder="Ví dụ: KH001")
+                with col_mst:
+                    ma_thue_inp = st.text_input("Mã Số Thuế", placeholder="Ví dụ: 0123456789")
+                gui_ct = st.form_submit_button("➕ Thêm", use_container_width=True)
+                if gui_ct:
+                    if not ten_ct_inp.strip():
+                        st.error("⛔ Vui lòng nhập Tên Công Ty!")
+                    else:
+                        try:
+                            with st.spinner("Đang lưu..."):
+                                id_ct = them_cong_ty(ten_ct_inp.strip(), dc_inp.strip(), ma_kh_inp.strip(), ma_thue_inp.strip())
+                            st.success(f"✅ Đã thêm #{id_ct}: **{ten_ct_inp}**!")
+                        except (ConnectionError, OSError, Exception) as e:
+                            st.error(f"🔌 Lưu thất bại — mất kết nối mạng. Hãy thử lại.\n\n`{e}`")
+            st.divider()
+            try:
+                df_ct = lay_danh_sach_cong_ty()
+                _loi_ct = False
+            except Exception as e:
+                df_ct = pd.DataFrame()
+                _loi_ct = str(e)
+            if _loi_ct:
+                st.warning("⚠️ Không thể tải dữ liệu — mất kết nối mạng.")
+            elif df_ct.empty:
+                st.info("ℹ️ Chưa có công ty nào. Hãy thêm ở form bên trên!")
+            else:
+                st.markdown(f"**Tổng cộng: {len(df_ct)} công ty**")
+                st.dataframe(df_ct, use_container_width=True, hide_index=True)
         _section_don_gian(
             "🔧 Loại Máy", "loai_may",
             lay_danh_sach_loai_may, them_loai_may, "Tên Loại Máy",
