@@ -9,6 +9,7 @@ from google.oauth2.service_account import Credentials
 import cloudinary
 import cloudinary.uploader
 import extra_streamlit_components as stx
+from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
 import pandas as pd
 from datetime import datetime, timedelta
@@ -491,6 +492,82 @@ def _them_hang_don_gian(ten_sheet: str, tieu_de: list, hang: list) -> int:
     return id_moi
 
 
+# ============================================================
+# HỆ THỐNG THÔNG BÁO (NOTIFICATIONS)
+# ============================================================
+_TB_SHEET   = "Notifications"
+_TB_HEADERS = ["ID", "Nguoi_Nhan", "Noi_Dung", "Task_ID", "Loai", "Thoi_Gian", "Da_Doc"]
+
+
+def them_thong_bao(nguoi_nhan: str, noi_dung: str, task_id: int = 0, loai: str = "general"):
+    """Thêm 1 thông báo cho người nhận cụ thể vào sheet Notifications."""
+    try:
+        sheet     = _lay_sheet_don_gian(_TB_SHEET, _TB_HEADERS)
+        id_moi    = len(sheet.col_values(1))
+        thoi_gian = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        sheet.append_row([id_moi, nguoi_nhan, noi_dung, str(task_id), loai, thoi_gian, "0"])
+    except Exception:
+        pass
+
+
+def them_thong_bao_tat_ca(noi_dung: str, task_id: int = 0, loai: str = "general", tru_nguoi: str = ""):
+    """Gửi thông báo cho tất cả nhân viên trong hệ thống (trừ người tạo nếu có)."""
+    try:
+        df_users = lay_danh_sach_users()
+        for _, row in df_users.iterrows():
+            ten = str(row.get("HoTen", "")).strip()
+            if ten and ten != tru_nguoi:
+                them_thong_bao(ten, noi_dung, task_id, loai)
+    except Exception:
+        pass
+
+
+def lay_thong_bao_nguoi_dung(ho_ten: str) -> pd.DataFrame:
+    """Lấy danh sách thông báo của user, mới nhất trước."""
+    try:
+        df = _lay_df_don_gian(_TB_SHEET, _TB_HEADERS)
+        if df.empty:
+            return df
+        df = df[df["Nguoi_Nhan"] == ho_ten].copy()
+        return df.sort_values("Thoi_Gian", ascending=False).reset_index(drop=True)
+    except Exception:
+        return pd.DataFrame(columns=_TB_HEADERS)
+
+
+def dem_chua_doc(ho_ten: str) -> int:
+    """Đếm số thông báo chưa đọc của user."""
+    try:
+        df = lay_thong_bao_nguoi_dung(ho_ten)
+        if df.empty:
+            return 0
+        return int((df["Da_Doc"] == "0").sum())
+    except Exception:
+        return 0
+
+
+def danh_dau_da_doc_tat_ca(ho_ten: str):
+    """Đánh dấu tất cả thông báo của user là đã đọc (batch update)."""
+    try:
+        sheet = _lay_sheet_don_gian(_TB_SHEET, _TB_HEADERS)
+        rows  = sheet.get_all_values()
+        if len(rows) <= 1:
+            return
+        headers   = rows[0]
+        idx_nhan  = headers.index("Nguoi_Nhan") + 1
+        idx_doc   = headers.index("Da_Doc") + 1
+        col_letter = chr(64 + idx_doc)
+        batch = []
+        for i, row in enumerate(rows[1:], start=2):
+            nhan = row[idx_nhan - 1] if len(row) >= idx_nhan else ""
+            doc  = row[idx_doc  - 1] if len(row) >= idx_doc  else "0"
+            if nhan == ho_ten and doc == "0":
+                batch.append({"range": f"{col_letter}{i}", "values": [["1"]]})
+        if batch:
+            sheet.batch_update(batch)
+    except Exception:
+        pass
+
+
 # Danh sách trạng thái mặc định (theo quy trình thực tế)
 _DS_TRANG_THAI_MAC_DINH = [
     "Đang Kiểm Tra",
@@ -721,6 +798,26 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
     lay_sheet.clear()
     _lay_bang_tinh.clear()
     lay_danh_sach_cong_viec.clear()
+
+    # ── Gửi thông báo cho tất cả người dùng ──────────────────────────────
+    _tb_task = (
+        f"📋 Task mới #{id_moi}: {ten_task}"
+        f" | Giao: {nguoi_duoc_giao}"
+        + (f" | Công ty: {cong_ty}" if cong_ty else "")
+    )
+    them_thong_bao_tat_ca(_tb_task, task_id=id_moi, loai="task_moi")
+    # Thông báo riêng cho từng người được giao công việc con
+    for _cv in (cong_viec_con or []):
+        _nv_cv = str(_cv.get("nhan_vien", "")).strip()
+        _ten_cv = str(_cv.get("ten", "")).strip()
+        if _nv_cv:
+            them_thong_bao(
+                _nv_cv,
+                f"🔧 Bạn được giao việc: {_ten_cv} (Task #{id_moi}: {ten_task})",
+                task_id=id_moi,
+                loai="cong_viec_con",
+            )
+
     return id_moi
 
 
@@ -1574,6 +1671,17 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         with st.spinner("Đang lưu..."):
             cap_nhat_trang_thai(task_id, tt_moi)
             lay_danh_sach_cong_viec.clear()
+        # Gửi thông báo cho tất cả khi trạng thái thay đổi
+        _ten_task  = hang.get("Tên Công Việc", "")
+        _nguoi_doi = st.session_state.get("ho_ten", "")
+        _ct        = hang.get("Công Ty", "")
+        _tb_tt = (
+            f"🔄 **{_nguoi_doi}** đã chuyển công việc "
+            f"**{_ten_task}**"
+            + (f" ({_ct})" if _ct else "")
+            + f" từ **{trang_thai}** → **{tt_moi}**"
+        )
+        them_thong_bao_tat_ca(_tb_tt, task_id=task_id, loai="trang_thai", tru_nguoi="")
 
     st.markdown("---")
     # Công ty, Công số, Năm, Hạn, Ngày tạo
@@ -1775,8 +1883,19 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         _save_cv_to_sheet(task_id, _cv_key)
 
     def _cb_cv_nv(i):
-        val = st.session_state.get(f"dlg_cv_nv_{task_id}_{i}", "-- Không chọn --")
-        st.session_state[_cv_key][i]["nhan_vien"] = "" if val == "-- Không chọn --" else val
+        val    = st.session_state.get(f"dlg_cv_nv_{task_id}_{i}", "-- Không chọn --")
+        nv_cu  = st.session_state[_cv_key][i].get("nhan_vien", "")
+        nv_moi = "" if val == "-- Không chọn --" else val
+        st.session_state[_cv_key][i]["nhan_vien"] = nv_moi
+        # Gửi thông báo nếu nhân viên thay đổi
+        if nv_moi and nv_moi != nv_cu:
+            ten_cv = st.session_state[_cv_key][i].get("ten", "")
+            them_thong_bao(
+                nv_moi,
+                f"🔧 Bạn được giao việc: {ten_cv} (Task #{task_id})",
+                task_id=task_id,
+                loai="cong_viec_con",
+            )
         _save_cv_to_sheet(task_id, _cv_key)
 
     def _cb_cv_del(i):
@@ -1836,11 +1955,20 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
             cd_v  = st.session_state.get(f"dlg_cv_new_cd_{task_id}_{_v}", "-- Chọn công đoạn --")
             nv_v  = st.session_state.get(f"dlg_cv_new_nv_{task_id}_{_v}", "-- Không chọn --")
             if cd_v and cd_v != "-- Chọn công đoạn --":
+                nv_moi = "" if nv_v == "-- Không chọn --" else nv_v
                 st.session_state[_cv_key].append({
                     "ten":       cd_v,
-                    "nhan_vien": "" if nv_v == "-- Không chọn --" else nv_v,
+                    "nhan_vien": nv_moi,
                     "done":      False,
                 })
+                # Gửi thông báo cho nhân viên được giao
+                if nv_moi:
+                    them_thong_bao(
+                        nv_moi,
+                        f"🔧 Bạn được giao việc: {cd_v} (Task #{task_id})",
+                        task_id=task_id,
+                        loai="cong_viec_con",
+                    )
                 st.session_state[_cv_add_v] += 1
                 _save_cv_to_sheet(task_id, _cv_key)
         st.button("＋", key=f"dlg_cv_add_{task_id}",
@@ -3095,19 +3223,16 @@ def giao_dien_admin():
         ds_nhan_vien = lay_danh_sach_nhan_vien()
         ds_trang_thai = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
-        col_ct, col_pd = st.columns([3, 2])
-        with col_ct:
-            adm_cong_ty = st.selectbox(
-                "🏢 Công Ty Khách Hàng *",
-                options=ds_cong_ty if ds_cong_ty else ["(Chưa có công ty)"],
-                key="adm_cong_ty",
-            )
-        with col_pd:
-            adm_phe_duyet = st.selectbox(
-                "✅ Người Phê Duyệt",
-                options=["-- Không chọn --"] + ds_nhan_vien,
-                key="adm_phe_duyet",
-            )
+        adm_cong_ty = st.selectbox(
+            "🏢 Công Ty Khách Hàng *",
+            options=ds_cong_ty if ds_cong_ty else ["(Chưa có công ty)"],
+            key="adm_cong_ty",
+        )
+        adm_phe_duyet = st.selectbox(
+            "✅ Người Phê Duyệt",
+            options=["-- Không chọn --"] + ds_nhan_vien,
+            key="adm_phe_duyet",
+        )
 
         col_tt_top, col_nam = st.columns(2)
         with col_tt_top:
@@ -3467,26 +3592,24 @@ def giao_dien_nhan_vien():
                 df_cua_toi["Tên Công Việc"].fillna("").str.lower().str.contains(q_search.strip().lower())
             ]
 
-        # Bộ lọc Năm + Công Ty cùng hàng
-        col_loc_nam, col_loc_ct = st.columns(2)
-        with col_loc_nam:
-            ds_nam_nv = sorted(
-                [str(y) for y in df_cua_toi["Năm"].dropna().unique() if str(y).strip() != ""],
-                reverse=True,
-            ) if "Năm" in df_cua_toi.columns else []
-            loc_nam_nv = st.selectbox(
-                "📅 Lọc theo năm",
-                options=["Tất cả"] + ds_nam_nv,
-                key="nv_loc_nam",
-            ) if ds_nam_nv else "Tất cả"
-            if loc_nam_nv != "Tất cả":
-                df_cua_toi = df_cua_toi[df_cua_toi["Năm"].astype(str) == loc_nam_nv]
-        with col_loc_ct:
-            ds_ct_nv = df_cua_toi["Công Ty"].dropna().unique().tolist() if "Công Ty" in df_cua_toi.columns else []
-            if ds_ct_nv:
-                loc_ct_nv = st.multiselect("🏢 Lọc công ty", ds_ct_nv, key="nv_loc_ct", placeholder="Tất cả")
-                if loc_ct_nv:
-                    df_cua_toi = df_cua_toi[df_cua_toi["Công Ty"].isin(loc_ct_nv)]
+        # Bộ lọc — mỗi cái 1 hàng full width
+        ds_nam_nv = sorted(
+            [str(y) for y in df_cua_toi["Năm"].dropna().unique() if str(y).strip() != ""],
+            reverse=True,
+        ) if "Năm" in df_cua_toi.columns else []
+        loc_nam_nv = st.selectbox(
+            "📅 Lọc theo năm",
+            options=["Tất cả"] + ds_nam_nv,
+            key="nv_loc_nam",
+        ) if ds_nam_nv else "Tất cả"
+        if loc_nam_nv != "Tất cả":
+            df_cua_toi = df_cua_toi[df_cua_toi["Năm"].astype(str) == loc_nam_nv]
+
+        ds_ct_nv = df_cua_toi["Công Ty"].dropna().unique().tolist() if "Công Ty" in df_cua_toi.columns else []
+        if ds_ct_nv:
+            loc_ct_nv = st.multiselect("🏢 Lọc công ty", ds_ct_nv, key="nv_loc_ct", placeholder="Tất cả")
+            if loc_ct_nv:
+                df_cua_toi = df_cua_toi[df_cua_toi["Công Ty"].isin(loc_ct_nv)]
 
         ds_tt = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
@@ -3519,16 +3642,14 @@ def giao_dien_nhan_vien():
             ds_nv_nv       = lay_danh_sach_nhan_vien()
             ds_trang_thai_nv = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
-            # ── Hàng đầu: Công Ty (trái) + Người Phê Duyệt (phải) ──
-            col_ct2, col_pd2 = st.columns([3, 2])
-            with col_ct2:
-                nv_cong_ty = st.selectbox("🏢 Công Ty *", options=ds_cong_ty_nv, key=f"{_nv_prefix}_ct")
-            with col_pd2:
-                nv_phe_duyet = st.selectbox(
-                    "✅ Người Phê Duyệt",
-                    options=["-- Không chọn --"] + ds_nv_nv,
-                    key=f"{_nv_prefix}_pd"
-                )
+            # ── Hàng đầu: Công Ty ──
+            nv_cong_ty = st.selectbox("🏢 Công Ty *", options=ds_cong_ty_nv, key=f"{_nv_prefix}_ct")
+            # ── Hàng tiếp theo: Người Phê Duyệt ──
+            nv_phe_duyet = st.selectbox(
+                "✅ Người Phê Duyệt",
+                options=["-- Không chọn --"] + ds_nv_nv,
+                key=f"{_nv_prefix}_pd"
+            )
 
             col_tt2, col_nam2 = st.columns(2)
             with col_tt2:
@@ -3854,6 +3975,44 @@ def inject_css():
     .logout-btn-wrap .stButton > button:hover {
         background: rgba(239,68,68,0.3) !important;
         border-color: rgba(239,68,68,0.75) !important;
+    }
+
+    /* ===== TOPBAR ACTIONS (bell + logout cột phải) ===== */
+    .topbar-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: stretch;
+        justify-content: center;
+        height: 100%;
+        padding-top: 0.3rem;
+    }
+    .topbar-actions .stButton > button {
+        border-radius: 8px !important;
+        font-size: 1rem !important;
+        padding: 0.3rem 0.4rem !important;
+        width: 100% !important;
+        white-space: nowrap !important;
+        min-width: 0 !important;
+        transition: all 0.2s ease !important;
+    }
+    /* Nút chuông */
+    .topbar-actions .stButton:first-child > button {
+        background: rgba(99,102,241,0.1) !important;
+        color: #4f46e5 !important;
+        border: 1.5px solid rgba(99,102,241,0.35) !important;
+    }
+    .topbar-actions .stButton:first-child > button:hover {
+        background: rgba(99,102,241,0.22) !important;
+    }
+    /* Nút đăng xuất */
+    .topbar-actions .stButton:last-child > button {
+        background: rgba(239,68,68,0.1) !important;
+        color: #ef4444 !important;
+        border: 1.5px solid rgba(239,68,68,0.35) !important;
+    }
+    .topbar-actions .stButton:last-child > button:hover {
+        background: rgba(239,68,68,0.25) !important;
     }
 
     /* Padding nội dung chính bình thường */
@@ -4243,9 +4402,88 @@ def inject_css():
     """, unsafe_allow_html=True)
 
 
+# ============================================================
+# DIALOG THÔNG BÁO
+# ============================================================
+@st.dialog("🔔 Thông Báo", width="large")
+def dialog_thong_bao(ho_ten: str):
+    """Dialog hiển thị danh sách thông báo của user."""
+    c_title, c_mark = st.columns([5, 2])
+    with c_title:
+        so_chua = dem_chua_doc(ho_ten)
+        if so_chua > 0:
+            st.markdown(f"**{so_chua} thông báo chưa đọc**")
+    with c_mark:
+        if st.button("✅ Đánh dấu tất cả đã đọc",
+                     key="dlg_mark_all_read",
+                     use_container_width=True):
+            danh_dau_da_doc_tat_ca(ho_ten)
+            st.rerun()
+
+    st.divider()
+
+    df_tb = lay_thong_bao_nguoi_dung(ho_ten)
+    if df_tb.empty:
+        st.info("🔔 Bạn chưa có thông báo nào.")
+        return
+
+    for _, tb_row in df_tb.head(50).iterrows():
+        _da_doc   = str(tb_row.get("Da_Doc", "0")) == "1"
+        _noi_dung = str(tb_row.get("Noi_Dung", ""))
+        _tgian    = str(tb_row.get("Thoi_Gian", ""))
+        _loai     = str(tb_row.get("Loai", ""))
+        _task_id  = str(tb_row.get("Task_ID", ""))
+
+        # Icon + màu avatar theo loại
+        _icon_map = {
+            "task_moi":     ("📋", "#6366f1"),
+            "trang_thai":   ("🔄", "#0ea5e9"),
+            "cong_viec_con":("🔧", "#f59e0b"),
+        }
+        _icon, _col_av = _icon_map.get(_loai, ("🔔", "#6b7280"))
+
+        # Thời gian tương đối
+        try:
+            _dt = datetime.strptime(_tgian[:19], "%Y-%m-%d %H:%M:%S")
+            _delta = datetime.now() - _dt
+            if _delta.seconds < 60:              _tg_text = "Vừa xong"
+            elif _delta.seconds < 3600:          _tg_text = f"{_delta.seconds // 60} phút trước"
+            elif _delta.days == 0:               _tg_text = f"{_delta.seconds // 3600} giờ trước"
+            elif _delta.days == 1:               _tg_text = "Hôm qua"
+            else:                                _tg_text = _dt.strftime("%d/%m/%Y")
+        except Exception:
+            _tg_text = _tgian
+
+        _bg      = "#eff6ff" if not _da_doc else "#f9fafb"
+        _border  = "2px solid #bfdbfe" if not _da_doc else "1px solid #e5e7eb"
+        _dot_html = "<span style='display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6;margin-left:6px;vertical-align:middle'></span>" if not _da_doc else ""
+
+        st.markdown(f"""
+        <div style='display:flex;gap:12px;align-items:flex-start;
+                    background:{_bg};border:{_border};
+                    border-radius:12px;padding:12px 14px;
+                    margin-bottom:8px;'>
+            <div style='flex-shrink:0;width:42px;height:42px;border-radius:50%;
+                        background:{_col_av};display:flex;align-items:center;
+                        justify-content:center;font-size:1.25rem'>
+                {_icon}
+            </div>
+            <div style='flex:1;min-width:0'>
+                <div style='font-size:0.93rem;color:#1e293b;line-height:1.45'>{_noi_dung}{_dot_html}</div>
+                <div style='font-size:0.78rem;color:#94a3b8;margin-top:4px'>{_tg_text}
+                    {f'&nbsp;&middot;&nbsp;Task #{_task_id}' if _task_id and _task_id != '0' else ''}
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
 def main():
     """Hàm chính: khởi động và điều hướng ứng dụng."""
     inject_css()
+
+    # Auto-refresh mỗi 30 giây để bắt thông báo mới theo thời gian thực
+    st_autorefresh(interval=30_000, key="_autorefresh_tb")
 
     cookie_mgr = _cookie_manager()
 
@@ -4292,9 +4530,46 @@ def main():
     vai_tro   = st.session_state.get("vai_tro", "nhan_vien")
     ho_ten    = st.session_state.get("ho_ten", "")
 
+    # ── Toast thông báo mới (tự động hiện ở góc màn hình) ─────────────────
+    try:
+        df_tb_all = lay_thong_bao_nguoi_dung(ho_ten)
+        if not df_tb_all.empty:
+            # Lấy ID lớn nhất hiện tại làm mốc
+            _ids_hien_tai = pd.to_numeric(df_tb_all["ID"], errors="coerce").dropna()
+            _max_id_hien_tai = int(_ids_hien_tai.max()) if not _ids_hien_tai.empty else 0
+
+            _key_seen = f"_tb_seen_max_id_{ho_ten}"
+            _last_seen_id = st.session_state.get(_key_seen, None)
+
+            if _last_seen_id is None:
+                # Lần đầu đăng nhập → ghi nhận mốc, không toast
+                st.session_state[_key_seen] = _max_id_hien_tai
+            elif _max_id_hien_tai > _last_seen_id:
+                # Có thông báo mới → toast từng cái (tối đa 3)
+                _moi = df_tb_all[
+                    pd.to_numeric(df_tb_all["ID"], errors="coerce") > _last_seen_id
+                ].head(3)
+                _loai_icon = {
+                    "task_moi":      "📋",
+                    "trang_thai":    "🔄",
+                    "cong_viec_con": "🔧",
+                }
+                for _, _r in _moi.iterrows():
+                    _icon = _loai_icon.get(str(_r.get("Loai", "")), "🔔")
+                    _nd   = str(_r.get("Noi_Dung", ""))
+                    # Rút gọn nội dung ≤ 80 ký tự
+                    _nd_short = (_nd[:77] + "…") if len(_nd) > 80 else _nd
+                    st.toast(f"{_icon} {_nd_short}", icon="🔔")
+                st.session_state[_key_seen] = _max_id_hien_tai
+    except Exception:
+        pass
+
     # ── Header + nút đăng xuất ──────────────────────────────────────────────
-    role_badge = "🛡️ Admin" if vai_tro == "admin" else "👤"
-    col_hdr, col_out = st.columns([5, 1])
+    role_badge   = "🛡️ Admin" if vai_tro == "admin" else "👤"
+    so_chua_doc  = dem_chua_doc(ho_ten)
+    _bell_label  = f"🔔 {so_chua_doc}" if so_chua_doc > 0 else "🔔"
+
+    col_hdr, col_actions = st.columns([5, 1])
     with col_hdr:
         st.markdown(f"""
             <div class="main-header">
@@ -4302,9 +4577,13 @@ def main():
                 <div class="main-header-user">{role_badge} &nbsp;<b>{ho_ten}</b></div>
             </div>
         """, unsafe_allow_html=True)
-    with col_out:
-        st.markdown('<div class="logout-btn-wrap">', unsafe_allow_html=True)
-        if st.button("🚪 Đăng xuất", key="topbar_logout", use_container_width=True):
+    with col_actions:
+        st.markdown('<div class="topbar-actions">', unsafe_allow_html=True)
+        if st.button(_bell_label, key="btn_bell", use_container_width=True,
+                     help="Thông báo của bạn"):
+            dialog_thong_bao(ho_ten)
+        if st.button("🚪 Đăng Xuất", key="topbar_logout", use_container_width=True,
+                     help="Đăng xuất"):
             cookie_mgr.delete("qlcv_uid",    key="del_uid")
             cookie_mgr.delete("qlcv_uname",  key="del_uname")
             cookie_mgr.delete("qlcv_hoten",  key="del_hoten")
