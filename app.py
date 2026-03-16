@@ -9,7 +9,6 @@ from google.oauth2.service_account import Credentials
 import cloudinary
 import cloudinary.uploader
 import extra_streamlit_components as stx
-from streamlit_autorefresh import st_autorefresh
 from fpdf import FPDF
 import pandas as pd
 from datetime import datetime, timedelta
@@ -79,6 +78,10 @@ st.markdown(
     /* ẩn ảnh tròn cứng */
     img[style*="border-radius: 50"] { display: none !important; visibility: hidden !important; }
     img[style*="border-radius:50"]  { display: none !important; visibility: hidden !important; }
+    /* Giảm font placeholder toàn app */
+    input::placeholder, textarea::placeholder {
+        font-size: 0.78rem !important;
+    }
     /* Thêm padding-bottom trên mobile để nội dung không bị avatar badge che khuất */
     @media (max-width: 768px) {
         .main .block-container {
@@ -349,6 +352,18 @@ def cau_hinh_cloudinary():
 def tai_anh_len_cloudinary(file_anh) -> str:
     """Wrapper gọi sang Drive (giữ tên cũ để không cần đổi call sites)."""
     return tai_anh_len_drive(file_anh)
+
+
+def _tai_media_len_drive(file_obj) -> str:
+    """Upload ảnh hoặc video lên Drive. Video → trả view URL; ảnh → thumbnail URL."""
+    import re as _re
+    url = tai_anh_len_drive(file_obj)
+    mime = getattr(file_obj, "type", "")
+    if mime.startswith("video/"):
+        m = _re.search(r"[?&]id=([^&]+)", url)
+        if m:
+            return f"https://drive.google.com/file/d/{m.group(1)}/view"
+    return url
 
 
 # ============================================================
@@ -1820,6 +1835,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                 "ten":       cv.get("ten", cv.get("Tên", "")),
                 "nhan_vien": cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))),
                 "done":      bool(cv.get("done", False)),
+                "anh":       cv.get("anh", []),
             }
             for cv in _cv_parsed if isinstance(cv, dict)
         ]
@@ -1844,10 +1860,10 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         flex: 0 0 32px !important; min-width: 32px !important; max-width: 32px !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) > [data-testid="stColumn"]:nth-child(2) {{
-        flex: 3 1 0% !important; min-width: 0 !important;
+        flex: 1 1 0% !important; min-width: 0 !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) > [data-testid="stColumn"]:nth-child(3) {{
-        flex: 5 1 0% !important; min-width: 0 !important;
+        flex: 1 1 0% !important; min-width: 0 !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) > [data-testid="stColumn"]:nth-child(4) {{
         flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
@@ -1860,7 +1876,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stSelectbox"] > div > div {{
         font-size: 0.85rem !important; border-color: #e0d7ff !important;
         background: #f5f3ff !important; color: #4c1d95 !important;
-        min-height: 32px !important; padding: 2px 8px !important;
+        min-height: 32px !important; padding: 2px 4px !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stColumn"]:nth-child(4) button {{
         background: transparent !important; border: none !important;
@@ -1889,13 +1905,17 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         st.session_state[_cv_key][i]["nhan_vien"] = nv_moi
         # Gửi thông báo nếu nhân viên thay đổi
         if nv_moi and nv_moi != nv_cu:
-            ten_cv = st.session_state[_cv_key][i].get("ten", "")
-            them_thong_bao(
-                nv_moi,
-                f"🔧 Bạn được giao việc: {ten_cv} (Task #{task_id})",
-                task_id=task_id,
-                loai="cong_viec_con",
-            )
+            ten_cv      = st.session_state[_cv_key][i].get("ten", "")
+            nguoi_giao  = st.session_state.get("ho_ten", "")
+            ten_task_tb = hang.get("Tên Công Việc", f"Task #{task_id}")
+            cong_ty_tb  = hang.get("Công Ty", "")
+            _suffix     = f"**{ten_task_tb}**" + (f" ({cong_ty_tb})" if cong_ty_tb else "")
+            them_thong_bao(nv_moi,
+                f"🔧 Bạn được giao việc: **{ten_cv}** • {_suffix}",
+                task_id=task_id, loai="cong_viec_con")
+            them_thong_bao_tat_ca(
+                f"🔧 **{nguoi_giao}** đã giao **{ten_cv}** cho **{nv_moi}** • {_suffix}",
+                task_id=task_id, loai="cong_viec_con", tru_nguoi=nv_moi)
         _save_cv_to_sheet(task_id, _cv_key)
 
     def _cb_cv_del(i):
@@ -1904,6 +1924,12 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
             for k in list(st.session_state.keys()):
                 if k.startswith(f"dlg_cv_nv_{task_id}_"):
                     del st.session_state[k]
+            _save_cv_to_sheet(task_id, _cv_key)
+
+    def _cb_del_cv_media(cvi, url_m):
+        _cvl = st.session_state.get(_cv_key, [])
+        if 0 <= cvi < len(_cvl):
+            _cvl[cvi]["anh"] = [u for u in _cvl[cvi].get("anh", []) if u != url_m]
             _save_cv_to_sheet(task_id, _cv_key)
 
     for _cvi, cv in enumerate(ds_cv_con):
@@ -1915,7 +1941,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         _wrap_cls = f"cv-item-wrap-{task_id}" + (" done" if _dcv else "")
 
         st.markdown(f"<div class='{_wrap_cls}'>", unsafe_allow_html=True)
-        col_ck, col_txt, col_nv, col_del = st.columns([0.4, 3, 5.5, 0.5], gap="small")
+        col_ck, col_txt, col_nv, col_del = st.columns([0.4, 4, 4, 0.5], gap="small")
         with col_ck:
             st.markdown(f"<span class='{_mk_cv}' style='display:none'></span>", unsafe_allow_html=True)
             st.checkbox("", value=_dcv, key=f"dlg_cv_ck_{task_id}_{_cvi}",
@@ -1927,13 +1953,49 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
             st.selectbox("", options=_ds_nv_cv, index=_nv_idx,
                          key=f"dlg_cv_nv_{task_id}_{_cvi}",
                          label_visibility="collapsed",
-                         format_func=lambda x: x if x.startswith("-- ") else x.strip().split()[-1],
+                         format_func=lambda x: "Tên NV" if x == "-- Không chọn --" else x.strip().split()[-1],
                          on_change=_cb_cv_nv, args=(_cvi,))
         with col_del:
             st.button("🗑️", key=f"dlg_cv_del_{task_id}_{_cvi}",
                       use_container_width=True,
                       on_click=_cb_cv_del, args=(_cvi,))
         st.markdown("</div>", unsafe_allow_html=True)
+
+        # ── Hình / Video cho công việc con ────────────────────
+        _cv_media = cv.get("anh", [])
+        _exp_lbl = f"📎 Hình/Video ({len(_cv_media)})" if _cv_media else "📎 Thêm hình/video"
+        with st.expander(_exp_lbl, expanded=False):
+            if _cv_media:
+                _cols_m = st.columns(min(len(_cv_media), 3))
+                for _mi, _url_m in enumerate(_cv_media):
+                    with _cols_m[_mi % 3]:
+                        if "/view" in _url_m:
+                            st.markdown(f"🎬 [Video {_mi + 1}]({_url_m})", unsafe_allow_html=False)
+                        else:
+                            _hien_thi_anh_drive(_url_m, use_container_width=True)
+                        st.button("🗑️ Xoá", key=f"del_cv_m_{task_id}_{_cvi}_{_mi}",
+                                  use_container_width=True,
+                                  on_click=_cb_del_cv_media, args=(_cvi, _url_m))
+            _up_key_m = f"up_cv_m_{task_id}_{_cvi}"
+            st.file_uploader(
+                "Chọn hình hoặc video",
+                type=["jpg", "jpeg", "png", "mp4", "mov", "avi"],
+                accept_multiple_files=True,
+                key=_up_key_m,
+                label_visibility="collapsed",
+            )
+            if st.button("📤 Upload", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True):
+                _files_m = st.session_state.get(_up_key_m) or []
+                if _files_m:
+                    with st.spinner("Đang upload..."):
+                        _cvl = st.session_state.get(_cv_key, [])
+                        for _fm in _files_m:
+                            _new_url = _tai_media_len_drive(_fm)
+                            _cvl[_cvi].setdefault("anh", []).append(_new_url)
+                    _save_cv_to_sheet(task_id, _cv_key)
+                    st.rerun(scope="fragment")
+                else:
+                    st.warning("Chưa chọn file!")
 
     # ── Thêm công việc con từ danh sách ──────────────────────
     _ds_cd_all = ["-- Chọn công đoạn --"] + lay_ten_cac_cong_doan()
@@ -1961,14 +2023,18 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                     "nhan_vien": nv_moi,
                     "done":      False,
                 })
-                # Gửi thông báo cho nhân viên được giao
+                # Gửi thông báo cho nhân viên được giao + broadcast cho tất cả
                 if nv_moi:
-                    them_thong_bao(
-                        nv_moi,
-                        f"🔧 Bạn được giao việc: {cd_v} (Task #{task_id})",
-                        task_id=task_id,
-                        loai="cong_viec_con",
-                    )
+                    nguoi_giao  = st.session_state.get("ho_ten", "")
+                    ten_task_tb = hang.get("Tên Công Việc", f"Task #{task_id}")
+                    cong_ty_tb  = hang.get("Công Ty", "")
+                    _suffix     = f"**{ten_task_tb}**" + (f" ({cong_ty_tb})" if cong_ty_tb else "")
+                    them_thong_bao(nv_moi,
+                        f"🔧 Bạn được giao việc: **{cd_v}** • {_suffix}",
+                        task_id=task_id, loai="cong_viec_con")
+                    them_thong_bao_tat_ca(
+                        f"🔧 **{nguoi_giao}** đã giao **{cd_v}** cho **{nv_moi}** • {_suffix}",
+                        task_id=task_id, loai="cong_viec_con", tru_nguoi=nv_moi)
                 st.session_state[_cv_add_v] += 1
                 _save_cv_to_sheet(task_id, _cv_key)
         st.button("＋", key=f"dlg_cv_add_{task_id}",
@@ -2929,44 +2995,13 @@ def giao_dien_admin():
             placeholder="Ví dụ: Bảo hành, Sửa chữa, Trả lại...",
             mo_ta_them="Tên Tình Trạng *",
         )
-        _section_don_gian(
-            "�📋 Trạng Thái Công Việc", "trang_thai",
-            lay_danh_sach_trang_thai_custom, them_trang_thai_custom, "Tên Trạng Thái",
-            placeholder="Ví dụ: Chờ Làm, Đang Làm, Hoàn Thành...",
-            mo_ta_them="Tên Trạng Thái *",
-        )
+
         _section_don_gian(
             "⚙️ Công Đoạn", "cong_doan",
             lay_danh_sach_cong_doan, them_cong_doan, "Tên Công Đoạn",
             placeholder="Ví dụ: Kiểm Tra Đầu Vào, Tháo Rã, Quấn Dây...",
             mo_ta_them="Tên Công Đoạn *",
         )
-        with st.expander("👷 Người Thực Hiện Công Đoạn"):
-            ds_cong_doan_hien = lay_ten_cac_cong_doan()
-            if not ds_cong_doan_hien:
-                st.warning("⚠️ Chưa có Công Đoạn nào. Hãy thêm ở mục **⚙️ Công Đoạn** trước!")
-            else:
-                with st.form("form_nguoi_cong_doan", clear_on_submit=True):
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        ho_ten_ncd = st.text_input("Họ Tên *", placeholder="Ví dụ: Nguyễn Văn An")
-                    with col_b:
-                        cong_doan_chon = st.selectbox("Công Đoạn *", options=ds_cong_doan_hien)
-                    gui_ncd = st.form_submit_button("➕ Thêm Người Thực Hiện", use_container_width=True)
-                    if gui_ncd:
-                        if not ho_ten_ncd.strip():
-                            st.error("⛔ Vui lòng nhập họ tên!")
-                        else:
-                            with st.spinner("Đang lưu..."):
-                                id_ncd = them_nguoi_cong_doan(ho_ten_ncd.strip(), cong_doan_chon)
-                            st.success(f"✅ Đã thêm #{id_ncd}: **{ho_ten_ncd}** — Công đoạn: **{cong_doan_chon}**!")
-                st.divider()
-                df_ncd = lay_danh_sach_nguoi_cong_doan()
-                if df_ncd.empty:
-                    st.info("ℹ️ Chưa có người thực hiện nào.")
-                else:
-                    st.markdown(f"**Tổng cộng: {len(df_ncd)} người**")
-                    st.dataframe(df_ncd, use_container_width=True, hide_index=True)
 
     # ══════════════════════════════════════════════
     # TAB 2 — NHÂN VIÊN
@@ -3262,17 +3297,19 @@ def giao_dien_admin():
                 key="adm_tinh_trang",
             )
 
-        col_cs_adm, col_sc_adm, col_ms_adm = st.columns(3)
+        col_cs_adm, col_sc_adm = st.columns(2)
         with col_cs_adm:
             adm_cong_suat = st.text_input("⚡ Công Suất", placeholder="VD: 5.5kW", key="adm_cong_suat")
         with col_sc_adm:
             adm_so_cuc = st.text_input("🔩 Số Cực", placeholder="VD: 4P", key="adm_so_cuc")
+
+        col_ms_adm, col_po_adm = st.columns(2)
         with col_ms_adm:
             adm_ma_so = st.text_input("🏷️ Mã Số", placeholder="VD: ABC-001", key="adm_ma_so")
-
-        col_po_adm, col_kh_adm, col_bg_adm = st.columns(3)
         with col_po_adm:
             adm_so_po_noi_bo = st.text_input("📄 Số PO Nội Bộ", placeholder="VD: PO-2024-001", key="adm_so_po_noi_bo")
+
+        col_kh_adm, col_bg_adm = st.columns(2)
         with col_kh_adm:
             adm_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key="adm_so_po_kh")
         with col_bg_adm:
@@ -3677,17 +3714,19 @@ def giao_dien_nhan_vien():
                     key=f"{_nv_prefix}_tinh_trang",
                 )
 
-            col_cs_nv, col_sc_nv, col_ms_nv = st.columns(3)
+            col_cs_nv, col_sc_nv = st.columns(2)
             with col_cs_nv:
                 nv_cong_suat = st.text_input("⚡ Công Suất", placeholder="VD: 5.5kW", key=f"{_nv_prefix}_cong_suat")
             with col_sc_nv:
                 nv_so_cuc = st.text_input("🔩 Số Cực", placeholder="VD: 4P", key=f"{_nv_prefix}_so_cuc")
+
+            col_ms_nv, col_po_nv = st.columns(2)
             with col_ms_nv:
                 nv_ma_so = st.text_input("🏷️ Mã Số", placeholder="VD: ABC-001", key=f"{_nv_prefix}_ma_so")
-
-            col_po_nv, col_kh_nv, col_bg_nv = st.columns(3)
             with col_po_nv:
                 nv_so_po_noi_bo = st.text_input("📄 Số PO Nội Bộ", placeholder="VD: PO-2024-001", key=f"{_nv_prefix}_so_po_noi_bo")
+
+            col_kh_nv, col_bg_nv = st.columns(2)
             with col_kh_nv:
                 nv_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key=f"{_nv_prefix}_so_po_kh")
             with col_bg_nv:
@@ -3865,12 +3904,6 @@ def giao_dien_dang_nhap(cookie_mgr=None):
                 else:
                     st.error(f"❌ {msg}")
 
-        with st.expander("ℹ️ Thông tin về tài khoản"):
-            st.info(
-                "- Tài khoản mới sẽ có vai trò **Nhân Viên**.\n"
-                "- Quản trị viên được cấp quyền **Admin** bởi hệ thống.\n"
-                "- Tài khoản mặc định admin: **admin / admin123** (đổi mật khẩu sau khi đăng nhập)."
-            )
 
 
 # ============================================================
@@ -4481,9 +4514,6 @@ def dialog_thong_bao(ho_ten: str):
 def main():
     """Hàm chính: khởi động và điều hướng ứng dụng."""
     inject_css()
-
-    # Auto-refresh mỗi 30 giây để bắt thông báo mới theo thời gian thực
-    st_autorefresh(interval=30_000, key="_autorefresh_tb")
 
     cookie_mgr = _cookie_manager()
 
