@@ -78,6 +78,13 @@ st.markdown(
     /* ẩn ảnh tròn cứng */
     img[style*="border-radius: 50"] { display: none !important; visibility: hidden !important; }
     img[style*="border-radius:50"]  { display: none !important; visibility: hidden !important; }
+    /* ẩn fixed bottom-right badge/avatar */
+    iframe[style*="position: fixed"] { display: none !important; }
+    iframe[style*="position:fixed"]  { display: none !important; }
+    div[style*="position: fixed"][style*="bottom"] img { display: none !important; }
+    [class*="badge"], [class*="Badge"], [class*="avatar"], [class*="Avatar"] {
+        display: none !important; visibility: hidden !important;
+    }
     /* Giảm font placeholder toàn app */
     input::placeholder, textarea::placeholder {
         font-size: 0.78rem !important;
@@ -117,6 +124,12 @@ components.html(
         'footer',
         'img[style*="border-radius: 50"]',
         'img[style*="border-radius:50"]',
+        '[class*="badge"]',
+        '[class*="Badge"]',
+        '[class*="avatar"]',
+        '[class*="Avatar"]',
+        'iframe[style*="position: fixed"]',
+        'iframe[style*="position:fixed"]',
     ];
     var CSS_RULES = HIDE.map(function(s){ return s+'{display:none!important;visibility:hidden!important}'; }).join('');
 
