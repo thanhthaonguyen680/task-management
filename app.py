@@ -89,6 +89,78 @@ st.markdown(
     input::placeholder, textarea::placeholder {
         font-size: 0.78rem !important;
     }
+    /* Selectbox: cho text đã chọn xuống hàng, giữ nguyên input */
+    /* Control wrapper */
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+        height: auto !important;
+        min-height: 38px !important;
+    }
+    /* Selected value: div trực tiếp bên trong ValueContainer không phải input */
+    /* Baseweb structure: select > div(control) > div(ValueContainer) > div(singleValue) + div(input) */
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div > div > div:not([data-testid]) {
+        font-size: 0.72rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: calc(100% - 28px) !important;
+        direction: rtl !important;
+        text-align: left !important;
+    }
+    /* Class-based fallback */
+    [data-testid="stSelectbox"] div[class*="singleValue"],
+    [data-testid="stSelectbox"] div[class*="SingleValue"],
+    [data-testid="stSelectbox"] div[class*="single-value"] {
+        font-size: 0.72rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: calc(100% - 28px) !important;
+        direction: rtl !important;
+        text-align: left !important;
+    }
+    /* Dropdown options — cho xuống hàng thay vì cắt ... */
+    [data-baseweb="menu"] li,
+    [data-baseweb="menu"] [role="option"],
+    [data-baseweb="popover"] li,
+    [data-baseweb="popover"] [role="option"],
+    [role="listbox"] [role="option"],
+    ul[data-baseweb="menu"] li,
+    [data-baseweb="select-dropdown"] li,
+    [data-baseweb="select-dropdown"] [role="option"] {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        font-size: 0.72rem !important;
+        line-height: 1.3 !important;
+        height: auto !important;
+        min-height: 32px !important;
+        max-height: none !important;
+        padding-top: 5px !important;
+        padding-bottom: 5px !important;
+    }
+    /* Tất cả con cháu bên trong option: override bất kỳ inline style nào */
+    [data-baseweb="menu"] li *,
+    [data-baseweb="menu"] [role="option"] *,
+    [role="listbox"] [role="option"] * {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        line-height: 1.3 !important;
+        max-width: 100% !important;
+        font-size: 0.72rem !important;
+    }
+    /* Span/div text bên trong option cũng cần wrap */
+    [data-baseweb="menu"] li span,
+    [data-baseweb="menu"] li div,
+    [role="listbox"] [role="option"] span,
+    [role="listbox"] [role="option"] div {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+    }
     /* Thêm padding-bottom trên mobile để nội dung không bị avatar badge che khuất */
     @media (max-width: 768px) {
         .main .block-container {
@@ -133,6 +205,18 @@ components.html(
     ];
     var CSS_RULES = HIDE.map(function(s){ return s+'{display:none!important;visibility:hidden!important}'; }).join('');
 
+    // CSS cho dropdown options wrap 2 hàng (inject vào body vì portal render ngoài DOM chính)
+    var DROPDOWN_CSS = [
+        '[data-baseweb="menu"] li { white-space:normal!important; word-break:break-word!important; overflow:visible!important; text-overflow:unset!important; height:auto!important; min-height:32px!important; max-height:none!important; padding:5px 10px!important; line-height:1.3!important; font-size:0.72rem!important; }',
+        '[data-baseweb="menu"] li * { white-space:normal!important; word-break:break-word!important; overflow:visible!important; text-overflow:unset!important; line-height:1.3!important; max-width:100%!important; font-size:0.72rem!important; }',  
+        '[data-baseweb="menu"] li span, [data-baseweb="menu"] li div { white-space:normal!important; word-break:break-word!important; overflow:visible!important; text-overflow:unset!important; }',
+        '[role="option"] { white-space:normal!important; word-break:break-word!important; height:auto!important; max-height:none!important; overflow:visible!important; }',
+        '[role="option"] * { white-space:normal!important; word-break:break-word!important; overflow:visible!important; text-overflow:unset!important; }',
+        '[role="listbox"] { overflow-y:auto!important; }',
+        '[data-testid="stSelectbox"] [data-baseweb="select"] [class*="singleValue"] { font-size:0.72rem!important; white-space:nowrap!important; overflow:hidden!important; text-overflow:ellipsis!important; max-width:calc(100% - 28px)!important; }',
+        '[data-testid="stSelectbox"] [data-baseweb="select"] [class*="SingleValue"] { font-size:0.72rem!important; white-space:nowrap!important; overflow:hidden!important; text-overflow:ellipsis!important; max-width:calc(100% - 28px)!important; }',
+    ].join('');
+
     function injectCSS(doc) {
         try {
             var id = '__st_hide_v2';
@@ -140,8 +224,135 @@ components.html(
             if (existing) return;
             var s = doc.createElement('style');
             s.id = id;
-            s.textContent = CSS_RULES;
+            s.textContent = CSS_RULES + DROPDOWN_CSS;
             (doc.head || doc.documentElement).appendChild(s);
+        } catch(e) {}
+    }
+
+    // Kiểm tra element có nằm trong row công việc con không (marker class "dlgcv...")
+    function isInsideCvCmRow(el) {
+        try {
+            var block = el.closest('[data-testid="stHorizontalBlock"]');
+            if (!block) return false;
+            return !!block.querySelector('[class*="dlgcv"]');
+        } catch(e) { return false; }
+    }
+
+    // Fix selectbox NV trong công việc con: bỏ overflow/clip, direction ltr
+    function fixCvCmSelectboxes(doc) {
+        try {
+            doc.querySelectorAll('[data-testid="stHorizontalBlock"]').forEach(function(block) {
+                if (!block.querySelector('[class*="dlgcv"]')) return;
+                // Tìm tất cả selectbox trong row này
+                block.querySelectorAll('[data-testid="stSelectbox"] [data-baseweb="select"]').forEach(function(sel) {
+                    // Fix toàn bộ children trực tiếp của baseweb select
+                    sel.querySelectorAll('div').forEach(function(div) {
+                        div.style.setProperty('overflow', 'visible', 'important');
+                        div.style.setProperty('text-overflow', 'clip', 'important');
+                        div.style.setProperty('max-width', 'none', 'important');
+                        div.style.setProperty('white-space', 'nowrap', 'important');
+                        div.style.setProperty('direction', 'ltr', 'important');
+                    });
+                });
+            });
+        } catch(e) {}
+    }
+
+    // Set font-size nhỏ trực tiếp lên singleValue div (override baseweb inline style)
+    function fixSelectedValue(doc) {
+        try {
+            var sels = [
+                '[data-testid="stSelectbox"] [data-baseweb="select"] [class*="singleValue"]',
+                '[data-testid="stSelectbox"] [data-baseweb="select"] [class*="SingleValue"]',
+            ];
+            sels.forEach(function(sel) {
+                doc.querySelectorAll(sel).forEach(function(el) {
+                    // Bỏ qua NV selectbox trong rows công việc con (hàng 1 layout)
+                    if (isInsideCvCmRow(el)) return;
+                    // Nhận diện selectbox nhân viên qua wrapper class hoặc label text
+                    var stBox = el.closest('[data-testid="stSelectbox"]');
+                    var isNvBox = false;
+                    if (stBox) {
+                        // Kiểm tra wrapper div cv-nv-frag- hoặc cv-nv-row-
+                        var wrap = stBox.parentElement;
+                        while (wrap) {
+                            if (wrap.className && typeof wrap.className === 'string' &&
+                                (wrap.className.indexOf('cv-nv-frag-') !== -1 ||
+                                 wrap.className.indexOf('cv-nv-row-') !== -1)) {
+                                isNvBox = true; break;
+                            }
+                            if (wrap === doc.body) break;
+                            wrap = wrap.parentElement;
+                        }
+                        // Fallback: kiểm tra label text
+                        if (!isNvBox) {
+                            var lbl = stBox.querySelector('label');
+                            if (lbl && lbl.textContent && lbl.textContent.indexOf('Nh\u00e2n vi\u00ean') !== -1) {
+                                isNvBox = true;
+                            }
+                        }
+                    }
+                    if (isNvBox) {
+                        el.style.setProperty('direction', 'ltr', 'important');
+                        el.style.setProperty('overflow', 'visible', 'important');
+                        el.style.setProperty('text-overflow', 'clip', 'important');
+                        el.style.setProperty('max-width', 'none', 'important');
+                        el.style.setProperty('white-space', 'nowrap', 'important');
+                        el.style.setProperty('font-size', '0.9rem', 'important');
+                        return;
+                    }
+                    el.style.setProperty('font-size', '0.72rem', 'important');
+                    el.style.setProperty('white-space', 'nowrap', 'important');
+                    el.style.setProperty('overflow', 'hidden', 'important');
+                    el.style.setProperty('text-overflow', 'ellipsis', 'important');
+                    el.style.setProperty('max-width', 'calc(100% - 28px)', 'important');
+                });
+            });
+        } catch(e) {}
+    }
+
+    // Fix inline styles trên dropdown option items (baseweb dùng inline style vượt qua CSS !important)
+    // Chỉ fix trực tiếp li/option và direct children — không đụng input, không querySelectorAll('*')
+    function fixDropdownOptions(doc) {
+        try {
+            // Không chạy khi user đang gõ/xóa trong search input của selectbox
+            try {
+                var ae = doc.activeElement;
+                if (ae && ae.tagName && ae.tagName.toLowerCase() === 'input') return;
+                // Kiểm tra window.parent nếu đây là iframe doc
+                var pae = window.parent && window.parent.document && window.parent.document.activeElement;
+                if (pae && pae.tagName && pae.tagName.toLowerCase() === 'input') return;
+            } catch(e) {}
+            var sels = [
+                '[data-baseweb="menu"] li',
+                '[data-baseweb="menu"] [role="option"]',
+                '[role="listbox"] [role="option"]',
+            ];
+            sels.forEach(function(sel) {
+                doc.querySelectorAll(sel).forEach(function(el) {
+                    el.style.setProperty('white-space', 'normal', 'important');
+                    el.style.setProperty('word-break', 'break-word', 'important');
+                    el.style.setProperty('overflow', 'visible', 'important');
+                    el.style.setProperty('text-overflow', 'unset', 'important');
+                    el.style.setProperty('height', 'auto', 'important');
+                    el.style.setProperty('max-height', 'none', 'important');
+                    el.style.setProperty('font-size', '0.72rem', 'important');
+                    el.style.setProperty('line-height', '1.3', 'important');
+                    el.style.setProperty('min-height', '28px', 'important');
+                    // Chỉ fix direct children (không phải input)
+                    for (var i = 0; i < el.children.length; i++) {
+                        var child = el.children[i];
+                        if (child.tagName && child.tagName.toLowerCase() !== 'input') {
+                            child.style.setProperty('white-space', 'normal', 'important');
+                            child.style.setProperty('word-break', 'break-word', 'important');
+                            child.style.setProperty('overflow', 'visible', 'important');
+                            child.style.setProperty('text-overflow', 'unset', 'important');
+                            child.style.setProperty('max-width', '100%', 'important');
+                            child.style.setProperty('font-size', '0.72rem', 'important');
+                        }
+                    }
+                });
+            });
         } catch(e) {}
     }
 
@@ -168,14 +379,44 @@ components.html(
     frames.forEach(function(doc) {
         injectCSS(doc);
         hideElements(doc);
+        fixSelectedValue(doc);
+        fixCvCmSelectboxes(doc);
     });
+
+    // Chạy sớm sau khi DOM sẵn sàng
+    setTimeout(function() {
+        frames.forEach(function(doc) { fixSelectedValue(doc); fixCvCmSelectboxes(doc); });
+    }, 100);
+    setTimeout(function() {
+        frames.forEach(function(doc) { fixSelectedValue(doc); fixCvCmSelectboxes(doc); });
+    }, 500);
 
     // MutationObserver để bắt các element được thêm sau
     function observeDoc(doc) {
         try {
+            var _fixTimer = null;
+            var _menuPresent = false; // track xem menu đã có trong DOM chưa
             var obs = new MutationObserver(function(mutations) {
                 injectCSS(doc);
                 hideElements(doc);
+                // Chỉ fix khi menu MỚI xuất hiện (không có → có)
+                // Không chạy lại khi user gõ/xóa bên trong menu đang mở
+                var menuNow = !!(doc.querySelector('[data-baseweb="menu"]') || doc.querySelector('[role="listbox"]'));
+                if (menuNow && !_menuPresent) {
+                    // Menu vừa mở ra → fix một lần sau 30ms
+                    _menuPresent = true;
+                    clearTimeout(_fixTimer);
+                    _fixTimer = setTimeout(function() {
+                        fixDropdownOptions(doc);
+                        fixSelectedValue(doc);
+                    }, 30);
+                } else if (!menuNow && _menuPresent) {
+                    _menuPresent = false;
+                    // Menu vừa đóng → update selected value display
+                    setTimeout(function() { fixSelectedValue(doc); fixCvCmSelectboxes(doc); }, 50);
+                } else if (!menuNow) {
+                    _menuPresent = false;
+                }
             });
             obs.observe(doc.documentElement, { childList: true, subtree: true });
         } catch(e) {}
@@ -189,6 +430,9 @@ components.html(
             frames.forEach(function(doc) {
                 injectCSS(doc);
                 hideElements(doc);
+                fixDropdownOptions(doc);
+                fixSelectedValue(doc);
+                fixCvCmSelectboxes(doc);
             });
         }, delay);
     });
@@ -551,15 +795,49 @@ def them_thong_bao_tat_ca(noi_dung: str, task_id: int = 0, loai: str = "general"
 
 
 def lay_thong_bao_nguoi_dung(ho_ten: str) -> pd.DataFrame:
-    """Lấy danh sách thông báo của user, mới nhất trước."""
+    """Lấy danh sách thông báo của user trong 48 giờ gần nhất, mới nhất trước."""
     try:
         df = _lay_df_don_gian(_TB_SHEET, _TB_HEADERS)
         if df.empty:
             return df
         df = df[df["Nguoi_Nhan"] == ho_ten].copy()
+        # Lọc chỉ thông báo trong 48 giờ gần nhất
+        try:
+            df["Thoi_Gian"] = pd.to_datetime(df["Thoi_Gian"], errors="coerce")
+            nguong = datetime.now() - timedelta(hours=48)
+            df = df[df["Thoi_Gian"] >= nguong]
+            df["Thoi_Gian"] = df["Thoi_Gian"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
         return df.sort_values("Thoi_Gian", ascending=False).reset_index(drop=True)
     except Exception:
         return pd.DataFrame(columns=_TB_HEADERS)
+
+
+def xoa_thong_bao_cu():
+    """Xóa các thông báo cũ hơn 48 giờ khỏi sheet (chạy định kỳ)."""
+    try:
+        sheet = _lay_sheet_don_gian(_TB_SHEET, _TB_HEADERS)
+        rows = sheet.get_all_values()
+        if len(rows) <= 1:
+            return
+        headers = rows[0]
+        idx_time = headers.index("Thoi_Gian")
+        nguong = datetime.now() - timedelta(hours=48)
+        # Tìm các hàng cần xóa (từ dưới lên để không lệch index)
+        rows_to_delete = []
+        for i, row in enumerate(rows[1:], start=2):
+            try:
+                tg = datetime.strptime(row[idx_time], "%Y-%m-%d %H:%M:%S")
+                if tg < nguong:
+                    rows_to_delete.append(i)
+            except Exception:
+                pass
+        # Xóa từ dưới lên
+        for r in reversed(rows_to_delete):
+            sheet.delete_rows(r)
+    except Exception:
+        pass
 
 
 def dem_chua_doc(ho_ten: str) -> int:
@@ -868,6 +1146,17 @@ def cap_nhat_ngay_ket_thuc(task_id: int, ngay_ket_thuc: str):
     o_tim = sheet.find(str(task_id), in_column=1)
     if o_tim:
         sheet.update_cell(o_tim.row, 24, ngay_ket_thuc)
+        lay_danh_sach_cong_viec.clear()
+
+
+def cap_nhat_han_hoan_thanh(task_id: int, han: str):
+    """
+    Cập nhật Hạn Hoàn Thành (cột J, cột 10) của công việc theo ID.
+    """
+    sheet = lay_sheet()
+    o_tim = sheet.find(str(task_id), in_column=1)
+    if o_tim:
+        sheet.update_cell(o_tim.row, 10, han)
         lay_danh_sach_cong_viec.clear()
 
 
@@ -1720,7 +2009,25 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     )
     if hang.get("Người Phê Duyệt"):
         st.markdown(f"✅ **Người phê duyệt:** `{hang.get('Người Phê Duyệt', '')}`")
-    st.markdown(f"📅 **Hạn hoàn thành:** `{hang.get('Hạn Hoàn Thành', '')}`")
+    # ── Hạn Hoàn Thành (nhân viên có thể chỉnh) ─────────────────────────────
+    _hht_hien_tai = hang.get("Hạn Hoàn Thành", "") or ""
+    try:
+        from datetime import date as _date
+        _hht_default = _date.fromisoformat(_hht_hien_tai.strip()) if _hht_hien_tai.strip() else None
+    except Exception:
+        _hht_default = None
+
+    _hht_val = st.date_input(
+        "📅 Hạn hoàn thành",
+        value=_hht_default,
+        format="YYYY-MM-DD",
+        key=f"hht_{task_id}",
+    )
+    _hht_str = _hht_val.strftime("%Y-%m-%d") if _hht_val else ""
+    if _hht_str != _hht_hien_tai.strip():
+        with st.spinner("Đang lưu..."):
+            cap_nhat_han_hoan_thanh(task_id, _hht_str)
+
     st.markdown(f"🕐 **Ngày tạo:** `{hang.get('Ngày Tạo', '')}`")
 
     # ── Ngày Kết Thúc (nhân viên tự điền) ───────────────────────────────────
@@ -1876,9 +2183,6 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         flex: 1 1 0% !important; min-width: 0 !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) > [data-testid="stColumn"]:nth-child(3) {{
-        flex: 1 1 0% !important; min-width: 0 !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) > [data-testid="stColumn"]:nth-child(4) {{
         flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stCheckbox"] {{ margin: 0 !important; }}
@@ -1886,22 +2190,29 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         margin: 0 !important; font-size: 0.93rem !important; font-weight: 600;
         color: #1e1b4b; padding: 2px 0;
     }}
-    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stSelectbox"] > div > div {{
-        font-size: 0.85rem !important; border-color: #e0d7ff !important;
-        background: #f5f3ff !important; color: #4c1d95 !important;
-        min-height: 32px !important; padding: 2px 4px !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stColumn"]:nth-child(4) button {{
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stColumn"]:nth-child(3) button {{
         background: transparent !important; border: none !important;
         box-shadow: none !important; color: #ef4444 !important;
         font-size: 1.1rem !important; padding: 2px 4px !important; min-height: 32px !important;
     }}
-    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stColumn"]:nth-child(4) button:hover {{
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stColumn"]:nth-child(3) button:hover {{
         background: #fee2e2 !important; border-radius: 6px !important;
     }}
+    .cv-nv-row-{task_id} [data-testid="stSelectbox"] > div > div {{
+        font-size: 0.9rem !important; border-color: #e0d7ff !important;
+        background: #f5f3ff !important; color: #4c1d95 !important;
+        min-height: 34px !important;
+    }}
+    .cv-nv-row-{task_id} [data-testid="stSelectbox"] [class*="singleValue"],
+    .cv-nv-row-{task_id} [data-testid="stSelectbox"] [class*="SingleValue"] {{
+        direction: ltr !important; font-size: 0.9rem !important;
+        overflow: visible !important; white-space: nowrap !important;
+        text-overflow: clip !important; max-width: none !important;
+    }}
+    .cv-nv-row-{task_id} label {{ font-size: 0.78rem !important; color: #6b7280 !important; }}
     .cv-item-wrap-{task_id} {{
         border-bottom: 1px solid #f3f4f6;
-        padding: 2px 0; margin-bottom: 0;
+        padding: 4px 0 2px 0; margin-bottom: 0;
     }}
     .cv-item-wrap-{task_id}.done {{ opacity: 0.6; }}
     </style>""", unsafe_allow_html=True)
@@ -1954,7 +2265,8 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         _wrap_cls = f"cv-item-wrap-{task_id}" + (" done" if _dcv else "")
 
         st.markdown(f"<div class='{_wrap_cls}'>", unsafe_allow_html=True)
-        col_ck, col_txt, col_nv, col_del = st.columns([0.4, 4, 4, 0.5], gap="small")
+        # Hàng 1: checkbox + tên công việc + nút xóa
+        col_ck, col_txt, col_del = st.columns([0.4, 5, 0.5], gap="small")
         with col_ck:
             st.markdown(f"<span class='{_mk_cv}' style='display:none'></span>", unsafe_allow_html=True)
             st.checkbox("", value=_dcv, key=f"dlg_cv_ck_{task_id}_{_cvi}",
@@ -1962,16 +2274,16 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                         on_change=_cb_cv_done, args=(_cvi,))
         with col_txt:
             st.markdown(f"<p>{_tcv}</p>", unsafe_allow_html=True)
-        with col_nv:
-            st.selectbox("", options=_ds_nv_cv, index=_nv_idx,
-                         key=f"dlg_cv_nv_{task_id}_{_cvi}",
-                         label_visibility="collapsed",
-                         format_func=lambda x: "Tên NV" if x == "-- Không chọn --" else x.strip().split()[-1],
-                         on_change=_cb_cv_nv, args=(_cvi,))
         with col_del:
             st.button("🗑️", key=f"dlg_cv_del_{task_id}_{_cvi}",
                       use_container_width=True,
                       on_click=_cb_cv_del, args=(_cvi,))
+        # Hàng 2: selectbox nhân viên full width
+        st.markdown(f"<div class='cv-nv-row-{task_id}'>", unsafe_allow_html=True)
+        st.selectbox("👤 Nhân viên thực hiện", options=_ds_nv_cv, index=_nv_idx,
+                     key=f"dlg_cv_nv_{task_id}_{_cvi}",
+                     on_change=_cb_cv_nv, args=(_cvi,))
+        st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
         # ── Hình / Video cho công việc con ────────────────────
@@ -2367,6 +2679,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
     mk_cv = f"cvcm{key_prefix}"
     nv_opts = ["-- Không chọn --"] + ds_nhan_vien
     st.markdown(f"""<style>
+    /* Hàng 1: checkbox + tên + xóa */
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) {{
         flex-wrap: nowrap !important;
         align-items: center !important;
@@ -2376,9 +2689,6 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:nth-child(2) {{
-        flex: 1 1 0% !important; min-width: 0 !important; overflow: hidden !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:nth-child(3) {{
         flex: 1 1 0% !important; min-width: 0 !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:last-child {{
@@ -2399,11 +2709,25 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] > div {{
         border: none !important; box-shadow: none !important; background: transparent !important;
     }}
-    /* Selectbox nhân viên nhỏ gọn */
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stSelectbox"] > div > div {{
-        font-size: 0.78rem !important; padding: 2px 6px !important;
-        border-color: #e0d7ff !important; background: #f5f3ff !important;
-        color: #4c1d95 !important; min-height: 30px !important;
+    /* Căn checkbox ngang hàng text input */
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:first-child {{
+        display: flex !important;
+        align-items: center !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:first-child > div {{
+        display: flex !important;
+        align-items: center !important;
+        width: 100% !important;
+        height: 100% !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stCheckbox"] {{
+        margin: 0 !important;
+        padding: 0 !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stCheckbox"] label {{
+        margin: 0 !important; padding: 0 !important;
     }}
     /* Nút xóa: transparent đỏ */
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stColumn"]:last-child button {{
@@ -2416,6 +2740,19 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         background: #fee2e2 !important; border-radius: 6px !important;
         box-shadow: none !important; transform: none !important;
     }}
+    /* Hàng 2: selectbox nhân viên full width */
+    .cv-nv-frag-{key_prefix} [data-testid="stSelectbox"] > div > div {{
+        font-size: 0.9rem !important; border-color: #e0d7ff !important;
+        background: #f5f3ff !important; color: #4c1d95 !important;
+        min-height: 34px !important;
+    }}
+    .cv-nv-frag-{key_prefix} [data-testid="stSelectbox"] [class*="singleValue"],
+    .cv-nv-frag-{key_prefix} [data-testid="stSelectbox"] [class*="SingleValue"] {{
+        direction: ltr !important; font-size: 0.9rem !important;
+        overflow: visible !important; white-space: nowrap !important;
+        text-overflow: clip !important; max-width: none !important;
+    }}
+    .cv-nv-frag-{key_prefix} label {{ font-size: 0.78rem !important; color: #6b7280 !important; }}
     </style>""", unsafe_allow_html=True)
 
     _xoa = None
@@ -2430,23 +2767,26 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         val = st.session_state.get(f"{key_prefix}_cv_nv_sel_{i}", "-- Không chọn --")
         st.session_state[cv_key][i]["nhan_vien"] = "" if val == "-- Không chọn --" else val
 
+    def _save_cv_done(i):
+        val = st.session_state.get(f"{key_prefix}_cv_ck_{i}", False)
+        st.session_state[cv_key][i]["done"] = val
+
     for i, cv in enumerate(items_cv):
         done_val = bool(cv.get("done", False))
         ten   = cv.get("ten", "") or f"Việc {i+1}"
         nguoi = cv.get("nhan_vien", cv.get("nguoi", "")) or ""
         nv_idx = nv_opts.index(nguoi) if nguoi in nv_opts else 0
 
-        col_ck, col_txt, col_nv, col_del = st.columns([0.5, 4.5, 4.5, 0.5], gap="small")
+        # Hàng 1: checkbox + tên công việc + nút xóa
+        col_ck, col_txt, col_del = st.columns([0.5, 5.5, 0.5], gap="small")
         with col_ck:
             st.markdown(f"<span class='{mk_cv}' style='display:none'></span>", unsafe_allow_html=True)
-            new_done = st.checkbox(
+            st.checkbox(
                 "", value=done_val,
                 key=f"{key_prefix}_cv_ck_{i}",
                 label_visibility="collapsed",
+                on_change=_save_cv_done, args=(i,),
             )
-            if new_done != done_val:
-                st.session_state[cv_key][i]["done"] = new_done
-                st.rerun()
         with col_txt:
             st.text_input(
                 "", value=ten,
@@ -2454,18 +2794,56 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 label_visibility="collapsed",
                 on_change=_save_cv_ten, args=(i,),
             )
-        with col_nv:
-            st.selectbox(
-                "", options=nv_opts,
-                index=nv_idx,
-                key=f"{key_prefix}_cv_nv_sel_{i}",
-                label_visibility="collapsed",
-                format_func=lambda x: x if x.startswith("-- ") else x.strip().split()[-1],
-                on_change=_save_cv_nv, args=(i,),
-            )
         with col_del:
             if st.button("🗑️", key=f"{key_prefix}_cv_del_{i}", use_container_width=True):
                 _xoa = i
+        # Hàng 2: selectbox nhân viên full width
+        st.markdown(f"<div class='cv-nv-frag-{key_prefix}'>", unsafe_allow_html=True)
+        st.selectbox(
+            "👤 Nhân viên thực hiện", options=nv_opts,
+            index=nv_idx,
+            key=f"{key_prefix}_cv_nv_sel_{i}",
+            on_change=_save_cv_nv, args=(i,),
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Hàng 3: upload ảnh cho từng công việc con
+        _cv_anh = st.session_state[cv_key][i].get("anh", [])
+        _exp_anh_lbl = f"📎 Hình/Video ({len(_cv_anh)})" if _cv_anh else "📎 Thêm hình/video"
+        with st.expander(_exp_anh_lbl, expanded=False):
+            if _cv_anh:
+                _cols_a = st.columns(min(len(_cv_anh), 3))
+                for _ai, _url_a in enumerate(_cv_anh):
+                    with _cols_a[_ai % 3]:
+                        if "/view" in _url_a or _url_a.endswith((".mp4", ".mov", ".avi")):
+                            st.markdown(f"🎬 [Video {_ai+1}]({_url_a})")
+                        else:
+                            _hien_thi_anh_drive(_url_a, use_container_width=True)
+                        def _del_cv_anh_frag(idx=i, url=_url_a):
+                            _cvl = st.session_state.get(cv_key, [])
+                            if 0 <= idx < len(_cvl):
+                                _cvl[idx]["anh"] = [u for u in _cvl[idx].get("anh", []) if u != url]
+                        st.button("🗑️ Xoá", key=f"{key_prefix}_del_cvanh_{i}_{_ai}",
+                                  use_container_width=True,
+                                  on_click=_del_cv_anh_frag)
+            _up_key_frag = f"{key_prefix}_up_cv_{i}"
+            st.file_uploader(
+                "Chọn hình hoặc video",
+                type=["jpg", "jpeg", "png", "mp4", "mov", "avi"],
+                accept_multiple_files=True,
+                key=_up_key_frag,
+                label_visibility="collapsed",
+            )
+            if st.button("📤 Upload", key=f"{key_prefix}_btn_up_cv_{i}", use_container_width=True):
+                _files = st.session_state.get(_up_key_frag) or []
+                if _files:
+                    with st.spinner("Đang upload..."):
+                        for _fm in _files:
+                            _new_url = _tai_media_len_drive(_fm)
+                            st.session_state[cv_key][i].setdefault("anh", []).append(_new_url)
+                    st.rerun(scope="fragment")
+                else:
+                    st.warning("Chưa chọn file!")
 
     if _xoa is not None:
         st.session_state[cv_key].pop(_xoa)
@@ -2476,19 +2854,17 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
 
     # Thêm thủ công một mục mới
     st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
-    col_inp, col_nv_inp = st.columns([3, 2])
-    with col_inp:
-        st.text_input(
-            "", placeholder="Tên công việc con...",
-            key=f"{key_prefix}_cv_ten_{st.session_state[cv_inp_v]}",
-            label_visibility="collapsed",
-        )
-    with col_nv_inp:
-        st.selectbox(
-            "", options=nv_opts,
-            key=f"{key_prefix}_cv_nv_{st.session_state[cv_inp_v]}",
-            label_visibility="collapsed",
-        )
+    st.text_input(
+        "", placeholder="Tên công việc con...",
+        key=f"{key_prefix}_cv_ten_{st.session_state[cv_inp_v]}",
+        label_visibility="collapsed",
+    )
+    st.markdown(f"<div class='cv-nv-frag-{key_prefix}'>", unsafe_allow_html=True)
+    st.selectbox(
+        "👤 Nhân viên thực hiện", options=nv_opts,
+        key=f"{key_prefix}_cv_nv_{st.session_state[cv_inp_v]}",
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
     if st.button("＋ Thêm công việc con", key=f"{key_prefix}_cv_add",
                  use_container_width=True):
         ten_val = st.session_state.get(
@@ -2505,60 +2881,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
             st.rerun()
 
 
-    # CSS dùng :has() với marker bên trong cột — không bị override bởi Streamlit mobile wrap
-    mk_cv = f"cvcm{key_prefix}"
-    nv_opts = ["-- Không chọn --"] + ds_nhan_vien
-    st.markdown(f"""<style>
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) {{
-        flex-wrap: nowrap !important;
-        align-items: center !important;
-        gap: 4px !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:first-child {{
-        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:nth-child(2) {{
-        flex: 1 1 0% !important; min-width: 0 !important; overflow: hidden !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:nth-child(3) {{
-        flex: 0 0 110px !important; min-width: 90px !important; max-width: 140px !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:last-child {{
-        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
-    }}
-    /* Tên công việc trông như plain text */
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] input {{
-        border: 1.5px solid transparent !important;
-        background: transparent !important; box-shadow: none !important;
-        padding: 3px 6px !important; font-size: 0.93rem !important;
-        color: #1e1b4b !important; min-height: 32px !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] input:focus {{
-        border-color: #7c3aed !important; background: white !important;
-        border-radius: 6px !important;
-        box-shadow: 0 0 0 2px rgba(124,58,237,0.12) !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] > div {{
-        border: none !important; box-shadow: none !important; background: transparent !important;
-    }}
-    /* Selectbox nhân viên nhỏ gọn */
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stSelectbox"] > div > div {{
-        font-size: 0.78rem !important; padding: 2px 6px !important;
-        border-color: #e0d7ff !important; background: #f5f3ff !important;
-        color: #4c1d95 !important; min-height: 30px !important;
-    }}
-    /* Nút xóa: transparent đỏ */
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stColumn"]:last-child button {{
-        background: transparent !important; border: none !important;
-        box-shadow: none !important; color: #ef4444 !important;
-        font-size: 1.1rem !important; padding: 2px 4px !important;
-        min-height: 32px !important; transform: none !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stColumn"]:last-child button:hover {{
-        background: #fee2e2 !important; border-radius: 6px !important;
-        box-shadow: none !important; transform: none !important;
-    }}
-    </style>""", unsafe_allow_html=True)
+
 
 
 
@@ -4340,8 +4663,23 @@ def inject_css():
             min-height: 44px !important;
         }
         .stSelectbox > div > div {
-            font-size: 1rem !important;
             min-height: 44px !important;
+            height: auto !important;
+        }
+        [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+            height: auto !important;
+            min-height: 44px !important;
+        }
+        [data-testid="stSelectbox"] div[class*="singleValue"],
+        [data-testid="stSelectbox"] div[class*="SingleValue"],
+        [data-testid="stSelectbox"] div[class*="single-value"] {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            font-size: 0.72rem !important;
+            max-width: calc(100% - 28px) !important;
+            direction: rtl !important;
+            text-align: left !important;
         }
 
         /* --- Expander: readable trên mobile --- */
@@ -4454,6 +4792,10 @@ def inject_css():
 @st.dialog("🔔 Thông Báo", width="large")
 def dialog_thong_bao(ho_ten: str):
     """Dialog hiển thị danh sách thông báo của user."""
+    # Dọn thông báo cũ hơn 48 giờ (chạy 1 lần mỗi session)
+    if not st.session_state.get("_da_xoa_tb_cu", False):
+        xoa_thong_bao_cu()
+        st.session_state["_da_xoa_tb_cu"] = True
     c_title, c_mark = st.columns([5, 2])
     with c_title:
         so_chua = dem_chua_doc(ho_ten)
@@ -4472,6 +4814,31 @@ def dialog_thong_bao(ho_ten: str):
     if df_tb.empty:
         st.info("🔔 Bạn chưa có thông báo nào.")
         return
+
+    # CSS: style nút "Xem Chi Tiết" nhỏ như text link
+    st.markdown("""<style>
+    [data-testid="stDialog"] .tb-xem-btn button {
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: #6366f1 !important;
+        font-size: 0.82rem !important;
+        padding: 0 0 8px 58px !important;
+        min-height: unset !important;
+        height: auto !important;
+        text-decoration: underline !important;
+        cursor: pointer !important;
+        justify-content: flex-start !important;
+    }
+    [data-testid="stDialog"] .tb-xem-btn button:hover {
+        color: #4338ca !important;
+        background: none !important;
+    }
+    [data-testid="stDialog"] .tb-xem-btn {
+        margin-top: -4px !important;
+        margin-bottom: 6px !important;
+    }
+    </style>""", unsafe_allow_html=True)
 
     for _, tb_row in df_tb.head(50).iterrows():
         _da_doc   = str(tb_row.get("Da_Doc", "0")) == "1"
@@ -4503,25 +4870,35 @@ def dialog_thong_bao(ho_ten: str):
         _bg      = "#eff6ff" if not _da_doc else "#f9fafb"
         _border  = "2px solid #bfdbfe" if not _da_doc else "1px solid #e5e7eb"
         _dot_html = "<span style='display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6;margin-left:6px;vertical-align:middle'></span>" if not _da_doc else ""
+        _has_task = _task_id and _task_id != '0'
+        _mk = f"tbmk{tb_row.name}"
+        _cursor = "cursor:pointer;" if _has_task else ""
 
+        # Card HTML gốc
         st.markdown(f"""
-        <div style='display:flex;gap:12px;align-items:flex-start;
+        <div style="display:flex;gap:12px;align-items:flex-start;
                     background:{_bg};border:{_border};
-                    border-radius:12px;padding:12px 14px;
-                    margin-bottom:8px;'>
-            <div style='flex-shrink:0;width:42px;height:42px;border-radius:50%;
+                    border-radius:12px;padding:12px 14px;margin-bottom:0;">
+            <div style="flex-shrink:0;width:42px;height:42px;border-radius:50%;
                         background:{_col_av};display:flex;align-items:center;
-                        justify-content:center;font-size:1.25rem'>
-                {_icon}
-            </div>
-            <div style='flex:1;min-width:0'>
-                <div style='font-size:0.93rem;color:#1e293b;line-height:1.45'>{_noi_dung}{_dot_html}</div>
-                <div style='font-size:0.78rem;color:#94a3b8;margin-top:4px'>{_tg_text}
-                    {f'&nbsp;&middot;&nbsp;Task #{_task_id}' if _task_id and _task_id != '0' else ''}
+                        justify-content:center;font-size:1.25rem">{_icon}</div>
+            <div style="flex:1;min-width:0">
+                <div style="font-size:0.93rem;color:#1e293b;line-height:1.45">{_noi_dung}{_dot_html}</div>
+                <div style="font-size:0.78rem;color:#94a3b8;margin-top:4px">{_tg_text}
+                    {f"&nbsp;&middot;&nbsp;Task #{_task_id}" if _has_task else ""}
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
+
+        # Nút "Xem Chi Tiết" nhỏ styled như text link
+        if _has_task:
+            st.markdown('<div class="tb-xem-btn">', unsafe_allow_html=True)
+            if st.button("📂 Xem Chi Tiết", key=f"tb_card_{tb_row.name}"):
+                st.session_state["_open_task_id_from_tb"] = _task_id
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='margin-bottom:8px'></div>", unsafe_allow_html=True)
 
 
 def main():
@@ -4636,6 +5013,19 @@ def main():
             st.session_state["manual_logout"] = True
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Mở task dialog từ thông báo (sau rerun) ───────────────────────────
+    if st.session_state.get("_open_task_id_from_tb"):
+        _tid_tb = st.session_state.pop("_open_task_id_from_tb")
+        st.session_state.pop("_open_task_id_from_tb_user", None)
+        try:
+            _df_all  = lay_danh_sach_cong_viec()
+            _ds_tt   = lay_ten_cac_trang_thai()
+            _matched = _df_all[_df_all["ID"].astype(str) == str(_tid_tb)]
+            if not _matched.empty:
+                _task_dialog(_matched.iloc[0].to_dict(), _ds_tt)
+        except Exception:
+            st.warning(f"Không tìm thấy Task #{_tid_tb}")
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
