@@ -8,7 +8,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import cloudinary
 import cloudinary.uploader
-from streamlit_cookies_controller import CookieController
+import uuid
 from fpdf import FPDF
 import pandas as pd
 from datetime import datetime, timedelta
@@ -442,11 +442,10 @@ components.html(
 )
 
 
-def _cookie_manager():
-    """Cookie manager dùng lưu session đăng nhập."""
-    if "__cookie_mgr" not in st.session_state:
-        st.session_state["__cookie_mgr"] = CookieController(key="qlcv_cookies")
-    return st.session_state["__cookie_mgr"]
+@st.cache_resource
+def _session_store():
+    """Lưu session token → thông tin user. Dùng cache_resource để chia sẻ giữa các session."""
+    return {}
 
 
 # ============================================================
@@ -4126,7 +4125,7 @@ def giao_dien_nhan_vien():
 # ============================================================
 # GIAO DIỆN ĐĂNG NHẬP / ĐĂNG KÝ
 # ============================================================
-def giao_dien_dang_nhap(cookie_mgr=None):
+def giao_dien_dang_nhap():
     """
     Trang đăng nhập và đăng ký.
     Lưu thông tin người dùng vào session_state sau khi xác thực thành công.
@@ -4185,13 +4184,15 @@ def giao_dien_dang_nhap(cookie_mgr=None):
                     st.session_state["ho_ten"]         = user["ho_ten"]
                     st.session_state["vai_tro"]        = user["vai_tro"]
                     st.session_state.pop("manual_logout", None)
-                    # Lưu vào cookie để giữ đăng nhập khi reload
-                    if cookie_mgr is not None:
-                        expires = datetime.now() + timedelta(days=7)
-                        cookie_mgr.set("qlcv_uid",    str(user["id"]))
-                        cookie_mgr.set("qlcv_uname",  user["username"])
-                        cookie_mgr.set("qlcv_hoten",  user["ho_ten"])
-                        cookie_mgr.set("qlcv_vaitro", user["vai_tro"])
+                    token = str(uuid.uuid4())
+                    _session_store()[token] = {
+                        "user_id":  str(user["id"]),
+                        "username": user["username"],
+                        "ho_ten":   user["ho_ten"],
+                        "vai_tro":  user["vai_tro"],
+                    }
+                    st.session_state["session_token"] = token
+                    st.query_params["s"] = token
                     st.success(f"Chào mừng, **{user['ho_ten']}**! 🎉")
                     st.rerun()
                 else:
@@ -4907,43 +4908,37 @@ def main():
     """Hàm chính: khởi động và điều hướng ứng dụng."""
     inject_css()
 
-    cookie_mgr = _cookie_manager()
-
-    # ── Khôi phục session từ cookie nếu chưa đăng nhập ───────────────────
+    # ── Khôi phục session từ query param nếu chưa đăng nhập ──────────────
     if not st.session_state.get("dang_nhap"):
-        # Nếu vừa bấm đăng xuất thủ công → giữ màn login, không đọc cookie
         if st.session_state.get("manual_logout"):
-            giao_dien_dang_nhap(cookie_mgr)
+            giao_dien_dang_nhap()
             return
 
-        # Đọc cookie — rerun 1 lần để đảm bảo JS component đã sẵn sàng
-        if not st.session_state.get("_cookie_checked"):
-            st.session_state["_cookie_checked"] = True
-            st.rerun()
+        token = st.query_params.get("s")
+        sess  = _session_store().get(token) if token else None
 
-        uid = cookie_mgr.get("qlcv_uid")
-
-        if uid:
-            ho_ten_cookie  = cookie_mgr.get("qlcv_hoten") or ""
-            vai_tro_cookie = cookie_mgr.get("qlcv_vaitro") or "nhan_vien"
+        if sess:
+            uid            = sess["user_id"]
+            ho_ten_sess    = sess["ho_ten"]
+            vai_tro_sess   = sess["vai_tro"]
             try:
                 df_users = lay_danh_sach_users()
                 if not df_users.empty:
-                    uid_int = int(uid)
-                    user_row = df_users[df_users["ID"].astype(str) == str(uid_int)]
+                    user_row = df_users[df_users["ID"].astype(str) == str(uid)]
                     if not user_row.empty:
-                        ho_ten_cookie  = user_row.iloc[0]["HoTen"]
-                        vai_tro_cookie = user_row.iloc[0]["VaiTro"]
+                        ho_ten_sess  = user_row.iloc[0]["HoTen"]
+                        vai_tro_sess = user_row.iloc[0]["VaiTro"]
             except Exception:
-                pass  # Nếu lỗi kết nối, dùng giá trị từ cookie
-            st.session_state["dang_nhap"] = True
-            st.session_state["user_id"]   = uid
-            st.session_state["username"]  = cookie_mgr.get("qlcv_uname") or ""
-            st.session_state["ho_ten"]    = ho_ten_cookie
-            st.session_state["vai_tro"]   = vai_tro_cookie
+                pass
+            st.session_state["dang_nhap"]      = True
+            st.session_state["user_id"]        = uid
+            st.session_state["username"]       = sess["username"]
+            st.session_state["ho_ten"]         = ho_ten_sess
+            st.session_state["vai_tro"]        = vai_tro_sess
+            st.session_state["session_token"]  = token
             st.rerun()
         else:
-            giao_dien_dang_nhap(cookie_mgr)
+            giao_dien_dang_nhap()
             return
 
     vai_tro   = st.session_state.get("vai_tro", "nhan_vien")
@@ -5003,12 +4998,12 @@ def main():
             dialog_thong_bao(ho_ten)
         if st.button("🚪 Đăng Xuất", key="topbar_logout", use_container_width=True,
                      help="Đăng xuất"):
-            cookie_mgr.remove("qlcv_uid")
-            cookie_mgr.remove("qlcv_uname")
-            cookie_mgr.remove("qlcv_hoten")
-            cookie_mgr.remove("qlcv_vaitro")
-            for k in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro"]:
+            token = st.session_state.get("session_token")
+            if token:
+                _session_store().pop(token, None)
+            for k in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro", "session_token"]:
                 st.session_state.pop(k, None)
+            st.query_params.clear()
             st.session_state["manual_logout"] = True
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
