@@ -561,7 +561,8 @@ def tai_anh_len_drive(file_anh) -> str:
         timeout=60,
     )
     if not resp.ok:
-        raise RuntimeError(f"Drive upload lỗi {resp.status_code}: {resp.text[:500]}")
+        st.error(f"Drive upload lỗi {resp.status_code}: {resp.text[:500]}")
+        st.stop()
     file_id = resp.json()["id"]
 
     # Set public read
