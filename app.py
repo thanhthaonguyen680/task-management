@@ -4916,19 +4916,16 @@ def main():
             giao_dien_dang_nhap(cookie_mgr)
             return
 
-        # get_all() trả về None khi JS component chưa sẵn sàng, trả về dict khi đã load
-        all_cookies = cookie_mgr.getAll()
-        if all_cookies is None:
-            # Component chưa init xong → chờ thêm 1 cycle
-            st.stop()
+        # Đọc cookie — rerun 1 lần để đảm bảo JS component đã sẵn sàng
+        if not st.session_state.get("_cookie_checked"):
+            st.session_state["_cookie_checked"] = True
+            st.rerun()
 
-        uid = (all_cookies or {}).get("qlcv_uid")
+        uid = cookie_mgr.get("qlcv_uid")
 
         if uid:
-            # Re-fetch thông tin user từ DB để đảm bảo ho_ten khớp chính xác
-            # với tên đã lưu trong cột Nhân Viên của Tasks sheet
-            ho_ten_cookie  = (all_cookies or {}).get("qlcv_hoten") or ""
-            vai_tro_cookie = (all_cookies or {}).get("qlcv_vaitro") or "nhan_vien"
+            ho_ten_cookie  = cookie_mgr.get("qlcv_hoten") or ""
+            vai_tro_cookie = cookie_mgr.get("qlcv_vaitro") or "nhan_vien"
             try:
                 df_users = lay_danh_sach_users()
                 if not df_users.empty:
@@ -4941,7 +4938,7 @@ def main():
                 pass  # Nếu lỗi kết nối, dùng giá trị từ cookie
             st.session_state["dang_nhap"] = True
             st.session_state["user_id"]   = uid
-            st.session_state["username"]  = (all_cookies or {}).get("qlcv_uname") or ""
+            st.session_state["username"]  = cookie_mgr.get("qlcv_uname") or ""
             st.session_state["ho_ten"]    = ho_ten_cookie
             st.session_state["vai_tro"]   = vai_tro_cookie
             st.rerun()
