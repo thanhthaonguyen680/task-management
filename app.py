@@ -8,7 +8,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import cloudinary
 import cloudinary.uploader
-import extra_streamlit_components as stx
+from streamlit_cookies_controller import CookieController
 from fpdf import FPDF
 import pandas as pd
 from datetime import datetime, timedelta
@@ -445,7 +445,7 @@ components.html(
 def _cookie_manager():
     """Cookie manager dùng lưu session đăng nhập."""
     if "__cookie_mgr" not in st.session_state:
-        st.session_state["__cookie_mgr"] = stx.CookieManager(key="qlcv_cookies")
+        st.session_state["__cookie_mgr"] = CookieController(key="qlcv_cookies")
     return st.session_state["__cookie_mgr"]
 
 
@@ -4188,10 +4188,10 @@ def giao_dien_dang_nhap(cookie_mgr=None):
                     # Lưu vào cookie để giữ đăng nhập khi reload
                     if cookie_mgr is not None:
                         expires = datetime.now() + timedelta(days=7)
-                        cookie_mgr.set("qlcv_uid",    str(user["id"]),       expires_at=expires, key="set_uid")
-                        cookie_mgr.set("qlcv_uname",  user["username"],      expires_at=expires, key="set_uname")
-                        cookie_mgr.set("qlcv_hoten",  user["ho_ten"],        expires_at=expires, key="set_hoten")
-                        cookie_mgr.set("qlcv_vaitro", user["vai_tro"],       expires_at=expires, key="set_vaitro")
+                        cookie_mgr.set("qlcv_uid",    str(user["id"]))
+                        cookie_mgr.set("qlcv_uname",  user["username"])
+                        cookie_mgr.set("qlcv_hoten",  user["ho_ten"])
+                        cookie_mgr.set("qlcv_vaitro", user["vai_tro"])
                     st.success(f"Chào mừng, **{user['ho_ten']}**! 🎉")
                     st.rerun()
                 else:
@@ -4917,7 +4917,7 @@ def main():
             return
 
         # get_all() trả về None khi JS component chưa sẵn sàng, trả về dict khi đã load
-        all_cookies = cookie_mgr.get_all()
+        all_cookies = cookie_mgr.getAll()
         if all_cookies is None:
             # Component chưa init xong → chờ thêm 1 cycle
             st.stop()
@@ -5006,10 +5006,10 @@ def main():
             dialog_thong_bao(ho_ten)
         if st.button("🚪 Đăng Xuất", key="topbar_logout", use_container_width=True,
                      help="Đăng xuất"):
-            cookie_mgr.delete("qlcv_uid",    key="del_uid")
-            cookie_mgr.delete("qlcv_uname",  key="del_uname")
-            cookie_mgr.delete("qlcv_hoten",  key="del_hoten")
-            cookie_mgr.delete("qlcv_vaitro", key="del_vaitro")
+            cookie_mgr.remove("qlcv_uid")
+            cookie_mgr.remove("qlcv_uname")
+            cookie_mgr.remove("qlcv_hoten")
+            cookie_mgr.remove("qlcv_vaitro")
             for k in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro"]:
                 st.session_state.pop(k, None)
             st.session_state["manual_logout"] = True
