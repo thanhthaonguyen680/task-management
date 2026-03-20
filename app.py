@@ -3175,6 +3175,14 @@ def _fragment_upload_do_luong(task_id, do_key: str):
 
 
 # ─── helper: lưu công việc con về sheet ───────────────────────────────────────
+def _parse_date_display(val: str):
+    """Chuyển chuỗi DD/MM/YYYY sang date object, trả None nếu lỗi."""
+    try:
+        return datetime.strptime(str(val)[:10], "%d/%m/%Y").date()
+    except Exception:
+        return None
+
+
 def _save_cv_to_sheet(task_id, cv_key):
     data = st.session_state.get(cv_key, [])
     try:
@@ -3344,8 +3352,8 @@ def giao_dien_admin():
     """Giao diện quản lý dành cho Admin — 4 tab ngang: Cài Đặt / Nhân Viên / Tạo Task / Tổng Quan."""
     st.header("🔧 Bảng Điều Khiển Admin")
 
-    tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_tong_quan, tab_board, tab_cvc = st.tabs(
-        ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "📊  Tổng Quan", "🗂️  Bảng Quản Lý", "📋  Công Việc Con"]
+    tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_tong_quan, tab_board, tab_cvc, tab_tdtdm = st.tabs(
+        ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "📊  Tổng Quan", "🗂️  Bảng Quản Lý", "📋  Công Việc Con", "🔩  Theo Dõi Tiến Độ Máy"]
     )
 
     # ── Helper: render section quản lý 1 field đơn ───────────────────────────
@@ -4374,6 +4382,283 @@ def giao_dien_admin():
                     data=buf,
                     file_name=ten_file,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=False,
+                )
+
+    # ========================================================
+    # Tab 7: Theo Dõi Tiến Độ Máy
+    # ========================================================
+    with tab_tdtdm:
+        st.subheader("🔩 Theo Dõi Tiến Độ Máy")
+
+        col_ref_tdm, _ = st.columns([1, 4])
+        with col_ref_tdm:
+            if st.button("🔄 Làm mới", key="adm_tdm_refresh"):
+                lay_danh_sach_cong_viec.clear()
+                st.rerun()
+
+        with st.spinner("Đang tải dữ liệu..."):
+            df_tdm_all = lay_danh_sach_cong_viec()
+
+        if df_tdm_all.empty:
+            st.info("ℹ️ Chưa có công việc nào.")
+        else:
+            today_tdm = datetime.today().date()
+            rows_tdm  = []
+
+            for stt_tdm, (_, r) in enumerate(df_tdm_all.iterrows(), start=1):
+                han_str_tdm  = str(r.get("Hạn Hoàn Thành", "") or "")
+                ngay_kt_str  = str(r.get("Ngày Kết Thúc", "") or "")
+                han_date_tdm = None
+                ngay_kt_date = None
+                try:
+                    if han_str_tdm:
+                        han_date_tdm = datetime.strptime(han_str_tdm[:10], "%Y-%m-%d").date()
+                except Exception:
+                    pass
+                try:
+                    if ngay_kt_str:
+                        ngay_kt_date = datetime.strptime(ngay_kt_str[:10], "%Y-%m-%d").date()
+                except Exception:
+                    pass
+
+                # Tính Tình Trạng
+                if ngay_kt_date and han_date_tdm:
+                    if ngay_kt_date < han_date_tdm:
+                        tinh_trang_tdm = "Trước hạn"
+                    elif ngay_kt_date == han_date_tdm:
+                        tinh_trang_tdm = "Đúng hạn"
+                    else:
+                        tinh_trang_tdm = "Quá hạn"
+                elif ngay_kt_date:
+                    tinh_trang_tdm = "Hoàn thành"
+                elif han_date_tdm and today_tdm > han_date_tdm:
+                    tinh_trang_tdm = "Quá hạn"
+                elif han_date_tdm and today_tdm == han_date_tdm:
+                    tinh_trang_tdm = "Đúng hạn"
+                else:
+                    tinh_trang_tdm = "Chưa xong"
+
+                # Định dạng ngày hiển thị
+                ngay_nhan_hien  = ""
+                ngay_giao_hien  = ""
+                han_hien        = ""
+                try:
+                    ngay_tao_str = str(r.get("Ngày Tạo", "") or "")
+                    if ngay_tao_str:
+                        ngay_nhan_hien = datetime.strptime(ngay_tao_str[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+                except Exception:
+                    ngay_nhan_hien = str(r.get("Ngày Tạo", "") or "")
+                try:
+                    if han_date_tdm:
+                        han_hien = han_date_tdm.strftime("%d/%m/%Y")
+                except Exception:
+                    han_hien = han_str_tdm
+                try:
+                    if ngay_kt_date:
+                        ngay_giao_hien = ngay_kt_date.strftime("%d/%m/%Y")
+                except Exception:
+                    ngay_giao_hien = ngay_kt_str
+
+                rows_tdm.append({
+                    "STT":              stt_tdm,
+                    "Tên Công Ty":      r.get("Công Ty", ""),
+                    "Tên Công Việc":    r.get("Tên Công Việc", ""),
+                    "Công Suất":        r.get("Công Suất", ""),
+                    "Mã Số Máy":        r.get("Mã Số", ""),
+                    "Số PO Nội Bộ":     r.get("Số PO Nội Bộ", ""),
+                    "Số PO KH/HĐ":      r.get("Số PO KH/HĐ", ""),
+                    "Số Báo Giá":       r.get("Số Báo Giá", ""),
+                    "Trạng Thái":       r.get("Trạng Thái", ""),
+                    "Ngày Nhận Máy":    ngay_nhan_hien,
+                    "Hạn Hoàn Thành":   han_hien,
+                    "Ngày Giao Máy":    ngay_giao_hien,
+                    "_han_raw":         han_date_tdm,
+                    "_giao_raw":        ngay_kt_date,
+                    "Loại Máy":         r.get("Loại Máy", ""),
+                    "Tình Trạng":       tinh_trang_tdm,
+                })
+
+            if not rows_tdm:
+                st.info("ℹ️ Chưa có dữ liệu.")
+            else:
+                df_tdm = pd.DataFrame(rows_tdm)
+
+                # ── Bộ lọc hàng 1 ──
+                col_tf1, col_tf2, col_tf3 = st.columns(3)
+                with col_tf1:
+                    ds_nv_tdm = sorted(df_tdm["Tên Công Ty"].dropna().unique().tolist())
+                    loc_ct_tdm = st.multiselect("🏢 Lọc công ty", ds_nv_tdm, key="tdm_loc_ct", placeholder="Tất cả")
+                with col_tf2:
+                    ds_tt_tdm = sorted(df_tdm["Tình Trạng"].dropna().unique().tolist())
+                    loc_tt_tdm = st.multiselect("📊 Lọc tình trạng", ds_tt_tdm, key="tdm_loc_tt", placeholder="Tất cả")
+                with col_tf3:
+                    ds_lm_tdm = sorted(df_tdm["Loại Máy"].dropna().unique().tolist())
+                    ds_lm_tdm = [x for x in ds_lm_tdm if x.strip()]
+                    loc_lm_tdm = st.multiselect("🔧 Lọc loại máy", ds_lm_tdm, key="tdm_loc_lm", placeholder="Tất cả")
+
+                # ── Bộ lọc hàng 2: khoảng ngày nhận / giao ──
+                col_td1, col_td2, col_td3, col_td4 = st.columns(4)
+                with col_td1:
+                    tu_ngay_nhan = st.date_input("📅 Nhận máy từ", value=None, format="DD/MM/YYYY", key="tdm_tu_nhan")
+                with col_td2:
+                    den_ngay_nhan = st.date_input("📅 Nhận máy đến", value=None, format="DD/MM/YYYY", key="tdm_den_nhan")
+                with col_td3:
+                    tu_ngay_giao = st.date_input("📅 Giao máy từ", value=None, format="DD/MM/YYYY", key="tdm_tu_giao")
+                with col_td4:
+                    den_ngay_giao = st.date_input("📅 Giao máy đến", value=None, format="DD/MM/YYYY", key="tdm_den_giao")
+
+                df_show_tdm = df_tdm.copy()
+                if loc_ct_tdm:
+                    df_show_tdm = df_show_tdm[df_show_tdm["Tên Công Ty"].isin(loc_ct_tdm)]
+                if loc_tt_tdm:
+                    df_show_tdm = df_show_tdm[df_show_tdm["Tình Trạng"].isin(loc_tt_tdm)]
+                if loc_lm_tdm:
+                    df_show_tdm = df_show_tdm[df_show_tdm["Loại Máy"].isin(loc_lm_tdm)]
+                if tu_ngay_nhan:
+                    df_show_tdm = df_show_tdm[df_show_tdm["Ngày Nhận Máy"].apply(
+                        lambda v: _parse_date_display(v) is not None and _parse_date_display(v) >= tu_ngay_nhan)]
+                if den_ngay_nhan:
+                    df_show_tdm = df_show_tdm[df_show_tdm["Ngày Nhận Máy"].apply(
+                        lambda v: _parse_date_display(v) is not None and _parse_date_display(v) <= den_ngay_nhan)]
+                if tu_ngay_giao:
+                    df_show_tdm = df_show_tdm[df_show_tdm["_giao_raw"].apply(
+                        lambda d: d is not None and d >= tu_ngay_giao)]
+                if den_ngay_giao:
+                    df_show_tdm = df_show_tdm[df_show_tdm["_giao_raw"].apply(
+                        lambda d: d is not None and d <= den_ngay_giao)]
+
+                # ── KPI nhanh ──
+                total_tdm   = len(df_show_tdm)
+                da_giao     = len(df_show_tdm[df_show_tdm["Ngày Giao Máy"] != ""])
+                qua_han_tdm = len(df_show_tdm[df_show_tdm["Tình Trạng"] == "Quá hạn"])
+                truoc_han_tdm = len(df_show_tdm[df_show_tdm["Tình Trạng"] == "Trước hạn"])
+                kpi_c = st.columns(4)
+                kpi_c[0].metric("🔩 Tổng máy", total_tdm)
+                kpi_c[1].metric("✅ Đã giao", da_giao)
+                kpi_c[2].metric("🔴 Quá hạn", qua_han_tdm)
+                kpi_c[3].metric("🟢 Trước hạn", truoc_han_tdm)
+
+                st.divider()
+
+                # ── Bảng HTML đẹp ──
+                _mau_tt_tdm = {
+                    "Trước hạn":  ("#dcfce7", "#16a34a"),
+                    "Đúng hạn":   ("#fef9c3", "#d97706"),
+                    "Quá hạn":    ("#fee2e2", "#dc2626"),
+                    "Hoàn thành": ("#dbeafe", "#1d4ed8"),
+                    "Chưa xong":  ("#f3f4f6", "#6b7280"),
+                }
+                _mau_trang_thai_tdm = {
+                    "Chờ Làm": ("#fee2e2", "#dc2626"), "Đang Làm": ("#fef9c3", "#d97706"),
+                    "Hoàn Thành": ("#dcfce7", "#16a34a"), "Đang Kiểm Tra": ("#dbeafe", "#1d4ed8"),
+                    "Đã Phê Duyệt": ("#dcfce7", "#15803d"), "Đã Báo Giá": ("#fef3c7", "#b45309"),
+                    "Có Đơn": ("#ede9fe", "#7c3aed"), "Chờ Giao": ("#fef9c3", "#a16207"),
+                    "Đã Hoàn Thành - Giao Máy": ("#bbf7d0", "#166534"),
+                    "Đã Xuất Hóa Đơn": ("#f3f4f6", "#374151"),
+                    "Bảo Hành - Trả Lại": ("#fee2e2", "#b91c1c"),
+                }
+                cols_show_tdm = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số Máy",
+                                 "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá", "Trạng Thái",
+                                 "Ngày Nhận Máy", "Hạn Hoàn Thành", "Ngày Giao Máy",
+                                 "Loại Máy", "Tình Trạng"]
+                header_html_tdm = "".join(f"<th>{c}</th>" for c in cols_show_tdm)
+                rows_html_tdm = ""
+                for _, row_t in df_show_tdm.iterrows():
+                    cells = ""
+                    for c in cols_show_tdm:
+                        val = str(row_t.get(c, "") or "")
+                        if c == "Tình Trạng":
+                            bg, fg = _mau_tt_tdm.get(val, ("#f3f4f6", "#6b7280"))
+                            cells += (
+                                f'<td><span style="background:{bg};color:{fg};padding:3px 10px;'
+                                f'border-radius:20px;font-weight:700;font-size:0.82rem;'
+                                f'border:1.5px solid {fg}40;white-space:nowrap;">{val}</span></td>'
+                            )
+                        elif c == "Trạng Thái":
+                            bg2, fg2 = _mau_trang_thai_tdm.get(val, ("#f3f4f6", "#6b7280"))
+                            cells += (
+                                f'<td><span style="background:{bg2};color:{fg2};padding:3px 10px;'
+                                f'border-radius:20px;font-weight:600;font-size:0.82rem;'
+                                f'white-space:nowrap;">{val}</span></td>'
+                            )
+                        elif c == "STT":
+                            cells += f'<td style="color:#7c3aed;font-weight:700;">{val}</td>'
+                        elif c == "Tên Công Ty":
+                            cells += f'<td style="color:#1e1b4b;font-weight:600;">{val}</td>'
+                        elif c == "Hạn Hoàn Thành":
+                            cells += f'<td style="color:#dc2626;font-weight:600;">⏰ {val}</td>'
+                        else:
+                            cells += f"<td>{val}</td>"
+                    rows_html_tdm += f"<tr>{cells}</tr>"
+
+                html_tdm = f"""
+                <style>
+                .tdm-table-wrap{{overflow-x:auto;border-radius:16px;
+                    box-shadow:0 4px 24px rgba(102,126,234,0.13);margin-top:0.5rem;}}
+                .tdm-table{{width:100%;border-collapse:collapse;
+                    font-family:'Be Vietnam Pro',sans-serif;font-size:0.86rem;
+                    background:white;border-radius:16px;overflow:hidden;}}
+                .tdm-table thead tr{{background:linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%);}}
+                .tdm-table thead th{{color:white;font-weight:700;padding:12px 14px;
+                    text-align:left;white-space:nowrap;border:none;font-size:0.82rem;
+                    text-transform:uppercase;}}
+                .tdm-table tbody tr{{border-bottom:1px solid #f0f0f5;}}
+                .tdm-table tbody tr:nth-child(even){{background:#eff6ff;}}
+                .tdm-table tbody tr:hover{{background:#dbeafe!important;}}
+                .tdm-table tbody td{{padding:10px 14px;color:#374151;
+                    vertical-align:middle;white-space:nowrap;}}
+                </style>
+                <div class="tdm-table-wrap">
+                <table class="tdm-table">
+                <thead><tr>{header_html_tdm}</tr></thead>
+                <tbody>{rows_html_tdm}</tbody>
+                </table></div>"""
+                st.markdown(html_tdm, unsafe_allow_html=True)
+                st.caption(f"Hiển thị {len(df_show_tdm)} / {total_tdm} máy")
+
+                # ── Xuất Excel ──
+                import io
+                cols_excel_tdm = cols_show_tdm
+                df_excel_tdm = df_show_tdm[cols_excel_tdm].copy()
+                buf_tdm = io.BytesIO()
+                with pd.ExcelWriter(buf_tdm, engine="openpyxl") as writer_tdm:
+                    df_excel_tdm.to_excel(writer_tdm, index=False, sheet_name="TheoDoiTienDoMay")
+                    ws_tdm = writer_tdm.sheets["TheoDoiTienDoMay"]
+                    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+                    hdr_fill_tdm = PatternFill("solid", fgColor="3B82F6")
+                    thin2 = Side(style="thin", color="DDDDDD")
+                    brd2  = Border(left=thin2, right=thin2, top=thin2, bottom=thin2)
+                    for cell in ws_tdm[1]:
+                        cell.font      = Font(bold=True, color="FFFFFF", size=11)
+                        cell.fill      = hdr_fill_tdm
+                        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                        cell.border    = brd2
+                    _mau_excel_tdm = {
+                        "Trước hạn": "DCFCE7", "Đúng hạn": "FEF9C3",
+                        "Quá hạn":   "FEE2E2", "Hoàn thành": "DBEAFE",
+                        "Chưa xong": "F3F4F6",
+                    }
+                    col_tt_idx_tdm = cols_excel_tdm.index("Tình Trạng") + 1
+                    for row_idx, row_cells in enumerate(ws_tdm.iter_rows(min_row=2), start=2):
+                        for cell in row_cells:
+                            cell.border    = brd2
+                            cell.alignment = Alignment(vertical="center")
+                        tt_val = ws_tdm.cell(row=row_idx, column=col_tt_idx_tdm).value or ""
+                        if tt_val in _mau_excel_tdm:
+                            ws_tdm.cell(row=row_idx, column=col_tt_idx_tdm).fill = PatternFill("solid", fgColor=_mau_excel_tdm[tt_val])
+                    for col in ws_tdm.columns:
+                        max_len = max((len(str(c.value or "")) for c in col), default=8)
+                        ws_tdm.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+                    ws_tdm.row_dimensions[1].height = 30
+                buf_tdm.seek(0)
+                ten_file_tdm = f"theo_doi_tien_do_may_{datetime.now().strftime('%d%m%Y_%H%M')}.xlsx"
+                st.download_button(
+                    label="📥 Xuất Excel",
+                    data=buf_tdm,
+                    file_name=ten_file_tdm,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="tdm_xuat_excel",
                     use_container_width=False,
                 )
 
