@@ -4973,21 +4973,17 @@ def giao_dien_nhan_vien():
         with st.spinner("Đang tải..."):
             df_pd_all = lay_danh_sach_cong_viec()
 
-        # Lọc: Người Phê Duyệt == ten_nhan_vien VÀ trạng thái "Đang Kiểm Tra"
-        _col_pd = "Người Phê Duyệt"
-        if _col_pd not in df_pd_all.columns:
-            df_pd_all[_col_pd] = ""
+        # Lọc: tất cả công việc ở trạng thái "Đang Kiểm Tra"
         df_pd = df_pd_all[
-            (df_pd_all[_col_pd].fillna("").str.strip().str.lower() == ten_nhan_vien.lower()) &
-            (df_pd_all["Trạng Thái"].fillna("") == "Đang Kiểm Tra")
+            df_pd_all["Trạng Thái"].fillna("") == "Đang Kiểm Tra"
         ].copy()
 
         ds_tt_pd = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
 
         if df_pd.empty:
-            st.success("✅ Không có công việc nào cần bạn phê duyệt!")
+            st.success("✅ Không có công việc nào đang chờ phê duyệt!")
         else:
-            st.info(f"**{len(df_pd)}** công việc đang chờ bạn phê duyệt.")
+            st.info(f"**{len(df_pd)}** công việc đang chờ phê duyệt.")
             for _, h in df_pd.iterrows():
                 task_id   = h.get("ID", "")
                 ten_cv    = str(h.get("Tên Công Việc", "") or "")
