@@ -3076,6 +3076,10 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
     def _save_cv_done(i):
         val = st.session_state.get(f"{key_prefix}_cv_ck_{i}", False)
         st.session_state[cv_key][i]["done"] = val
+        if val:
+            st.session_state[cv_key][i]["ngay_hoan_thanh"] = datetime.now().strftime("%Y-%m-%d")
+        else:
+            st.session_state[cv_key][i].pop("ngay_hoan_thanh", None)
 
     for i, cv in enumerate(items_cv):
         done_val = bool(cv.get("done", False))
@@ -4223,7 +4227,7 @@ def giao_dien_admin():
                     stt += 1
                     ten_cv   = cv.get("ten", cv.get("Tên", ""))
                     nv       = cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))) or ""
-                    ngay_ht  = cv.get("ngay_hoan_thanh", "")
+                    ngay_ht  = cv.get("ngay_hoan_thanh", "") or str(task_row.get("Ngày Tạo", ""))[:10]
 
                     # Tính Tình Trạng (deadline-based)
                     if done and ngay_ht:
