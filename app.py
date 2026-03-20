@@ -4034,11 +4034,8 @@ def giao_dien_admin():
             with col_nam:
                 adm_nam = st.text_input("Năm *", value=str(datetime.now().year), key="adm_nam")
 
-            col_nv, col_dl = st.columns(2)
-            with col_nv:
-                adm_nguoi_giao = st.selectbox("👤 Giao cho nhân viên *", options=ds_nhan_vien, key="adm_nguoi_giao")
-            with col_dl:
-                adm_deadline = st.date_input("📅 Hạn hoàn thành", key="adm_deadline")
+            adm_nguoi_giao = ""
+            adm_deadline = st.date_input("📅 Hạn hoàn thành", key="adm_deadline")
 
             col_lm_adm, col_tt_adm = st.columns(2)
             with col_lm_adm:
@@ -4115,8 +4112,7 @@ def giao_dien_admin():
                         st.session_state.pop(_k, None)
                     lay_danh_sach_cong_viec.clear()
                     st.session_state["_adm_task_success"] = (
-                        f"✅ Đã tạo task #{id_moi} thành công! "
-                        f"Công ty: **{adm_cong_ty}** | Giao: **{adm_nguoi_giao}**"
+                        f"✅ Đã tạo task #{id_moi} thành công! Công ty: **{adm_cong_ty}**"
                     )
                     st.rerun(scope="app")
 
@@ -4929,8 +4925,8 @@ def giao_dien_nhan_vien():
         with st.spinner("Đang tải công việc..."):
             df = lay_danh_sach_cong_viec()
 
-        df["_nv_norm"] = df["Nhân Viên"].fillna("").str.strip().str.lower()
-        df_cua_toi = df[df["_nv_norm"] == ten_nhan_vien.lower()].copy()
+        # Hiển thị tất cả công việc (không lọc theo nhân viên)
+        df_cua_toi = df.copy()
 
         if q_search.strip():
             df_cua_toi = df_cua_toi[
@@ -4959,7 +4955,7 @@ def giao_dien_nhan_vien():
         ds_tt = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
         if df_cua_toi.empty:
-            st.success("🎉 Bạn hiện chưa có công việc nào được giao!")
+            st.info("Chưa có công việc nào trong hệ thống.")
         else:
             # ── KANBAN BOARD ────────────────────────────────────
             _render_kanban_board(df_cua_toi, ds_tt, board_key="nv_kb")
@@ -5063,8 +5059,6 @@ def giao_dien_nhan_vien():
             with col_nam2:
                 nv_nam = st.text_input("📅 Năm", value=str(datetime.now().year), key=f"{_nv_prefix}_nam")
 
-            # Nhân viên giao = chính mình, chỉ cần chọn deadline
-            st.markdown(f"**👤 Nhân viên thực hiện:** `{ten_nhan_vien}` *(tự động)*")
             nv_deadline = st.date_input("📅 Hạn Hoàn Thành", key=f"{_nv_prefix}_dl")
 
             col_lm_nv, col_tt_nv = st.columns(2)
