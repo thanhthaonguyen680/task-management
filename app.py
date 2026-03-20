@@ -4901,8 +4901,9 @@ def giao_dien_nhan_vien():
         st.session_state["_last_nv_load"] = ten_nhan_vien
 
     # ---- Tabs ----
-    tab_cong_viec, tab_tao_task = st.tabs([
-        "�️ Bảng Quản Lý Công Việc",
+    tab_cong_viec, tab_phe_duyet, tab_tao_task = st.tabs([
+        "🗂️ Bảng Quản Lý Công Việc",
+        "✅ Việc Cần Phê Duyệt",
         "➕ Tạo Công Việc Mới"
     ])
 
@@ -4964,7 +4965,65 @@ def giao_dien_nhan_vien():
             _render_kanban_board(df_cua_toi, ds_tt, board_key="nv_kb")
 
     # ========================================================
-    # Tab 2: Tạo Công Việc Mới (nhân viên tự nhập)
+    # Tab 2: Việc Cần Phê Duyệt
+    # ========================================================
+    with tab_phe_duyet:
+        col_btn_pd, _ = st.columns([1, 4])
+        with col_btn_pd:
+            if st.button("🔄 Làm mới", key="nv_refresh_pd"):
+                lay_danh_sach_cong_viec.clear()
+                st.rerun()
+
+        with st.spinner("Đang tải..."):
+            df_pd_all = lay_danh_sach_cong_viec()
+
+        # Lọc: Người Phê Duyệt == ten_nhan_vien VÀ trạng thái "Đang Kiểm Tra"
+        df_pd = df_pd_all[
+            (df_pd_all["Người Phê Duyệt"].fillna("").str.strip().str.lower() == ten_nhan_vien.lower()) &
+            (df_pd_all["Trạng Thái"].fillna("") == "Đang Kiểm Tra")
+        ].copy()
+
+        ds_tt_pd = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+
+        if df_pd.empty:
+            st.success("✅ Không có công việc nào cần bạn phê duyệt!")
+        else:
+            st.info(f"**{len(df_pd)}** công việc đang chờ bạn phê duyệt.")
+            for _, h in df_pd.iterrows():
+                task_id   = h.get("ID", "")
+                ten_cv    = str(h.get("Tên Công Việc", "") or "")
+                cong_ty   = str(h.get("Công Ty", "") or "")
+                nhan_vien = str(h.get("Nhân Viên", "") or "")
+                ngay_tao  = str(h.get("Ngày Tạo", ""))[:10]
+                deadline  = str(h.get("Ngày Kết Thúc", "") or "")[:10]
+
+                today_d = datetime.now().date()
+                is_over = False
+                try:
+                    if deadline:
+                        is_over = datetime.strptime(deadline, "%Y-%m-%d").date() < today_d
+                except Exception:
+                    pass
+
+                border_color = "#ef4444" if is_over else "#3b82f6"
+                card_html = f"""
+                <div style='border:1.5px solid {border_color};border-radius:10px;
+                     padding:12px 16px;margin-bottom:10px;background:#f8faff;'>
+                  <div style='font-weight:700;font-size:1rem;color:#1e3a8a;margin-bottom:4px;'>
+                    #{task_id} · {ten_cv}
+                  </div>
+                  <div style='font-size:0.85rem;color:#475569;'>
+                    🏢 {cong_ty}&nbsp;&nbsp;|&nbsp;&nbsp;👤 {nhan_vien}&nbsp;&nbsp;|&nbsp;&nbsp;
+                    📅 Tạo: {ngay_tao}&nbsp;&nbsp;|&nbsp;&nbsp;
+                    ⏰ Hạn: <span style='color:{"#ef4444" if is_over else "#16a34a"};font-weight:600;'>{deadline or "—"}</span>
+                  </div>
+                </div>"""
+                st.markdown(card_html, unsafe_allow_html=True)
+                if st.button("📂 Xem & Phê Duyệt", key=f"pd_open_{task_id}", use_container_width=False):
+                    _task_dialog(h.to_dict(), ds_tt_pd)
+
+    # ========================================================
+    # Tab 3: Tạo Công Việc Mới (nhân viên tự nhập)
     # ========================================================
     with tab_tao_task:
         st.subheader("➕ Tạo Công Việc Mới")
