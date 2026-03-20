@@ -5184,7 +5184,7 @@ def giao_dien_dang_nhap():
         <div class="auth-sub">Đăng nhập để tiếp tục</div>
     """, unsafe_allow_html=True)
 
-    tab_dn, tab_dk, tab_dmk = st.tabs(["🔑  Đăng Nhập", "📝  Đăng Ký", "🔒  Đổi Mật Khẩu"])
+    tab_dn, tab_dmk = st.tabs(["🔑  Đăng Nhập", "🔒  Đổi Mật Khẩu"])
 
     # ─────────────────────────── ĐĂNG NHẬP ───────────────────────────
     with tab_dn:
@@ -5219,51 +5219,6 @@ def giao_dien_dang_nhap():
                     st.rerun()
                 else:
                     st.error("❌ Username hoặc mật khẩu không đúng.")
-
-    # ─────────────────────────── ĐĂNG KÝ ────────────────────────────
-    with tab_dk:
-        with st.form("form_dang_ky", clear_on_submit=True):
-            st.markdown("##### Thông Tin Tài Khoản")
-            col_u, col_p = st.columns(2)
-            with col_u:
-                username_dk = st.text_input("Username *", placeholder="Tối thiểu 3 ký tự")
-            with col_p:
-                matkhau_dk  = st.text_input("Mật khẩu *", type="password",
-                                             placeholder="Tối thiểu 6 ký tự")
-            xn_matkhau = st.text_input("Xác nhận mật khẩu *", type="password",
-                                        placeholder="Nhập lại mật khẩu")
-            st.markdown("##### Thông Tin Cá Nhân")
-            ho_ten_dk   = st.text_input("Họ và Tên *", placeholder="Vd: Nguyễn Văn A")
-            ngay_sinh_dk = st.date_input(
-                "Ngày, Tháng, Năm Sinh *",
-                value=None,
-                min_value=datetime(1950, 1, 1).date(),
-                max_value=datetime.today().date(),
-                format="DD/MM/YYYY",
-            )
-            btn_dk = st.form_submit_button("Tạo Tài Khoản", use_container_width=True,
-                                            type="primary")
-
-        if btn_dk:
-            if matkhau_dk != xn_matkhau:
-                st.error("❌ Mật khẩu xác nhận không khớp.")
-            else:
-                ngay_sinh_str = str(ngay_sinh_dk) if ngay_sinh_dk else ""
-                with st.spinner("Đang tạo tài khoản..."):
-                    ok, msg = dang_ky_tai_khoan(
-                        username=username_dk,
-                        mat_khau=matkhau_dk,
-                        ho_ten=ho_ten_dk,
-                        ngay_sinh=ngay_sinh_str,
-                        vai_tro="nhan_vien",
-                    )
-                if ok:
-                    st.success(
-                        f"✅ Tài khoản **{username_dk}** đã được tạo thành công! "
-                        "Vui lòng chuyển sang tab **Đăng Nhập** để tiếp tục."
-                    )
-                else:
-                    st.error(f"❌ {msg}")
 
     # ─────────────────────────── ĐỔI MẬT KHẨU ───────────────────────────
     with tab_dmk:
