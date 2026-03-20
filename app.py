@@ -4181,21 +4181,31 @@ def giao_dien_admin():
                     else:
                         tinh_trang_td = "Chưa xong"
 
+                    # Ngày hoàn thành dạng date object để lọc
+                    ngay_ht_date = None
+                    ngay_ht_hien = ""
+                    if done and ngay_ht:
+                        try:
+                            ngay_ht_date = datetime.strptime(ngay_ht[:10], "%Y-%m-%d").date()
+                            ngay_ht_hien = ngay_ht_date.strftime("%d/%m/%Y")
+                        except Exception:
+                            ngay_ht_hien = "✅ (chưa rõ ngày)"
+                    elif done:
+                        ngay_ht_hien = "✅ (chưa rõ ngày)"
+
                     rows_cvc.append({
-                        "STT":            stt,
-                        "Tên Công Ty":    task_row.get("Công Ty", ""),
-                        "Tên Công Việc":  task_row.get("Tên Công Việc", ""),
-                        "Công Suất":      task_row.get("Công Suất", ""),
-                        "Mã Số":          task_row.get("Mã Số", ""),
-                        "Công Việc Con":  ten_cv,
-                        "Nhân Viên":      nv,
-                        "Ngày Hoàn Thành": (
-                            datetime.strptime(ngay_ht[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
-                            if done and ngay_ht else ("✅ (chưa rõ ngày)" if done else "")
-                        ),
-                        "Trạng Thái":     task_row.get("Trạng Thái", ""),
-                        "Loại Máy":       task_row.get("Loại Máy", ""),
-                        "Tình Trạng":     tinh_trang_td,
+                        "STT":             stt,
+                        "Tên Công Ty":     task_row.get("Công Ty", ""),
+                        "Tên Công Việc":   task_row.get("Tên Công Việc", ""),
+                        "Công Suất":       task_row.get("Công Suất", ""),
+                        "Mã Số":           task_row.get("Mã Số", ""),
+                        "Công Việc Con":   ten_cv,
+                        "Nhân Viên":       nv,
+                        "Ngày Hoàn Thành": ngay_ht_hien,
+                        "_ngay_ht_raw":    ngay_ht_date,  # dùng để lọc, ẩn khi hiển thị
+                        "Trạng Thái":      task_row.get("Trạng Thái", ""),
+                        "Loại Máy":        task_row.get("Loại Máy", ""),
+                        "Tình Trạng":      tinh_trang_td,
                     })
 
             if not rows_cvc:
@@ -4203,7 +4213,7 @@ def giao_dien_admin():
             else:
                 df_cvc = pd.DataFrame(rows_cvc)
 
-                # ── Bộ lọc ──
+                # ── Bộ lọc hàng 1: nhân viên / công ty / tình trạng ──
                 col_f1, col_f2, col_f3 = st.columns(3)
                 with col_f1:
                     ds_nv_cvc = sorted(df_cvc["Nhân Viên"].dropna().unique().tolist())
@@ -4215,6 +4225,23 @@ def giao_dien_admin():
                     ds_tt_cvc = sorted(df_cvc["Tình Trạng"].dropna().unique().tolist())
                     loc_tt_cvc = st.multiselect("📊 Lọc tình trạng", ds_tt_cvc, key="cvc_loc_tt", placeholder="Tất cả")
 
+                # ── Bộ lọc hàng 2: khoảng ngày hoàn thành ──
+                col_d1, col_d2, _ = st.columns(3)
+                with col_d1:
+                    tu_ngay = st.date_input(
+                        "📅 Từ ngày (Ngày Hoàn Thành)",
+                        value=None,
+                        format="DD/MM/YYYY",
+                        key="cvc_tu_ngay",
+                    )
+                with col_d2:
+                    den_ngay = st.date_input(
+                        "📅 Đến ngày",
+                        value=None,
+                        format="DD/MM/YYYY",
+                        key="cvc_den_ngay",
+                    )
+
                 df_show_cvc = df_cvc.copy()
                 if loc_nv_cvc:
                     df_show_cvc = df_show_cvc[df_show_cvc["Nhân Viên"].isin(loc_nv_cvc)]
@@ -4222,6 +4249,12 @@ def giao_dien_admin():
                     df_show_cvc = df_show_cvc[df_show_cvc["Tên Công Ty"].isin(loc_ct_cvc)]
                 if loc_tt_cvc:
                     df_show_cvc = df_show_cvc[df_show_cvc["Tình Trạng"].isin(loc_tt_cvc)]
+                if tu_ngay:
+                    df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(
+                        lambda d: d is not None and d >= tu_ngay)]
+                if den_ngay:
+                    df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(
+                        lambda d: d is not None and d <= den_ngay)]
 
                 # ── KPI nhanh ──
                 total = len(df_show_cvc)
@@ -4294,6 +4327,55 @@ def giao_dien_admin():
                 </table></div>"""
                 st.markdown(html_cvc, unsafe_allow_html=True)
                 st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con")
+
+                # ── Xuất Excel ──
+                import io
+                cols_excel = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
+                              "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
+                              "Loại Máy", "Tình Trạng"]
+                df_excel = df_show_cvc[cols_excel].copy()
+                buf = io.BytesIO()
+                with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+                    df_excel.to_excel(writer, index=False, sheet_name="CongViecCon")
+                    ws = writer.sheets["CongViecCon"]
+                    # Định dạng header
+                    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+                    header_fill = PatternFill("solid", fgColor="F59E0B")
+                    thin = Side(style="thin", color="DDDDDD")
+                    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+                    for cell in ws[1]:
+                        cell.font      = Font(bold=True, color="FFFFFF", size=11)
+                        cell.fill      = header_fill
+                        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                        cell.border    = border
+                    # Tô màu cột Tình Trạng
+                    _mau_excel = {
+                        "Trước hạn": "DCFCE7", "Đúng hạn": "FEF9C3",
+                        "Quá hạn":   "FEE2E2", "Hoàn thành": "DBEAFE",
+                        "Chưa xong": "F3F4F6",
+                    }
+                    col_tt_idx = cols_excel.index("Tình Trạng") + 1
+                    for row_idx, row_cells in enumerate(ws.iter_rows(min_row=2), start=2):
+                        for cell in row_cells:
+                            cell.border    = border
+                            cell.alignment = Alignment(vertical="center")
+                        tt_val = ws.cell(row=row_idx, column=col_tt_idx).value or ""
+                        if tt_val in _mau_excel:
+                            ws.cell(row=row_idx, column=col_tt_idx).fill = PatternFill("solid", fgColor=_mau_excel[tt_val])
+                    # Tự động độ rộng cột
+                    for col in ws.columns:
+                        max_len = max((len(str(c.value or "")) for c in col), default=8)
+                        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+                    ws.row_dimensions[1].height = 30
+                buf.seek(0)
+                ten_file = f"cong_viec_con_{datetime.now().strftime('%d%m%Y_%H%M')}.xlsx"
+                st.download_button(
+                    label="📥 Xuất Excel",
+                    data=buf,
+                    file_name=ten_file,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=False,
+                )
 
 
 def giao_dien_nhan_vien():
