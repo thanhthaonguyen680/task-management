@@ -4189,7 +4189,10 @@ def giao_dien_admin():
                         "Mã Số":          task_row.get("Mã Số", ""),
                         "Công Việc Con":  ten_cv,
                         "Nhân Viên":      nv,
-                        "Ngày Hoàn Thành": ngay_ht if done and ngay_ht else ("✅" if done else ""),
+                        "Ngày Hoàn Thành": (
+                            datetime.strptime(ngay_ht[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+                            if done and ngay_ht else ("✅ (chưa rõ ngày)" if done else "")
+                        ),
                         "Trạng Thái":     task_row.get("Trạng Thái", ""),
                         "Loại Máy":       task_row.get("Loại Máy", ""),
                         "Tình Trạng":     tinh_trang_td,
