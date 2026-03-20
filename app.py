@@ -4274,10 +4274,12 @@ def giao_dien_admin():
                         "Công Việc Con":   ten_cv,
                         "Nhân Viên":       nv,
                         "Ngày Hoàn Thành": ngay_ht_hien,
-                        "_ngay_ht_raw":    ngay_ht_date,  # dùng để lọc, ẩn khi hiển thị
+                        "_ngay_ht_raw":    ngay_ht_date,
                         "Trạng Thái":      task_row.get("Trạng Thái", ""),
                         "Loại Máy":        task_row.get("Loại Máy", ""),
                         "Tình Trạng":      tinh_trang_td,
+                        "_task_id":        task_row.get("ID", ""),
+                        "_task_dict":      task_row.to_dict(),
                     })
 
             if not rows_cvc:
@@ -4341,7 +4343,7 @@ def giao_dien_admin():
 
                 st.divider()
 
-                # ── Bảng HTML đẹp ──
+                # ── Bảng HTML CSS ──
                 _mau_tinh_trang = {
                     "Trước hạn":  ("#dcfce7", "#16a34a"),
                     "Đúng hạn":   ("#fef9c3", "#d97706"),
@@ -4352,8 +4354,10 @@ def giao_dien_admin():
                 cols_show = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
                              "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
                              "Loại Máy", "Tình Trạng"]
-                header_html = "".join(f"<th>{c}</th>" for c in cols_show)
+                header_html = "".join(f"<th>{c}</th>" for c in cols_show) + "<th>Chi Tiết</th>"
                 rows_html = ""
+                _ds_tt_dlg_cvc = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+                _cvc_rows_for_btn = []
                 for _, r in df_show_cvc.iterrows():
                     cells = ""
                     for c in cols_show:
@@ -4373,8 +4377,9 @@ def giao_dien_admin():
                             cells += f'<td style="color:#1e1b4b;font-weight:600;">{val}</td>'
                         else:
                             cells += f"<td>{val}</td>"
+                    cells += '<td>📂</td>'
                     rows_html += f"<tr>{cells}</tr>"
-
+                    _cvc_rows_for_btn.append(r)
                 html_cvc = f"""
                 <style>
                 .cvc-table-wrap{{overflow-x:auto;border-radius:16px;
@@ -4399,6 +4404,17 @@ def giao_dien_admin():
                 </table></div>"""
                 st.markdown(html_cvc, unsafe_allow_html=True)
                 st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con")
+
+                # ── Buttons Xem tương ứng từng hàng ──
+                st.markdown("<style>.btn-xem button{padding:2px 10px!important;font-size:0.78rem!important;height:auto!important;margin:1px 0!important;}</style>", unsafe_allow_html=True)
+                for _ri, _r in enumerate(_cvc_rows_for_btn):
+                    _tid_cvc = str(_r.get("_task_id", ""))
+                    _ten_cvc = str(_r.get("Tên Công Việc", ""))[:30]
+                    _cvc_lbl = str(_r.get("Công Việc Con", ""))[:20]
+                    st.markdown(f"<div class='btn-xem'>", unsafe_allow_html=True)
+                    if st.button(f"📂 Xem — {_ten_cvc} ({_cvc_lbl})", key=f"cvc_xem_{_tid_cvc}_{_ri}", use_container_width=False):
+                        _task_dialog(_r["_task_dict"], _ds_tt_dlg_cvc)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                 # ── Xuất Excel ──
                 import io
@@ -4541,6 +4557,8 @@ def giao_dien_admin():
                     "_giao_raw":        ngay_kt_date,
                     "Loại Máy":         r.get("Loại Máy", ""),
                     "Tình Trạng":       tinh_trang_tdm,
+                    "_task_id":         r.get("ID", ""),
+                    "_task_dict":       r.to_dict(),
                 })
 
             if not rows_tdm:
@@ -4605,7 +4623,7 @@ def giao_dien_admin():
 
                 st.divider()
 
-                # ── Bảng HTML đẹp ──
+                # ── Bảng HTML CSS ──
                 _mau_tt_tdm = {
                     "Trước hạn":  ("#dcfce7", "#16a34a"),
                     "Đúng hạn":   ("#fef9c3", "#d97706"),
@@ -4619,33 +4637,28 @@ def giao_dien_admin():
                     "Đã Phê Duyệt": ("#dcfce7", "#15803d"), "Đã Báo Giá": ("#fef3c7", "#b45309"),
                     "Có Đơn": ("#ede9fe", "#7c3aed"), "Chờ Giao": ("#fef9c3", "#a16207"),
                     "Đã Hoàn Thành - Giao Máy": ("#bbf7d0", "#166534"),
-                    "Đã Xuất Hóa Đơn": ("#f3f4f6", "#374151"),
-                    "Bảo Hành - Trả Lại": ("#fee2e2", "#b91c1c"),
                 }
-                cols_show_tdm = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số Máy",
-                                 "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá", "Trạng Thái",
-                                 "Ngày Nhận Máy", "Hạn Hoàn Thành", "Ngày Giao Máy",
-                                 "Loại Máy", "Tình Trạng"]
-                header_html_tdm = "".join(f"<th>{c}</th>" for c in cols_show_tdm)
+                _cols_display_tdm = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số Máy",
+                                     "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá", "Trạng Thái",
+                                     "Ngày Nhận Máy", "Hạn Hoàn Thành", "Ngày Giao Máy",
+                                     "Loại Máy", "Tình Trạng"]
+                header_html_tdm = "".join(f"<th>{c}</th>" for c in _cols_display_tdm) + "<th>Chi Tiết</th>"
                 rows_html_tdm = ""
+                _tdm_rows_for_btn = []
                 for _, row_t in df_show_tdm.iterrows():
                     cells = ""
-                    for c in cols_show_tdm:
+                    for c in _cols_display_tdm:
                         val = str(row_t.get(c, "") or "")
                         if c == "Tình Trạng":
                             bg, fg = _mau_tt_tdm.get(val, ("#f3f4f6", "#6b7280"))
-                            cells += (
-                                f'<td><span style="background:{bg};color:{fg};padding:3px 10px;'
-                                f'border-radius:20px;font-weight:700;font-size:0.82rem;'
-                                f'border:1.5px solid {fg}40;white-space:nowrap;">{val}</span></td>'
-                            )
+                            cells += (f'<td><span style="background:{bg};color:{fg};padding:3px 10px;'
+                                      f'border-radius:20px;font-weight:700;font-size:0.82rem;'
+                                      f'border:1.5px solid {fg}40;white-space:nowrap;">{val}</span></td>')
                         elif c == "Trạng Thái":
                             bg2, fg2 = _mau_trang_thai_tdm.get(val, ("#f3f4f6", "#6b7280"))
-                            cells += (
-                                f'<td><span style="background:{bg2};color:{fg2};padding:3px 10px;'
-                                f'border-radius:20px;font-weight:600;font-size:0.82rem;'
-                                f'white-space:nowrap;">{val}</span></td>'
-                            )
+                            cells += (f'<td><span style="background:{bg2};color:{fg2};padding:3px 10px;'
+                                      f'border-radius:20px;font-weight:600;font-size:0.82rem;'
+                                      f'white-space:nowrap;">{val}</span></td>')
                         elif c == "STT":
                             cells += f'<td style="color:#7c3aed;font-weight:700;">{val}</td>'
                         elif c == "Tên Công Ty":
@@ -4654,8 +4667,9 @@ def giao_dien_admin():
                             cells += f'<td style="color:#dc2626;font-weight:600;">⏰ {val}</td>'
                         else:
                             cells += f"<td>{val}</td>"
+                    cells += '<td>📂</td>'
                     rows_html_tdm += f"<tr>{cells}</tr>"
-
+                    _tdm_rows_for_btn.append(row_t)
                 html_tdm = f"""
                 <style>
                 .tdm-table-wrap{{overflow-x:auto;border-radius:16px;
@@ -4681,9 +4695,18 @@ def giao_dien_admin():
                 st.markdown(html_tdm, unsafe_allow_html=True)
                 st.caption(f"Hiển thị {len(df_show_tdm)} / {total_tdm} máy")
 
+                # ── Buttons Xem tương ứng từng hàng ──
+                _ds_tt_dlg_tdm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+                for _ri2, _rt in enumerate(_tdm_rows_for_btn):
+                    _tid2 = str(_rt.get("_task_id", ""))
+                    _ten2 = str(_rt.get("Tên Công Việc", ""))[:35]
+                    _ct2  = str(_rt.get("Tên Công Ty", ""))[:20]
+                    if st.button(f"📂 Xem — {_ten2} ({_ct2})", key=f"tdm_xem_{_tid2}_{_ri2}", use_container_width=False):
+                        _task_dialog(_rt["_task_dict"], _ds_tt_dlg_tdm)
+
                 # ── Xuất Excel ──
                 import io
-                cols_excel_tdm = cols_show_tdm
+                cols_excel_tdm = _cols_display_tdm
                 df_excel_tdm = df_show_tdm[cols_excel_tdm].copy()
                 buf_tdm = io.BytesIO()
                 with pd.ExcelWriter(buf_tdm, engine="openpyxl") as writer_tdm:
