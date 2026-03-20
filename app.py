@@ -713,6 +713,29 @@ def them_cong_ty(ten_cong_ty: str, dia_chi: str = "", ma_kh: str = "", ma_so_thu
     return id_moi
 
 
+def sua_cong_ty(record_id: str, ten_moi: str, dia_chi: str = "", ma_kh: str = "", ma_so_thue: str = ""):
+    sheet = lay_sheet_cong_ty()
+    o_tim = sheet.find(str(record_id), in_column=1)
+    if o_tim is None:
+        raise ValueError(f"Không tìm thấy ID={record_id}.")
+    sheet.update_cell(o_tim.row, 2, ten_moi)
+    sheet.update_cell(o_tim.row, 3, dia_chi)
+    sheet.update_cell(o_tim.row, 4, ma_kh)
+    sheet.update_cell(o_tim.row, 5, ma_so_thue)
+    lay_danh_sach_cong_ty.clear()
+    lay_ten_cac_cong_ty.clear()
+
+
+def xoa_cong_ty(record_id: str):
+    sheet = lay_sheet_cong_ty()
+    o_tim = sheet.find(str(record_id), in_column=1)
+    if o_tim is None:
+        raise ValueError(f"Không tìm thấy ID={record_id}.")
+    sheet.delete_rows(o_tim.row)
+    lay_danh_sach_cong_ty.clear()
+    lay_ten_cac_cong_ty.clear()
+
+
 @st.cache_data(ttl=60)
 def lay_ten_cac_cong_ty() -> list:
     """Trả về danh sách tên công ty để hiển thị trong selectbox."""
@@ -763,6 +786,25 @@ def _them_hang_don_gian(ten_sheet: str, tieu_de: list, hang: list) -> int:
     id_moi = len(sheet.col_values(1))  # số hàng hiện tại (kể cả header) = ID tiếp theo
     sheet.append_row([id_moi] + hang)
     return id_moi
+
+
+def _sua_hang_don_gian(ten_sheet: str, tieu_de: list, record_id: str, ten_cot: str, gia_tri_moi: str):
+    """Helper chung: tìm hàng theo ID (cột 1) rồi cập nhật cột ten_cot."""
+    sheet = _lay_sheet_don_gian(ten_sheet, tieu_de)
+    o_tim = sheet.find(str(record_id), in_column=1)
+    if o_tim is None:
+        raise ValueError(f"Không tìm thấy ID={record_id} trong sheet {ten_sheet}.")
+    col_idx = tieu_de.index(ten_cot) + 1
+    sheet.update_cell(o_tim.row, col_idx, gia_tri_moi)
+
+
+def _xoa_hang_don_gian(ten_sheet: str, tieu_de: list, record_id: str):
+    """Helper chung: tìm hàng theo ID (cột 1) rồi xóa."""
+    sheet = _lay_sheet_don_gian(ten_sheet, tieu_de)
+    o_tim = sheet.find(str(record_id), in_column=1)
+    if o_tim is None:
+        raise ValueError(f"Không tìm thấy ID={record_id} trong sheet {ten_sheet}.")
+    sheet.delete_rows(o_tim.row)
 
 
 # ============================================================
@@ -901,6 +943,16 @@ def them_loai_may(ten: str) -> int:
     lay_ten_cac_loai_may.clear()
     return result
 
+def sua_loai_may(record_id: str, ten_moi: str):
+    _sua_hang_don_gian("LoaiMay", _TIEUDE_LOAI_MAY, record_id, "Tên Loại Máy", ten_moi)
+    lay_danh_sach_loai_may.clear()
+    lay_ten_cac_loai_may.clear()
+
+def xoa_loai_may(record_id: str):
+    _xoa_hang_don_gian("LoaiMay", _TIEUDE_LOAI_MAY, record_id)
+    lay_danh_sach_loai_may.clear()
+    lay_ten_cac_loai_may.clear()
+
 @st.cache_data(ttl=60)
 def lay_ten_cac_loai_may() -> list:
     df = lay_danh_sach_loai_may()
@@ -920,6 +972,16 @@ def them_tinh_trang(ten: str) -> int:
     lay_danh_sach_tinh_trang.clear()
     lay_ten_cac_tinh_trang.clear()
     return result
+
+def sua_tinh_trang(record_id: str, ten_moi: str):
+    _sua_hang_don_gian("TinhTrang", _TIEUDE_TINH_TRANG, record_id, "Tên Tình Trạng", ten_moi)
+    lay_danh_sach_tinh_trang.clear()
+    lay_ten_cac_tinh_trang.clear()
+
+def xoa_tinh_trang(record_id: str):
+    _xoa_hang_don_gian("TinhTrang", _TIEUDE_TINH_TRANG, record_id)
+    lay_danh_sach_tinh_trang.clear()
+    lay_ten_cac_tinh_trang.clear()
 
 @st.cache_data(ttl=60)
 def lay_ten_cac_tinh_trang() -> list:
@@ -960,6 +1022,16 @@ def them_cong_doan(ten: str) -> int:
     lay_danh_sach_cong_doan.clear()
     lay_ten_cac_cong_doan.clear()
     return result
+
+def sua_cong_doan(record_id: str, ten_moi: str):
+    _sua_hang_don_gian("CongDoan", _TIEUDE_CONG_DOAN, record_id, "Tên Công Đoạn", ten_moi)
+    lay_danh_sach_cong_doan.clear()
+    lay_ten_cac_cong_doan.clear()
+
+def xoa_cong_doan_item(record_id: str):
+    _xoa_hang_don_gian("CongDoan", _TIEUDE_CONG_DOAN, record_id)
+    lay_danh_sach_cong_doan.clear()
+    lay_ten_cac_cong_doan.clear()
 
 @st.cache_data(ttl=60)
 def lay_ten_cac_cong_doan() -> list:
@@ -1361,6 +1433,36 @@ def dang_ky_tai_khoan(username: str, mat_khau: str, ho_ten: str,
     # Xóa cache để đọc lại danh sách mới nhất
     lay_danh_sach_users.clear()
     lay_danh_sach_nhan_vien.clear()
+    return True, "OK"
+
+
+def doi_mat_khau(username: str, mat_khau_cu: str, mat_khau_moi: str) -> tuple:
+    """
+    Đổi mật khẩu cho tài khoản.
+    Trả về (True, 'OK') nếu thành công, (False, 'lý do') nếu thất bại.
+    """
+    if not mat_khau_moi:
+        return False, "Vui lòng nhập mật khẩu mới."
+    if len(mat_khau_moi) < 6:
+        return False, "Mật khẩu mới phải có ít nhất 6 ký tự."
+
+    df = lay_danh_sach_users()
+    if df.empty:
+        return False, "Không tìm thấy tài khoản."
+
+    pw_hash_cu = _ma_hoa_mat_khau(mat_khau_cu)
+    row = df[(df["Username"].str.lower() == username.strip().lower()) &
+             (df["Password"] == pw_hash_cu)]
+    if row.empty:
+        return False, "Mật khẩu hiện tại không đúng."
+
+    sheet = lay_sheet_users()
+    o_tim = sheet.find(username.strip(), in_column=2)
+    if o_tim is None:
+        return False, "Không tìm thấy tài khoản trong hệ thống."
+
+    sheet.update_cell(o_tim.row, 3, _ma_hoa_mat_khau(mat_khau_moi))
+    lay_danh_sach_users.clear()
     return True, "OK"
 
 
@@ -3252,6 +3354,8 @@ def giao_dien_admin():
         placeholder: str = "",
         mo_ta_them: str  = "",
         expanded: bool   = False,
+        sua_func=None,
+        xoa_func=None,
     ):
         with st.expander(ten_section, expanded=expanded):
             with st.form(f"form_{key_prefix}", clear_on_submit=True):
@@ -3280,7 +3384,53 @@ def giao_dien_admin():
                 st.info("ℹ️ Chưa có dữ liệu. Hãy thêm ở form bên trên!")
             else:
                 st.markdown(f"**Tổng cộng: {len(df)} mục**")
-                st.dataframe(df, use_container_width=True, hide_index=True)
+                for _, row in df.iterrows():
+                    rid  = str(row.get("ID", ""))
+                    ten  = str(row.get(ten_cot, ""))
+                    c1, c2, c3 = st.columns([7, 1, 1])
+                    c1.markdown(f"**{ten}**")
+                    if sua_func and c2.button("✏️", key=f"btn_edit_{key_prefix}_{rid}", help="Chỉnh sửa"):
+                        st.session_state[f"editing_{key_prefix}"] = rid
+                        st.session_state.pop(f"deleting_{key_prefix}", None)
+                    if xoa_func and c3.button("🗑️", key=f"btn_del_{key_prefix}_{rid}", help="Xóa"):
+                        st.session_state[f"deleting_{key_prefix}"] = rid
+                        st.session_state.pop(f"editing_{key_prefix}", None)
+                    # Form chỉnh sửa inline
+                    if sua_func and st.session_state.get(f"editing_{key_prefix}") == rid:
+                        with st.form(f"form_edit_{key_prefix}_{rid}"):
+                            ten_moi = st.text_input("Tên mới *", value=ten)
+                            c_save, c_cancel = st.columns(2)
+                            saved    = c_save.form_submit_button("💾 Lưu", type="primary", use_container_width=True)
+                            canceled = c_cancel.form_submit_button("❌ Huỷ", use_container_width=True)
+                        if saved:
+                            if not ten_moi.strip():
+                                st.error("⛔ Tên không được để trống!")
+                            else:
+                                try:
+                                    with st.spinner("Đang lưu..."):
+                                        sua_func(rid, ten_moi.strip())
+                                    st.session_state.pop(f"editing_{key_prefix}", None)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"🔌 Lỗi: {e}")
+                        if canceled:
+                            st.session_state.pop(f"editing_{key_prefix}", None)
+                            st.rerun()
+                    # Xác nhận xóa
+                    if xoa_func and st.session_state.get(f"deleting_{key_prefix}") == rid:
+                        st.warning(f"⚠️ Xác nhận xóa **{ten}**?")
+                        c_ok, c_no = st.columns(2)
+                        if c_ok.button("✅ Xác nhận xóa", key=f"ok_del_{key_prefix}_{rid}", use_container_width=True):
+                            try:
+                                with st.spinner("Đang xóa..."):
+                                    xoa_func(rid)
+                                st.session_state.pop(f"deleting_{key_prefix}", None)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"🔌 Lỗi: {e}")
+                        if c_no.button("❌ Huỷ", key=f"no_del_{key_prefix}_{rid}", use_container_width=True):
+                            st.session_state.pop(f"deleting_{key_prefix}", None)
+                            st.rerun()
 
     # ══════════════════════════════════════════════
     # TAB 1 — CÀI ĐẶT
@@ -3319,18 +3469,75 @@ def giao_dien_admin():
                 st.info("ℹ️ Chưa có công ty nào. Hãy thêm ở form bên trên!")
             else:
                 st.markdown(f"**Tổng cộng: {len(df_ct)} công ty**")
-                st.dataframe(df_ct, use_container_width=True, hide_index=True)
+                for _, row_ct in df_ct.iterrows():
+                    rid_ct  = str(row_ct.get("ID", ""))
+                    ten_ct  = str(row_ct.get("Tên Công Ty", ""))
+                    dc_ct   = str(row_ct.get("Địa Chỉ", ""))
+                    mkh_ct  = str(row_ct.get("Mã Khách Hàng", ""))
+                    mst_ct  = str(row_ct.get("Mã Số Thuế", ""))
+                    c1, c2, c3 = st.columns([7, 1, 1])
+                    c1.markdown(f"**{ten_ct}**" + (f"  —  {dc_ct}" if dc_ct else ""))
+                    if c2.button("✏️", key=f"btn_edit_ct_{rid_ct}", help="Chỉnh sửa"):
+                        st.session_state["editing_ct"] = rid_ct
+                        st.session_state.pop("deleting_ct", None)
+                    if c3.button("🗑️", key=f"btn_del_ct_{rid_ct}", help="Xóa"):
+                        st.session_state["deleting_ct"] = rid_ct
+                        st.session_state.pop("editing_ct", None)
+                    # Form chỉnh sửa Công Ty
+                    if st.session_state.get("editing_ct") == rid_ct:
+                        with st.form(f"form_edit_ct_{rid_ct}"):
+                            ten_ct_e  = st.text_input("Tên Công Ty *", value=ten_ct)
+                            dc_e      = st.text_input("Địa Chỉ", value=dc_ct)
+                            col_a, col_b = st.columns(2)
+                            mkh_e  = col_a.text_input("Mã Khách Hàng", value=mkh_ct)
+                            mst_e  = col_b.text_input("Mã Số Thuế", value=mst_ct)
+                            c_s, c_c = st.columns(2)
+                            saved_ct    = c_s.form_submit_button("💾 Lưu", type="primary", use_container_width=True)
+                            canceled_ct = c_c.form_submit_button("❌ Huỷ", use_container_width=True)
+                        if saved_ct:
+                            if not ten_ct_e.strip():
+                                st.error("⛔ Tên Công Ty không được để trống!")
+                            else:
+                                try:
+                                    with st.spinner("Đang lưu..."):
+                                        sua_cong_ty(rid_ct, ten_ct_e.strip(), dc_e.strip(), mkh_e.strip(), mst_e.strip())
+                                    st.session_state.pop("editing_ct", None)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"🔌 Lỗi: {e}")
+                        if canceled_ct:
+                            st.session_state.pop("editing_ct", None)
+                            st.rerun()
+                    # Xác nhận xóa Công Ty
+                    if st.session_state.get("deleting_ct") == rid_ct:
+                        st.warning(f"⚠️ Xác nhận xóa **{ten_ct}**?")
+                        c_ok, c_no = st.columns(2)
+                        if c_ok.button("✅ Xác nhận xóa", key=f"ok_del_ct_{rid_ct}", use_container_width=True):
+                            try:
+                                with st.spinner("Đang xóa..."):
+                                    xoa_cong_ty(rid_ct)
+                                st.session_state.pop("deleting_ct", None)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"🔌 Lỗi: {e}")
+                        if c_no.button("❌ Huỷ", key=f"no_del_ct_{rid_ct}", use_container_width=True):
+                            st.session_state.pop("deleting_ct", None)
+                            st.rerun()
         _section_don_gian(
             "🔧 Loại Máy", "loai_may",
             lay_danh_sach_loai_may, them_loai_may, "Tên Loại Máy",
             placeholder="Ví dụ: Động Cơ Điện, Máy Bơm...",
             mo_ta_them="Tên Loại Máy *",
+            sua_func=sua_loai_may,
+            xoa_func=xoa_loai_may,
         )
         _section_don_gian(
-            "�️ Tình Trạng", "tinh_trang",
+            "🛠️ Tình Trạng", "tinh_trang",
             lay_danh_sach_tinh_trang, them_tinh_trang, "Tên Tình Trạng",
             placeholder="Ví dụ: Bảo hành, Sửa chữa, Trả lại...",
             mo_ta_them="Tên Tình Trạng *",
+            sua_func=sua_tinh_trang,
+            xoa_func=xoa_tinh_trang,
         )
 
         _section_don_gian(
@@ -3338,6 +3545,8 @@ def giao_dien_admin():
             lay_danh_sach_cong_doan, them_cong_doan, "Tên Công Đoạn",
             placeholder="Ví dụ: Kiểm Tra Đầu Vào, Tháo Rã, Quấn Dây...",
             mo_ta_them="Tên Công Đoạn *",
+            sua_func=sua_cong_doan,
+            xoa_func=xoa_cong_doan_item,
         )
 
     # ══════════════════════════════════════════════
@@ -4162,7 +4371,7 @@ def giao_dien_dang_nhap():
         <div class="auth-sub">Đăng nhập để tiếp tục</div>
     """, unsafe_allow_html=True)
 
-    tab_dn, tab_dk = st.tabs(["🔑  Đăng Nhập", "📝  Đăng Ký"])
+    tab_dn, tab_dk, tab_dmk = st.tabs(["🔑  Đăng Nhập", "📝  Đăng Ký", "🔒  Đổi Mật Khẩu"])
 
     # ─────────────────────────── ĐĂNG NHẬP ───────────────────────────
     with tab_dn:
@@ -4243,6 +4452,34 @@ def giao_dien_dang_nhap():
                 else:
                     st.error(f"❌ {msg}")
 
+    # ─────────────────────────── ĐỔI MẬT KHẨU ───────────────────────────
+    with tab_dmk:
+        with st.form("form_doi_mat_khau", clear_on_submit=True):
+            st.markdown("##### Đổi Mật Khẩu")
+            username_dmk   = st.text_input("Username", placeholder="Nhập username của bạn")
+            mk_hien_tai    = st.text_input("Mật khẩu hiện tại", type="password",
+                                           placeholder="Nhập mật khẩu hiện tại")
+            mk_moi         = st.text_input("Mật khẩu mới", type="password",
+                                           placeholder="Tối thiểu 6 ký tự")
+            xn_mk_moi      = st.text_input("Xác nhận mật khẩu mới", type="password",
+                                           placeholder="Nhập lại mật khẩu mới")
+            btn_dmk = st.form_submit_button("Đổi Mật Khẩu", use_container_width=True,
+                                            type="primary")
+
+        if btn_dmk:
+            if not username_dmk or not mk_hien_tai or not mk_moi or not xn_mk_moi:
+                st.error("❌ Vui lòng điền đầy đủ thông tin.")
+            elif mk_moi != xn_mk_moi:
+                st.error("❌ Mật khẩu mới xác nhận không khớp.")
+            elif mk_moi == mk_hien_tai:
+                st.error("❌ Mật khẩu mới phải khác mật khẩu hiện tại.")
+            else:
+                with st.spinner("Đang cập nhật mật khẩu..."):
+                    ok, msg = doi_mat_khau(username_dmk, mk_hien_tai, mk_moi)
+                if ok:
+                    st.success("✅ Đổi mật khẩu thành công! Vui lòng đăng nhập lại.")
+                else:
+                    st.error(f"❌ {msg}")
 
 
 # ============================================================
