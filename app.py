@@ -2453,10 +2453,11 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     if _cv_key not in st.session_state:
         st.session_state[_cv_key] = [
             {
-                "ten":       cv.get("ten", cv.get("Tên", "")),
-                "nhan_vien": cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))),
-                "done":      bool(cv.get("done", False)),
-                "anh":       cv.get("anh", []),
+                "ten":              cv.get("ten", cv.get("Tên", "")),
+                "nhan_vien":        cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))),
+                "done":             bool(cv.get("done", False)),
+                "anh":              cv.get("anh", []),
+                "ngay_hoan_thanh":  cv.get("ngay_hoan_thanh", ""),
             }
             for cv in _cv_parsed if isinstance(cv, dict)
         ]
@@ -3550,8 +3551,8 @@ def giao_dien_admin():
     """Giao diện quản lý dành cho Admin — 4 tab ngang: Cài Đặt / Nhân Viên / Tạo Task / Tổng Quan."""
     st.header("🔧 Bảng Điều Khiển Admin")
 
-    tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_tong_quan, tab_board, tab_cvc, tab_tdtdm = st.tabs(
-        ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "📊  Tổng Quan", "🗂️  Bảng Quản Lý", "📋  Công Việc Con", "🔩  Theo Dõi Tiến Độ Máy"]
+    tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_board, tab_cvc, tab_tdtdm = st.tabs(
+        ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "🗂️  Bảng Quản Lý", "📋  Công Việc Con", "🔩  Theo Dõi Tiến Độ Máy"]
     )
 
     # ── Helper: render section quản lý 1 field đơn ───────────────────────────
@@ -4117,147 +4118,6 @@ def giao_dien_admin():
                     st.rerun(scope="app")
 
         _fragment_tao_task_admin()
-
-    # ══════════════════════════════════════════════
-    # TAB 4 — TỔNG QUAN
-    # ══════════════════════════════════════════════
-    with tab_tong_quan:
-        if st.button("🔄 Làm mới dữ liệu", key="adm_lam_moi"):
-            lay_danh_sach_cong_viec.clear()
-            st.rerun()
-
-        with st.spinner("Đang tải dữ liệu..."):
-            df = lay_danh_sach_cong_viec()
-
-        if df.empty:
-            st.info("ℹ️ Chưa có công việc nào. Hãy tạo mới ở tab **➕ Tạo Công Việc Mới**!")
-        else:
-            # ── KPI: Tổng + mỗi trạng thái xuất hiện trong data ──
-            ds_tt_data = df["Trạng Thái"].dropna().unique().tolist()
-            # Sắp theo thứ tự chuẩn, thêm các trạng thái lạ ở cuối
-            _THU_TU = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-            ds_tt_sorted = [t for t in _THU_TU if t in ds_tt_data] + \
-                           [t for t in ds_tt_data if t not in _THU_TU]
-
-            _ICON_KPI = {
-                "Đang Kiểm Tra": "🔵", "Đã Phê Duyệt": "🟢", "Đã Báo Giá": "🟠",
-                "Có Đơn": "🟣", "Chờ Giao": "🟡", "Đã Hoàn Thành - Giao Máy": "✅",
-                "Đã Xuất Hóa Đơn": "⬜", "Bảo Hành - Trả Lại": "🔴",
-                "Chờ Làm": "🔴", "Đang Làm": "🟡", "Hoàn Thành": "🟢",
-            }
-
-            # KPI cards: 2 cột để hiển thị đẹp trên mobile
-            kpi_items = [("📋 TỔNG TASK", len(df))] + [
-                (f"{_ICON_KPI.get(tt, '⚪')} {tt.upper()}", len(df[df["Trạng Thái"] == tt]))
-                for tt in ds_tt_sorted
-            ]
-            for row_start in range(0, len(kpi_items), 2):
-                chunk = kpi_items[row_start:row_start + 2]
-                cols_kpi = st.columns(2)
-                for col_kpi, (label, val) in zip(cols_kpi, chunk):
-                    col_kpi.metric(label, val)
-
-            st.divider()
-
-            # ── Bộ lọc ──
-            col_f1, col_f2, col_f3 = st.columns(3)
-            with col_f1:
-                all_tt = df["Trạng Thái"].dropna().unique().tolist()
-                loc_trang_thai = st.multiselect(
-                    "Lọc theo trạng thái",
-                    options=all_tt,
-                    default=[],
-                    placeholder="Hiển thị tất cả...",
-                    key="adm_loc_tt",
-                )
-            with col_f2:
-                danh_sach_nv = df["Nhân Viên"].dropna().unique().tolist()
-                loc_nhan_vien = st.multiselect("Lọc theo nhân viên", options=danh_sach_nv, key="adm_loc_nv")
-            with col_f3:
-                danh_sach_ct = df["Công Ty"].dropna().unique().tolist() if "Công Ty" in df.columns else []
-                loc_cong_ty  = st.multiselect("🏢 Lọc theo Công Ty", options=danh_sach_ct, key="adm_loc_ct")
-
-            df_hien_thi = df.copy()
-            if loc_trang_thai:  # rỗng = hiển thị tất cả
-                df_hien_thi = df_hien_thi[df_hien_thi["Trạng Thái"].isin(loc_trang_thai)]
-            if loc_nhan_vien:
-                df_hien_thi = df_hien_thi[df_hien_thi["Nhân Viên"].isin(loc_nhan_vien)]
-            if loc_cong_ty:
-                df_hien_thi = df_hien_thi[df_hien_thi["Công Ty"].isin(loc_cong_ty)]
-
-            def render_bang_dep(df_in: pd.DataFrame):
-                mau_trang_thai = {
-                    "Chờ Làm":                     ("🔴", "#fee2e2", "#dc2626", "#fef2f2"),
-                    "Đang Làm":                    ("🟡", "#fef9c3", "#d97706", "#fffbeb"),
-                    "Hoàn Thành":                  ("🟢", "#dcfce7", "#16a34a", "#f0fdf4"),
-                    "Đang Kiểm Tra":               ("🔵", "#dbeafe", "#1d4ed8", "#eff6ff"),
-                    "Đã Phê Duyệt":               ("🟢", "#dcfce7", "#15803d", "#f0fdf4"),
-                    "Đã Báo Giá":                 ("🟠", "#fef3c7", "#b45309", "#fffbeb"),
-                    "Có Đơn":                      ("🟣", "#ede9fe", "#7c3aed", "#f5f3ff"),
-                    "Chờ Giao":                    ("🟡", "#fef9c3", "#a16207", "#fefce8"),
-                    "Đã Hoàn Thành - Giao Máy":   ("✅", "#bbf7d0", "#166534", "#f0fdf4"),
-                    "Đã Xuất Hóa Đơn":            ("⬜", "#f3f4f6", "#374151", "#f9fafb"),
-                    "Bảo Hành - Trả Lại":         ("🔴", "#fee2e2", "#b91c1c", "#fef2f2"),
-                }
-                cols_hien_thi = ["ID", "Công Ty", "Công Số", "Năm",
-                                 "Tên Công Việc", "Nhân Viên", "Trạng Thái",
-                                 "Ngày Tạo", "Hạn Hoàn Thành"]
-                cols_co  = [c for c in cols_hien_thi if c in df_in.columns]
-                df_show  = df_in[cols_co]
-                header_html = "".join(f"<th>{c}</th>" for c in cols_co)
-                rows_html = ""
-                for _, row in df_show.iterrows():
-                    cells = ""
-                    for col in cols_co:
-                        val = str(row[col]) if pd.notna(row[col]) else ""
-                        if col == "Trạng Thái":
-                            icon, bg, color, _ = mau_trang_thai.get(val, ("⚪", "#f3f4f6", "#6b7280", "#f9fafb"))
-                            cells += (
-                                f'<td><span style="background:{bg};color:{color};'
-                                f'padding:4px 12px;border-radius:20px;font-weight:700;'
-                                f'font-size:0.82rem;white-space:nowrap;'
-                                f'border:1.5px solid {color}40;">'
-                                f'{icon} {val}</span></td>'
-                            )
-                        elif col == "ID":
-                            cells += (
-                                f'<td><span style="background:#ede9fe;color:#7c3aed;'
-                                f'padding:3px 10px;border-radius:8px;font-weight:700;'
-                                f'font-size:0.85rem;">#{val}</span></td>'
-                            )
-                        elif col == "Công Ty":
-                            cells += f'<td><strong style="color:#1e1b4b;">{val}</strong></td>'
-                        elif col == "Hạn Hoàn Thành":
-                            cells += f'<td><span style="color:#dc2626;font-weight:600;">⏰ {val}</span></td>'
-                        else:
-                            cells += f"<td>{val}</td>"
-                    rows_html += f"<tr>{cells}</tr>"
-
-                html = f"""
-                <style>
-                .custom-table-wrap{{overflow-x:auto;border-radius:16px;
-                    box-shadow:0 4px 24px rgba(102,126,234,0.13);margin-top:0.5rem;}}
-                .custom-table{{width:100%;border-collapse:collapse;
-                    font-family:'Be Vietnam Pro',sans-serif;font-size:0.88rem;
-                    background:white;border-radius:16px;overflow:hidden;}}
-                .custom-table thead tr{{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);}}
-                .custom-table thead th{{color:white;font-weight:700;padding:14px 16px;
-                    text-align:left;white-space:nowrap;border:none;font-size:0.85rem;
-                    text-transform:uppercase;}}
-                .custom-table tbody tr{{border-bottom:1px solid #f0f0f5;}}
-                .custom-table tbody tr:nth-child(even){{background:#f8f7ff;}}
-                .custom-table tbody tr:hover{{background:#ede9fe!important;}}
-                .custom-table tbody td{{padding:12px 16px;color:#374151;
-                    vertical-align:middle;white-space:nowrap;}}
-                </style>
-                <div class="custom-table-wrap">
-                <table class="custom-table">
-                <thead><tr>{header_html}</tr></thead>
-                <tbody>{rows_html}</tbody>
-                </table></div>"""
-                st.markdown(html, unsafe_allow_html=True)
-
-            render_bang_dep(df_hien_thi)
 
     # ========================================================
     # Tab 5: Bảng Quản Lý (Kanban board toàn bộ task)
