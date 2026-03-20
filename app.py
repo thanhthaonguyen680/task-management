@@ -1981,6 +1981,206 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
 
 
 # ============================================================
+# TẠO EXCEL BIÊN BẢN NGHIỆM THU
+# ============================================================
+def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
+    """Tạo file Excel biên bản nghiệm thu theo mẫu Điện Cơ Ngọc Trâm."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import (Font, PatternFill, Alignment, Border, Side,
+                                 GradientFill)
+    from openpyxl.utils import get_column_letter
+
+    # ── Parse dữ liệu ──────────────────────────────────────────
+    ten_dong_co  = str(thong_tin_task.get("Tên Công Việc", ""))
+    khach_hang   = str(thong_tin_task.get("Công Ty", ""))
+    cong_so      = str(thong_tin_task.get("Công Số", ""))
+    mo_ta        = str(thong_tin_task.get("Mô Tả", ""))
+    nhan_vien    = str(thong_tin_task.get("Nhân Viên", ""))
+    ngay_tao_str = str(thong_tin_task.get("Ngày Tạo", ""))
+    try:
+        dt = datetime.strptime(ngay_tao_str[:10], "%Y-%m-%d")
+        ngay_en = dt.strftime("%d %B %Y")
+        ngay_vi = f"Ngày {dt.day:02d} Tháng {dt.month:02d} Năm {dt.year}"
+    except Exception:
+        ngay_en = ngay_tao_str
+        ngay_vi = ngay_tao_str
+
+    hang_muc = [h.strip() for h in mo_ta.split("\n") if h.strip()]
+
+    # ── Styles ──────────────────────────────────────────────────
+    thin  = Side(style="thin",   color="000000")
+    thick = Side(style="medium", color="000000")
+    brd_all  = Border(left=thin, right=thin, top=thin, bottom=thin)
+    brd_thick = Border(left=thick, right=thick, top=thick, bottom=thick)
+
+    BLUE_HDR  = "4472C4"
+    BLUE_CELL = "BDD7EE"
+    PURPLE    = "70309F"
+    WHITE     = "FFFFFF"
+    YELLOW    = "FFF2CC"
+
+    def _font(bold=False, size=10, color="000000", italic=False):
+        return Font(bold=bold, size=size, color=color, italic=italic,
+                    name="Times New Roman")
+
+    def _fill(hex_color):
+        return PatternFill("solid", fgColor=hex_color)
+
+    def _align(h="center", v="center", wrap=True):
+        return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
+
+    def _set_cell(ws, row, col, value="", bold=False, size=10, color="000000",
+                  h_align="center", v_align="center", fill_color=None,
+                  border=None, italic=False, wrap=True):
+        c = ws.cell(row=row, column=col, value=value)
+        c.font      = _font(bold=bold, size=size, color=color, italic=italic)
+        c.alignment = _align(h=h_align, v=v_align, wrap=wrap)
+        if fill_color:
+            c.fill  = _fill(fill_color)
+        if border:
+            c.border = border
+        return c
+
+    # ── Tạo workbook ────────────────────────────────────────────
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Biên Bản Nghiệm Thu"
+
+    # Độ rộng cột (A=STT, B=Hạng mục, C=Ngày, D=Thông qua)
+    ws.column_dimensions["A"].width = 6
+    ws.column_dimensions["B"].width = 52
+    ws.column_dimensions["C"].width = 18
+    ws.column_dimensions["D"].width = 18
+
+    row = 1
+
+    # ── Header công ty ──────────────────────────────────────────
+    ws.merge_cells(f"A{row}:D{row}")
+    _set_cell(ws, row, 1,
+              "CÔNG TY TNHH MỘT THÀNH VIÊN ĐIỆN CƠ NGỌC TRÂM",
+              bold=True, size=13, color=PURPLE)
+    ws.row_dimensions[row].height = 20
+    row += 1
+
+    for txt in [
+        "Địa chỉ : 8/5, hẻm 04, tổ 9, khu Kim Sơn, Xã Long Thành, Tỉnh Đồng Nai, Việt Nam",
+        "Website: ngoctrammotor.com   Mail: ctyngoctram1811@gmail.com",
+        "MST: 3603238978  ĐT: 0907 042 043 (Mr.Hiệp) – 0908 062 291 (Ms.Linh)",
+    ]:
+        ws.merge_cells(f"A{row}:D{row}")
+        _set_cell(ws, row, 1, txt, size=9)
+        ws.row_dimensions[row].height = 14
+        row += 1
+
+    row += 1  # khoảng trống
+
+    # ── Tiêu đề BBNT ────────────────────────────────────────────
+    ws.merge_cells(f"A{row}:D{row}")
+    _set_cell(ws, row, 1, "REPAIR ACCEPTANCE CERTIFICATE", bold=True, size=12)
+    ws.row_dimensions[row].height = 18
+    row += 1
+
+    ws.merge_cells(f"A{row}:D{row}")
+    c = _set_cell(ws, row, 1, "BIÊN BẢN NGHIỆM THU",
+                  bold=True, size=15, fill_color=BLUE_CELL, border=brd_thick)
+    ws.row_dimensions[row].height = 22
+    row += 1
+
+    row += 1  # khoảng trống
+
+    # ── Bảng thông tin Engine / Customer / Address ──────────────
+    for en_lbl, vi_lbl, val in [
+        ("Engine",   "Động cơ",    ten_dong_co),
+        ("Customer", "Khách hàng", khach_hang),
+        ("Address",  "Địa chỉ",   ""),
+    ]:
+        _set_cell(ws, row, 1, f"{en_lbl} / {vi_lbl}",
+                  bold=True, size=9, fill_color=BLUE_CELL, border=brd_all,
+                  h_align="left")
+        ws.merge_cells(f"B{row}:D{row}")
+        _set_cell(ws, row, 2, val, size=10, border=brd_all, h_align="left")
+        ws.row_dimensions[row].height = 18
+        row += 1
+
+    row += 1
+
+    # ── Section I ────────────────────────────────────────────────
+    ws.merge_cells(f"A{row}:D{row}")
+    _set_cell(ws, row, 1,
+              "I. Time and place of the test / Thời gian và địa điểm kiểm tra",
+              bold=True, size=10, h_align="left")
+    row += 1
+
+    ws.merge_cells(f"A{row}:D{row}")
+    _set_cell(ws, row, 1,
+              f"At 7:30 AM on {ngay_en}, at Ngoc Tram Motor",
+              size=10, h_align="left")
+    row += 1
+
+    ws.merge_cells(f"A{row}:D{row}")
+    _set_cell(ws, row, 1,
+              f"Lúc 7h30 - {ngay_vi}, tại Điện cơ Ngọc Trâm",
+              size=9, h_align="left")
+    row += 1
+    row += 1
+
+    # ── Section II: Header bảng 12 hạng mục ─────────────────────
+    ws.merge_cells(f"A{row}:D{row}")
+    _set_cell(ws, row, 1,
+              "II. Hạng mục sửa chữa / Repair catalog",
+              bold=True, size=10, h_align="left")
+    row += 1
+
+    # Header hàng bảng
+    for col_i, (txt, width) in enumerate([
+        ("STT", 6), ("Repair catalog / Hạng mục sửa chữa", 52),
+        ("Date / Ngày", 18), ("Passed / Thông qua", 18)
+    ], start=1):
+        _set_cell(ws, row, col_i, txt,
+                  bold=True, size=9, color=WHITE,
+                  fill_color=BLUE_HDR, border=brd_all)
+    ws.row_dimensions[row].height = 20
+    row += 1
+
+    # 12 dòng hạng mục
+    for i in range(1, 13):
+        noi_dung = hang_muc[i - 1] if (i - 1) < len(hang_muc) else ""
+        fill = YELLOW if i % 2 == 0 else WHITE
+        _set_cell(ws, row, 1, f"{i}", size=9, border=brd_all, fill_color=fill)
+        _set_cell(ws, row, 2, noi_dung, size=9, border=brd_all,
+                  h_align="left", fill_color=fill)
+        _set_cell(ws, row, 3, "", size=9, border=brd_all, fill_color=fill)
+        _set_cell(ws, row, 4, "", size=9, border=brd_all, fill_color=fill)
+        ws.row_dimensions[row].height = 16
+        row += 1
+
+    row += 1
+
+    # ── Footer thông tin tài liệu ────────────────────────────────
+    footer_data = [
+        ("Số Đặt Hàng / Order number", cong_so),
+        ("Nhân viên / Technician",     nhan_vien),
+        ("Tài liệu quản lý",           "QT-NT-029-1A"),
+        ("Ngày ban hành / Edition date", "24/04/2025"),
+    ]
+    for lbl, val in footer_data:
+        _set_cell(ws, row, 1, lbl, bold=True, size=9,
+                  fill_color=BLUE_CELL, border=brd_all,
+                  h_align="left")
+        ws.merge_cells(f"B{row}:D{row}")
+        _set_cell(ws, row, 2, val, size=9, border=brd_all, h_align="left")
+        ws.row_dimensions[row].height = 16
+        row += 1
+
+    # ── Xuất bytes ──────────────────────────────────────────────
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.read()
+
+
+# ============================================================
 # FRAGMENT: CHI TIẾT TASK NHÂN VIÊN (rerun cục bộ khi tick checkbox / đổi trạng thái)
 # ============================================================
 @st.fragment
@@ -2490,17 +2690,17 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     tt_pdf = st.session_state.get(f"tt_select_{task_id}", trang_thai)
     if tt_pdf == "Đã Hoàn Thành - Giao Máy" or "Hoàn Thành" in tt_pdf:
         st.divider()
-        if st.button("📄 Tạo Biên Bản PDF", key=f"pdf_{task_id}", use_container_width=True):
-            with st.spinner("Đang tạo PDF..."):
+        if st.button("📊 Tạo Biên Bản Excel", key=f"pdf_{task_id}", use_container_width=True):
+            with st.spinner("Đang tạo Excel..."):
                 df_moi = lay_danh_sach_cong_viec()
                 rows = df_moi[df_moi["ID"].astype(str) == str(task_id)]
                 if not rows.empty:
-                    du_lieu_pdf = tao_pdf_nghiem_thu(rows.iloc[0].to_dict())
+                    du_lieu_excel = tao_excel_nghiem_thu(rows.iloc[0].to_dict())
                     st.download_button(
-                        "💾 Tải Xuống PDF",
-                        data=du_lieu_pdf,
-                        file_name=f"BBNT_task_{task_id}.pdf",
-                        mime="application/pdf",
+                        "💾 Tải Xuống Excel",
+                        data=du_lieu_excel,
+                        file_name=f"BBNT_task_{task_id}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"dl_pdf_{task_id}",
                         use_container_width=True,
                     )
