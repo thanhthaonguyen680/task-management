@@ -3774,7 +3774,7 @@ def giao_dien_admin():
 
             else:
                 # ── DANH SÁCH CARD NHÂN VIÊN ───────────────────────────
-                for _, u in df_nv_users.iterrows():
+                for _idx_u, u in df_nv_users.iterrows():
                     ho_ten_u  = u["HoTen"]
                     uname     = u["Username"]
                     ns        = u["NgaySinh"]
@@ -3792,7 +3792,7 @@ def giao_dien_admin():
                     </div>
                     <div class="nv-badge-row">📋 {tc} công việc chính &nbsp;|&nbsp; 🔹 {ts} việc con</div>
                     """, unsafe_allow_html=True)
-                    if st.button("👁️ Xem chi tiết", key=f"adm_xem_{ho_ten_u}", use_container_width=True):
+                    if st.button("👁️ Xem chi tiết", key=f"adm_xem_{_idx_u}_{uname}", use_container_width=True):
                         lay_danh_sach_cong_viec.clear()
                         st.session_state["adm_xem_nv"] = ho_ten_u
                         st.rerun()
