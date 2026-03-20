@@ -4343,78 +4343,98 @@ def giao_dien_admin():
 
                 st.divider()
 
-                # ── Bảng HTML CSS ──
-                _mau_tinh_trang = {
-                    "Trước hạn":  ("#dcfce7", "#16a34a"),
-                    "Đúng hạn":   ("#fef9c3", "#d97706"),
-                    "Quá hạn":    ("#fee2e2", "#dc2626"),
-                    "Hoàn thành": ("#dbeafe", "#1d4ed8"),
-                    "Chưa xong":  ("#f3f4f6", "#6b7280"),
+                # ── Bảng AgGrid (click hàng để xem chi tiết) ──
+                from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+                from st_aggrid.shared import JsCode
+
+                _aggrid_css = {
+                    ".ag-header": {"background": "linear-gradient(135deg,#f59e0b 0%,#d97706 100%) !important"},
+                    ".ag-header-cell-text": {"color": "white !important", "font-weight": "700 !important",
+                                             "font-size": "0.8rem !important", "text-transform": "uppercase !important"},
+                    ".ag-header-icon": {"color": "white !important"},
+                    ".ag-header-cell-resize::after": {"background-color": "rgba(255,255,255,0.25) !important"},
+                    ".ag-row-even": {"background-color": "#fffbeb !important"},
+                    ".ag-row-odd": {"background-color": "#ffffff !important"},
+                    ".ag-row-hover": {"background-color": "#fef3c7 !important"},
+                    ".ag-row-selected": {"background-color": "#fde68a !important"},
+                    ".ag-cell": {"font-size": "0.86rem !important", "color": "#374151 !important"},
                 }
+
                 cols_show = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
                              "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
                              "Loại Máy", "Tình Trạng"]
-                header_html = "".join(f"<th>{c}</th>" for c in cols_show) + "<th>Chi Tiết</th>"
-                rows_html = ""
-                _ds_tt_dlg_cvc = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-                _cvc_rows_for_btn = []
-                for _, r in df_show_cvc.iterrows():
-                    cells = ""
-                    for c in cols_show:
-                        val = str(r.get(c, "") or "")
-                        if c == "Tình Trạng":
-                            bg, fg = _mau_tinh_trang.get(val, ("#f3f4f6", "#6b7280"))
-                            cells += (
-                                f'<td><span style="background:{bg};color:{fg};padding:3px 10px;'
-                                f'border-radius:20px;font-weight:700;font-size:0.82rem;'
-                                f'border:1.5px solid {fg}40;white-space:nowrap;">{val}</span></td>'
-                            )
-                        elif c == "STT":
-                            cells += f'<td style="color:#7c3aed;font-weight:700;">{val}</td>'
-                        elif c == "Công Việc Con":
-                            cells += f'<td><strong>{val}</strong></td>'
-                        elif c == "Tên Công Ty":
-                            cells += f'<td style="color:#1e1b4b;font-weight:600;">{val}</td>'
-                        else:
-                            cells += f"<td>{val}</td>"
-                    cells += '<td>📂</td>'
-                    rows_html += f"<tr>{cells}</tr>"
-                    _cvc_rows_for_btn.append(r)
-                html_cvc = f"""
-                <style>
-                .cvc-table-wrap{{overflow-x:auto;border-radius:16px;
-                    box-shadow:0 4px 24px rgba(102,126,234,0.13);margin-top:0.5rem;}}
-                .cvc-table{{width:100%;border-collapse:collapse;
-                    font-family:'Be Vietnam Pro',sans-serif;font-size:0.86rem;
-                    background:white;border-radius:16px;overflow:hidden;}}
-                .cvc-table thead tr{{background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);}}
-                .cvc-table thead th{{color:white;font-weight:700;padding:12px 14px;
-                    text-align:left;white-space:nowrap;border:none;font-size:0.82rem;
-                    text-transform:uppercase;}}
-                .cvc-table tbody tr{{border-bottom:1px solid #f0f0f5;}}
-                .cvc-table tbody tr:nth-child(even){{background:#fffbeb;}}
-                .cvc-table tbody tr:hover{{background:#fef3c7!important;}}
-                .cvc-table tbody td{{padding:10px 14px;color:#374151;
-                    vertical-align:middle;white-space:nowrap;}}
-                </style>
-                <div class="cvc-table-wrap">
-                <table class="cvc-table">
-                <thead><tr>{header_html}</tr></thead>
-                <tbody>{rows_html}</tbody>
-                </table></div>"""
-                st.markdown(html_cvc, unsafe_allow_html=True)
-                st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con")
+                _df_grid_cvc = df_show_cvc[["_task_id"] + cols_show].copy().reset_index(drop=True)
 
-                # ── Buttons Xem tương ứng từng hàng ──
-                st.markdown("<style>.btn-xem button{padding:2px 10px!important;font-size:0.78rem!important;height:auto!important;margin:1px 0!important;}</style>", unsafe_allow_html=True)
-                for _ri, _r in enumerate(_cvc_rows_for_btn):
-                    _tid_cvc = str(_r.get("_task_id", ""))
-                    _ten_cvc = str(_r.get("Tên Công Việc", ""))[:30]
-                    _cvc_lbl = str(_r.get("Công Việc Con", ""))[:20]
-                    st.markdown(f"<div class='btn-xem'>", unsafe_allow_html=True)
-                    if st.button(f"📂 Xem — {_ten_cvc} ({_cvc_lbl})", key=f"cvc_xem_{_tid_cvc}_{_ri}", use_container_width=False):
-                        _task_dialog(_r["_task_dict"], _ds_tt_dlg_cvc)
-                    st.markdown("</div>", unsafe_allow_html=True)
+                _badge_tt = JsCode("""
+                class TinhTrangRenderer {
+                    init(p) {
+                        const c={'Trước hạn':{bg:'#dcfce7',fg:'#16a34a'},'Đúng hạn':{bg:'#fef9c3',fg:'#d97706'},
+                            'Quá hạn':{bg:'#fee2e2',fg:'#dc2626'},'Hoàn thành':{bg:'#dbeafe',fg:'#1d4ed8'},
+                            'Chưa xong':{bg:'#f3f4f6',fg:'#6b7280'}};
+                        const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
+                        this.el=document.createElement('span');
+                        this.el.innerText=p.value||'';
+                        Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
+                            borderRadius:'20px',fontWeight:'700',fontSize:'0.82rem',
+                            border:'1.5px solid '+s.fg+'40',whiteSpace:'nowrap',display:'inline-block'});
+                    }
+                    getGui(){return this.el;}
+                }""")
+
+                _badge_ts = JsCode("""
+                class TrangThaiRenderer {
+                    init(p) {
+                        const c={'Chờ Làm':{bg:'#fee2e2',fg:'#dc2626'},'Đang Làm':{bg:'#fef9c3',fg:'#d97706'},
+                            'Hoàn Thành':{bg:'#dcfce7',fg:'#16a34a'},'Đang Kiểm Tra':{bg:'#dbeafe',fg:'#1d4ed8'},
+                            'Đã Phê Duyệt':{bg:'#dcfce7',fg:'#15803d'},'Đã Báo Giá':{bg:'#fef3c7',fg:'#b45309'},
+                            'Có Đơn':{bg:'#ede9fe',fg:'#7c3aed'},'Chờ Giao':{bg:'#fef9c3',fg:'#a16207'},
+                            'Đã Hoàn Thành - Giao Máy':{bg:'#bbf7d0',fg:'#166534'}};
+                        const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
+                        this.el=document.createElement('span');
+                        this.el.innerText=p.value||'';
+                        Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
+                            borderRadius:'20px',fontWeight:'600',fontSize:'0.82rem',
+                            whiteSpace:'nowrap',display:'inline-block'});
+                    }
+                    getGui(){return this.el;}
+                }""")
+
+                gb_cvc = GridOptionsBuilder.from_dataframe(_df_grid_cvc)
+                gb_cvc.configure_default_column(resizable=True, sortable=True, minWidth=80)
+                gb_cvc.configure_column("_task_id", hide=True)
+                gb_cvc.configure_column("STT", maxWidth=60, minWidth=50)
+                gb_cvc.configure_column("Tình Trạng", cellRenderer=_badge_tt, minWidth=110)
+                gb_cvc.configure_column("Trạng Thái", cellRenderer=_badge_ts, minWidth=155)
+                gb_cvc.configure_column("Tên Công Ty", minWidth=220, flex=2)
+                gb_cvc.configure_column("Tên Công Việc", minWidth=180, flex=2)
+                gb_cvc.configure_column("Công Việc Con", minWidth=120)
+                gb_cvc.configure_column("Nhân Viên", minWidth=140)
+                gb_cvc.configure_column("Ngày Hoàn Thành", minWidth=130)
+                gb_cvc.configure_column("Loại Máy", minWidth=140)
+                gb_cvc.configure_selection(selection_mode="single", use_checkbox=False)
+                gb_cvc.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38)
+                _go_cvc = gb_cvc.build()
+
+                _resp_cvc = AgGrid(
+                    _df_grid_cvc,
+                    gridOptions=_go_cvc,
+                    update_mode=GridUpdateMode.SELECTION_CHANGED,
+                    allow_unsafe_jscode=True,
+                    use_container_width=True,
+                    fit_columns_on_grid_load=False,
+                    theme="alpine",
+                    custom_css=_aggrid_css,
+                    key="aggrid_cvc",
+                )
+                st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con · 👆 Click vào hàng để xem chi tiết")
+
+                _sel_cvc = _resp_cvc.get("selected_rows")
+                if _sel_cvc is not None and len(_sel_cvc) > 0:
+                    _sel_id_cvc = str((_sel_cvc.iloc[0] if hasattr(_sel_cvc, "iloc") else _sel_cvc[0]).get("_task_id", ""))
+                    _match_cvc = df_show_cvc[df_show_cvc["_task_id"].astype(str) == _sel_id_cvc]
+                    if not _match_cvc.empty:
+                        _ds_tt_dlg_cvc = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+                        _task_dialog(_match_cvc.iloc[0]["_task_dict"], _ds_tt_dlg_cvc)
 
                 # ── Xuất Excel ──
                 import io
@@ -4623,86 +4643,88 @@ def giao_dien_admin():
 
                 st.divider()
 
-                # ── Bảng HTML CSS ──
-                _mau_tt_tdm = {
-                    "Trước hạn":  ("#dcfce7", "#16a34a"),
-                    "Đúng hạn":   ("#fef9c3", "#d97706"),
-                    "Quá hạn":    ("#fee2e2", "#dc2626"),
-                    "Hoàn thành": ("#dbeafe", "#1d4ed8"),
-                    "Chưa xong":  ("#f3f4f6", "#6b7280"),
-                }
-                _mau_trang_thai_tdm = {
-                    "Chờ Làm": ("#fee2e2", "#dc2626"), "Đang Làm": ("#fef9c3", "#d97706"),
-                    "Hoàn Thành": ("#dcfce7", "#16a34a"), "Đang Kiểm Tra": ("#dbeafe", "#1d4ed8"),
-                    "Đã Phê Duyệt": ("#dcfce7", "#15803d"), "Đã Báo Giá": ("#fef3c7", "#b45309"),
-                    "Có Đơn": ("#ede9fe", "#7c3aed"), "Chờ Giao": ("#fef9c3", "#a16207"),
-                    "Đã Hoàn Thành - Giao Máy": ("#bbf7d0", "#166534"),
-                }
+                # ── Bảng AgGrid ──
                 _cols_display_tdm = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số Máy",
                                      "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá", "Trạng Thái",
                                      "Ngày Nhận Máy", "Hạn Hoàn Thành", "Ngày Giao Máy",
                                      "Loại Máy", "Tình Trạng"]
-                header_html_tdm = "".join(f"<th>{c}</th>" for c in _cols_display_tdm) + "<th>Chi Tiết</th>"
-                rows_html_tdm = ""
-                _tdm_rows_for_btn = []
-                for _, row_t in df_show_tdm.iterrows():
-                    cells = ""
-                    for c in _cols_display_tdm:
-                        val = str(row_t.get(c, "") or "")
-                        if c == "Tình Trạng":
-                            bg, fg = _mau_tt_tdm.get(val, ("#f3f4f6", "#6b7280"))
-                            cells += (f'<td><span style="background:{bg};color:{fg};padding:3px 10px;'
-                                      f'border-radius:20px;font-weight:700;font-size:0.82rem;'
-                                      f'border:1.5px solid {fg}40;white-space:nowrap;">{val}</span></td>')
-                        elif c == "Trạng Thái":
-                            bg2, fg2 = _mau_trang_thai_tdm.get(val, ("#f3f4f6", "#6b7280"))
-                            cells += (f'<td><span style="background:{bg2};color:{fg2};padding:3px 10px;'
-                                      f'border-radius:20px;font-weight:600;font-size:0.82rem;'
-                                      f'white-space:nowrap;">{val}</span></td>')
-                        elif c == "STT":
-                            cells += f'<td style="color:#7c3aed;font-weight:700;">{val}</td>'
-                        elif c == "Tên Công Ty":
-                            cells += f'<td style="color:#1e1b4b;font-weight:600;">{val}</td>'
-                        elif c == "Hạn Hoàn Thành":
-                            cells += f'<td style="color:#dc2626;font-weight:600;">⏰ {val}</td>'
-                        else:
-                            cells += f"<td>{val}</td>"
-                    cells += '<td>📂</td>'
-                    rows_html_tdm += f"<tr>{cells}</tr>"
-                    _tdm_rows_for_btn.append(row_t)
-                html_tdm = f"""
-                <style>
-                .tdm-table-wrap{{overflow-x:auto;border-radius:16px;
-                    box-shadow:0 4px 24px rgba(102,126,234,0.13);margin-top:0.5rem;}}
-                .tdm-table{{width:100%;border-collapse:collapse;
-                    font-family:'Be Vietnam Pro',sans-serif;font-size:0.86rem;
-                    background:white;border-radius:16px;overflow:hidden;}}
-                .tdm-table thead tr{{background:linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%);}}
-                .tdm-table thead th{{color:white;font-weight:700;padding:12px 14px;
-                    text-align:left;white-space:nowrap;border:none;font-size:0.82rem;
-                    text-transform:uppercase;}}
-                .tdm-table tbody tr{{border-bottom:1px solid #f0f0f5;}}
-                .tdm-table tbody tr:nth-child(even){{background:#eff6ff;}}
-                .tdm-table tbody tr:hover{{background:#dbeafe!important;}}
-                .tdm-table tbody td{{padding:10px 14px;color:#374151;
-                    vertical-align:middle;white-space:nowrap;}}
-                </style>
-                <div class="tdm-table-wrap">
-                <table class="tdm-table">
-                <thead><tr>{header_html_tdm}</tr></thead>
-                <tbody>{rows_html_tdm}</tbody>
-                </table></div>"""
-                st.markdown(html_tdm, unsafe_allow_html=True)
-                st.caption(f"Hiển thị {len(df_show_tdm)} / {total_tdm} máy")
 
-                # ── Buttons Xem tương ứng từng hàng ──
-                _ds_tt_dlg_tdm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-                for _ri2, _rt in enumerate(_tdm_rows_for_btn):
-                    _tid2 = str(_rt.get("_task_id", ""))
-                    _ten2 = str(_rt.get("Tên Công Việc", ""))[:35]
-                    _ct2  = str(_rt.get("Tên Công Ty", ""))[:20]
-                    if st.button(f"📂 Xem — {_ten2} ({_ct2})", key=f"tdm_xem_{_tid2}_{_ri2}", use_container_width=False):
-                        _task_dialog(_rt["_task_dict"], _ds_tt_dlg_tdm)
+                from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+                from st_aggrid.shared import JsCode
+
+                _badge_tt_tdm = JsCode("""
+                class TinhTrangTDMRenderer {
+                    init(p) {
+                        const c={'Trước hạn':{bg:'#dcfce7',fg:'#16a34a'},'Đúng hạn':{bg:'#fef9c3',fg:'#d97706'},
+                            'Quá hạn':{bg:'#fee2e2',fg:'#dc2626'},'Hoàn thành':{bg:'#dbeafe',fg:'#1d4ed8'},
+                            'Chưa xong':{bg:'#f3f4f6',fg:'#6b7280'}};
+                        const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
+                        this.el=document.createElement('span');
+                        this.el.innerText=p.value||'';
+                        Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
+                            borderRadius:'20px',fontWeight:'700',fontSize:'0.82rem',
+                            border:'1.5px solid '+s.fg+'40',whiteSpace:'nowrap',display:'inline-block'});
+                    }
+                    getGui(){return this.el;}
+                }""")
+
+                _badge_ts_tdm = JsCode("""
+                class TrangThaiTDMRenderer {
+                    init(p) {
+                        const c={'Chờ Làm':{bg:'#fee2e2',fg:'#dc2626'},'Đang Làm':{bg:'#fef9c3',fg:'#d97706'},
+                            'Hoàn Thành':{bg:'#dcfce7',fg:'#16a34a'},'Đang Kiểm Tra':{bg:'#dbeafe',fg:'#1d4ed8'},
+                            'Đã Phê Duyệt':{bg:'#dcfce7',fg:'#15803d'},'Đã Báo Giá':{bg:'#fef3c7',fg:'#b45309'},
+                            'Có Đơn':{bg:'#ede9fe',fg:'#7c3aed'},'Chờ Giao':{bg:'#fef9c3',fg:'#a16207'},
+                            'Đã Hoàn Thành - Giao Máy':{bg:'#bbf7d0',fg:'#166534'}};
+                        const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
+                        this.el=document.createElement('span');
+                        this.el.innerText=p.value||'';
+                        Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
+                            borderRadius:'20px',fontWeight:'600',fontSize:'0.82rem',
+                            whiteSpace:'nowrap',display:'inline-block'});
+                    }
+                    getGui(){return this.el;}
+                }""")
+
+                _df_grid_tdm = df_show_tdm[["_task_id"] + _cols_display_tdm].copy().reset_index(drop=True)
+
+                gb_tdm = GridOptionsBuilder.from_dataframe(_df_grid_tdm)
+                gb_tdm.configure_default_column(resizable=True, sortable=True, minWidth=80)
+                gb_tdm.configure_column("_task_id", hide=True)
+                gb_tdm.configure_column("STT", maxWidth=60, minWidth=50)
+                gb_tdm.configure_column("Tình Trạng", cellRenderer=_badge_tt_tdm, minWidth=110)
+                gb_tdm.configure_column("Trạng Thái", cellRenderer=_badge_ts_tdm, minWidth=155)
+                gb_tdm.configure_column("Tên Công Ty", minWidth=220, flex=2)
+                gb_tdm.configure_column("Tên Công Việc", minWidth=180, flex=2)
+                gb_tdm.configure_column("Hạn Hoàn Thành", minWidth=130)
+                gb_tdm.configure_column("Ngày Nhận Máy", minWidth=120)
+                gb_tdm.configure_column("Ngày Giao Máy", minWidth=120)
+                gb_tdm.configure_column("Loại Máy", minWidth=140)
+                gb_tdm.configure_column("Mã Số Máy", minWidth=100)
+                gb_tdm.configure_selection(selection_mode="single", use_checkbox=False)
+                gb_tdm.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38)
+                _go_tdm = gb_tdm.build()
+
+                _resp_tdm = AgGrid(
+                    _df_grid_tdm,
+                    gridOptions=_go_tdm,
+                    update_mode=GridUpdateMode.SELECTION_CHANGED,
+                    allow_unsafe_jscode=True,
+                    use_container_width=True,
+                    fit_columns_on_grid_load=False,
+                    theme="alpine",
+                    custom_css=_aggrid_css,
+                    key="aggrid_tdm",
+                )
+                st.caption(f"Hiển thị {len(df_show_tdm)} / {total_tdm} máy · 👆 Click vào hàng để xem chi tiết")
+
+                _sel_tdm = _resp_tdm.get("selected_rows")
+                if _sel_tdm is not None and len(_sel_tdm) > 0:
+                    _sel_id_tdm = str((_sel_tdm.iloc[0] if hasattr(_sel_tdm, "iloc") else _sel_tdm[0]).get("_task_id", ""))
+                    _match_tdm = df_show_tdm[df_show_tdm["_task_id"].astype(str) == _sel_id_tdm]
+                    if not _match_tdm.empty:
+                        _ds_tt_dlg_tdm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+                        _task_dialog(_match_tdm.iloc[0]["_task_dict"], _ds_tt_dlg_tdm)
 
                 # ── Xuất Excel ──
                 import io
