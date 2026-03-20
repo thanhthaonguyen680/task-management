@@ -3808,117 +3808,121 @@ def giao_dien_admin():
         if st.session_state.get("_adm_task_success"):
             st.success(st.session_state.pop("_adm_task_success"))
             st.balloons()
-        ds_cong_ty = lay_ten_cac_cong_ty()
-        if not ds_cong_ty:
-            st.warning("⚠️ Chưa có công ty nào! Hãy thêm ở tab **⚙️ Cài Đặt** trước.")
 
-        _ADM_PREFIX = "adm"
-        ds_nhan_vien = lay_danh_sach_nhan_vien()
-        ds_trang_thai = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
+        @st.fragment
+        def _fragment_tao_task_admin():
+            _ADM_PREFIX   = "adm"
+            ds_cong_ty    = lay_ten_cac_cong_ty()
+            ds_nhan_vien  = lay_danh_sach_nhan_vien()
+            ds_trang_thai = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
-        adm_cong_ty = st.selectbox(
-            "🏢 Công Ty Khách Hàng *",
-            options=ds_cong_ty if ds_cong_ty else ["(Chưa có công ty)"],
-            key="adm_cong_ty",
-        )
-        adm_phe_duyet = st.selectbox(
-            "✅ Người Phê Duyệt",
-            options=["-- Không chọn --"] + ds_nhan_vien,
-            key="adm_phe_duyet",
-        )
+            if not ds_cong_ty:
+                st.warning("⚠️ Chưa có công ty nào! Hãy thêm ở tab **⚙️ Cài Đặt** trước.")
 
-        col_tt_top, col_nam = st.columns(2)
-        with col_tt_top:
-            adm_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai, key="adm_trang_thai")
-        with col_nam:
-            adm_nam = st.text_input("Năm *", value=str(datetime.now().year), key="adm_nam")
-
-        col_nv, col_dl = st.columns(2)
-        with col_nv:
-            adm_nguoi_giao = st.selectbox("👤 Giao cho nhân viên *", options=ds_nhan_vien, key="adm_nguoi_giao")
-        with col_dl:
-            adm_deadline = st.date_input("📅 Hạn hoàn thành", key="adm_deadline")
-
-        col_lm_adm, col_tt_adm = st.columns(2)
-        with col_lm_adm:
-            ds_loai_may_adm = lay_ten_cac_loai_may()
-            adm_loai_may = st.selectbox(
-                "🔧 Loại Máy",
-                options=["-- Không chọn --"] + ds_loai_may_adm,
-                key="adm_loai_may",
+            adm_cong_ty = st.selectbox(
+                "🏢 Công Ty Khách Hàng *",
+                options=ds_cong_ty if ds_cong_ty else ["(Chưa có công ty)"],
+                key="adm_cong_ty",
             )
-        with col_tt_adm:
-            ds_tinh_trang_adm = lay_ten_cac_tinh_trang()
-            adm_tinh_trang = st.selectbox(
-                "🛠️ Tình Trạng",
-                options=["-- Không chọn --"] + ds_tinh_trang_adm,
-                key="adm_tinh_trang",
+            adm_phe_duyet = st.selectbox(
+                "✅ Người Phê Duyệt",
+                options=["-- Không chọn --"] + ds_nhan_vien,
+                key="adm_phe_duyet",
             )
 
-        col_cs_adm, col_sc_adm = st.columns(2)
-        with col_cs_adm:
-            adm_cong_suat = st.text_input("⚡ Công Suất", placeholder="VD: 5.5kW", key="adm_cong_suat")
-        with col_sc_adm:
-            adm_so_cuc = st.text_input("🔩 Số Cực", placeholder="VD: 4P", key="adm_so_cuc")
+            col_tt_top, col_nam = st.columns(2)
+            with col_tt_top:
+                adm_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai, key="adm_trang_thai")
+            with col_nam:
+                adm_nam = st.text_input("Năm *", value=str(datetime.now().year), key="adm_nam")
 
-        col_ms_adm, col_po_adm = st.columns(2)
-        with col_ms_adm:
-            adm_ma_so = st.text_input("🏷️ Mã Số", placeholder="VD: ABC-001", key="adm_ma_so")
-        with col_po_adm:
-            adm_so_po_noi_bo = st.text_input("📄 Số PO Nội Bộ", placeholder="VD: PO-2024-001", key="adm_so_po_noi_bo")
+            col_nv, col_dl = st.columns(2)
+            with col_nv:
+                adm_nguoi_giao = st.selectbox("👤 Giao cho nhân viên *", options=ds_nhan_vien, key="adm_nguoi_giao")
+            with col_dl:
+                adm_deadline = st.date_input("📅 Hạn hoàn thành", key="adm_deadline")
 
-        col_kh_adm, col_bg_adm = st.columns(2)
-        with col_kh_adm:
-            adm_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key="adm_so_po_kh")
-        with col_bg_adm:
-            adm_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key="adm_so_bao_gia")
-
-        adm_ten_task   = st.text_input("📌 Tên công việc *", placeholder="Ví dụ: Sửa chữa động cơ bơm", key="adm_ten_task")
-        adm_mo_ta      = st.text_area("📝 Mô tả chi tiết", placeholder="Nhập mô tả, yêu cầu kỹ thuật...", key="adm_mo_ta")
-
-        st.divider()
-        _fragment_checklist(_ADM_PREFIX, show_done=False, default_items=_MAC_DINH_CHECKLIST)
-        st.divider()
-        _fragment_cong_viec_con(_ADM_PREFIX, ds_nhan_vien, show_done=False)
-        st.divider()
-
-        if st.button("✅ Tạo Task", use_container_width=True, type="primary", key="adm_submit_task"):
-            if not adm_ten_task.strip():
-                st.error("⛔ Vui lòng nhập tên công việc!")
-            elif not ds_cong_ty:
-                st.error("⛔ Vui lòng thêm ít nhất một công ty trước!")
-            else:
-                phe_duyet_luu = adm_phe_duyet if adm_phe_duyet != "-- Không chọn --" else ""
-                with st.spinner("Đang lưu lên Google Sheets..."):
-                    id_moi = them_cong_viec(
-                        adm_ten_task.strip(), adm_mo_ta.strip(), adm_nguoi_giao,
-                        adm_deadline.strftime("%Y-%m-%d"),
-                        cong_ty=adm_cong_ty, cong_so="",
-                        nam=adm_nam.strip(), trang_thai=adm_trang_thai,
-                        nguoi_phe_duyet=phe_duyet_luu,
-                        checklist=list(st.session_state.get(f"{_ADM_PREFIX}_checklist", [])),
-                        cong_viec_con=list(st.session_state.get(f"{_ADM_PREFIX}_cong_viec_con", [])),
-                        cong_doan="",
-                        loai_may=adm_loai_may if adm_loai_may != "-- Không chọn --" else "",
-                        tinh_trang=adm_tinh_trang if adm_tinh_trang != "-- Không chọn --" else "",
-                        cong_suat=adm_cong_suat.strip(),
-                        so_cuc=adm_so_cuc.strip(),
-                        ma_so=adm_ma_so.strip(),
-                        so_po_noi_bo=adm_so_po_noi_bo.strip(),
-                        so_po_kh=adm_so_po_kh.strip(),
-                        so_bao_gia=adm_so_bao_gia.strip(),
-                    )
-                st.session_state[f"{_ADM_PREFIX}_checklist"] = []
-                st.session_state[f"{_ADM_PREFIX}_cong_viec_con"] = []
-                # Xoá form fields
-                for _k in ["adm_ten_task", "adm_mo_ta"]:
-                    st.session_state.pop(_k, None)
-                st.session_state["_adm_task_success"] = (
-                    f"✅ Đã tạo task #{id_moi} thành công! "
-                    f"Công ty: **{adm_cong_ty}** | Giao: **{adm_nguoi_giao}**"
+            col_lm_adm, col_tt_adm = st.columns(2)
+            with col_lm_adm:
+                adm_loai_may = st.selectbox(
+                    "🔧 Loại Máy",
+                    options=["-- Không chọn --"] + lay_ten_cac_loai_may(),
+                    key="adm_loai_may",
                 )
-                lay_danh_sach_cong_viec.clear()
-                st.rerun()
+            with col_tt_adm:
+                adm_tinh_trang = st.selectbox(
+                    "🛠️ Tình Trạng",
+                    options=["-- Không chọn --"] + lay_ten_cac_tinh_trang(),
+                    key="adm_tinh_trang",
+                )
+
+            col_cs_adm, col_sc_adm = st.columns(2)
+            with col_cs_adm:
+                adm_cong_suat = st.text_input("⚡ Công Suất", placeholder="VD: 5.5kW", key="adm_cong_suat")
+            with col_sc_adm:
+                adm_so_cuc = st.text_input("🔩 Số Cực", placeholder="VD: 4P", key="adm_so_cuc")
+
+            col_ms_adm, col_po_adm = st.columns(2)
+            with col_ms_adm:
+                adm_ma_so = st.text_input("🏷️ Mã Số", placeholder="VD: ABC-001", key="adm_ma_so")
+            with col_po_adm:
+                adm_so_po_noi_bo = st.text_input("📄 Số PO Nội Bộ", placeholder="VD: PO-2024-001", key="adm_so_po_noi_bo")
+
+            col_kh_adm, col_bg_adm = st.columns(2)
+            with col_kh_adm:
+                adm_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key="adm_so_po_kh")
+            with col_bg_adm:
+                adm_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key="adm_so_bao_gia")
+
+            adm_ten_task = st.text_input("📌 Tên công việc *", placeholder="Ví dụ: Sửa chữa động cơ bơm", key="adm_ten_task")
+            adm_mo_ta    = st.text_area("📝 Mô tả chi tiết", placeholder="Nhập mô tả, yêu cầu kỹ thuật...", key="adm_mo_ta")
+
+            st.divider()
+            _fragment_checklist(_ADM_PREFIX, show_done=False, default_items=_MAC_DINH_CHECKLIST)
+            st.divider()
+            _fragment_cong_viec_con(_ADM_PREFIX, ds_nhan_vien, show_done=False)
+            st.divider()
+
+            if st.button("✅ Tạo Task", use_container_width=True, type="primary", key="adm_submit_task"):
+                if not adm_ten_task.strip():
+                    st.error("⛔ Vui lòng nhập tên công việc!")
+                elif not ds_cong_ty:
+                    st.error("⛔ Vui lòng thêm ít nhất một công ty trước!")
+                else:
+                    phe_duyet_luu = adm_phe_duyet if adm_phe_duyet != "-- Không chọn --" else ""
+                    with st.spinner("Đang lưu lên Google Sheets..."):
+                        id_moi = them_cong_viec(
+                            adm_ten_task.strip(), adm_mo_ta.strip(), adm_nguoi_giao,
+                            adm_deadline.strftime("%Y-%m-%d"),
+                            cong_ty=adm_cong_ty, cong_so="",
+                            nam=adm_nam.strip(), trang_thai=adm_trang_thai,
+                            nguoi_phe_duyet=phe_duyet_luu,
+                            checklist=list(st.session_state.get(f"{_ADM_PREFIX}_checklist", [])),
+                            cong_viec_con=list(st.session_state.get(f"{_ADM_PREFIX}_cong_viec_con", [])),
+                            cong_doan="",
+                            loai_may=adm_loai_may if adm_loai_may != "-- Không chọn --" else "",
+                            tinh_trang=adm_tinh_trang if adm_tinh_trang != "-- Không chọn --" else "",
+                            cong_suat=adm_cong_suat.strip(),
+                            so_cuc=adm_so_cuc.strip(),
+                            ma_so=adm_ma_so.strip(),
+                            so_po_noi_bo=adm_so_po_noi_bo.strip(),
+                            so_po_kh=adm_so_po_kh.strip(),
+                            so_bao_gia=adm_so_bao_gia.strip(),
+                        )
+                    st.session_state[f"{_ADM_PREFIX}_checklist"]    = []
+                    st.session_state[f"{_ADM_PREFIX}_cong_viec_con"] = []
+                    st.session_state[f"{_ADM_PREFIX}_cv_seeded"]     = False
+                    for _k in ["adm_ten_task", "adm_mo_ta", "adm_cong_suat", "adm_so_cuc",
+                               "adm_ma_so", "adm_so_po_noi_bo", "adm_so_po_kh", "adm_so_bao_gia"]:
+                        st.session_state.pop(_k, None)
+                    lay_danh_sach_cong_viec.clear()
+                    st.session_state["_adm_task_success"] = (
+                        f"✅ Đã tạo task #{id_moi} thành công! "
+                        f"Công ty: **{adm_cong_ty}** | Giao: **{adm_nguoi_giao}**"
+                    )
+                    st.rerun(scope="app")
+
+        _fragment_tao_task_admin()
 
     # ══════════════════════════════════════════════
     # TAB 4 — TỔNG QUAN
