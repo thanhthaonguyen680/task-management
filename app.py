@@ -4163,10 +4163,12 @@ def giao_dien_admin():
                 for cv in ds_cv:
                     if not isinstance(cv, dict):
                         continue
+                    done = bool(cv.get("done", False))
+                    if not done:
+                        continue  # Chỉ hiển thị công việc con đã hoàn thành
                     stt += 1
                     ten_cv   = cv.get("ten", cv.get("Tên", ""))
                     nv       = cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))) or ""
-                    done     = bool(cv.get("done", False))
                     ngay_ht  = cv.get("ngay_hoan_thanh", "")
 
                     # Tính Tình Trạng (deadline-based)
