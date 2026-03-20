@@ -925,8 +925,6 @@ _DS_TRANG_THAI_MAC_DINH = [
     "Có Đơn",
     "Chờ Giao",
     "Đã Hoàn Thành - Giao Máy",
-    "Đã Xuất Hóa Đơn",
-    "Bảo Hành - Trả Lại",
 ]
 
 # ---- Loại Máy ----
@@ -3448,7 +3446,7 @@ def giao_dien_admin():
     # TAB 1 — CÀI ĐẶT
     # ══════════════════════════════════════════════
     with tab_cai_dat:
-        with st.expander("🏢 Quản Lý Công Ty", expanded=True):
+        with st.expander("🏢 Quản Lý Công Ty", expanded=False):
             with st.form("form_cong_ty", clear_on_submit=True):
                 ten_ct_inp = st.text_input("Tên Công Ty *", placeholder="Ví dụ: Công Ty TNHH ABC")
                 dc_inp = st.text_input("Địa Chỉ", placeholder="Ví dụ: 123 Nguyễn Văn Linh, Q.7, TP.HCM")
