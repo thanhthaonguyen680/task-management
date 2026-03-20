@@ -838,16 +838,16 @@ def them_thong_bao_tat_ca(noi_dung: str, task_id: int = 0, loai: str = "general"
 
 
 def lay_thong_bao_nguoi_dung(ho_ten: str) -> pd.DataFrame:
-    """Lấy danh sách thông báo của user trong 48 giờ gần nhất, mới nhất trước."""
+    """Lấy danh sách thông báo của user trong 2 tuần gần nhất, mới nhất trước."""
     try:
         df = _lay_df_don_gian(_TB_SHEET, _TB_HEADERS)
         if df.empty:
             return df
         df = df[df["Nguoi_Nhan"] == ho_ten].copy()
-        # Lọc chỉ thông báo trong 48 giờ gần nhất
+        # Lọc chỉ thông báo trong 2 tuần gần nhất
         try:
             df["Thoi_Gian"] = pd.to_datetime(df["Thoi_Gian"], errors="coerce")
-            nguong = datetime.now() - timedelta(hours=48)
+            nguong = datetime.now() - timedelta(weeks=2)
             df = df[df["Thoi_Gian"] >= nguong]
             df["Thoi_Gian"] = df["Thoi_Gian"].dt.strftime("%Y-%m-%d %H:%M:%S")
         except Exception:
@@ -858,7 +858,7 @@ def lay_thong_bao_nguoi_dung(ho_ten: str) -> pd.DataFrame:
 
 
 def xoa_thong_bao_cu():
-    """Xóa các thông báo cũ hơn 48 giờ khỏi sheet (chạy định kỳ)."""
+    """Xóa các thông báo cũ hơn 2 tuần khỏi sheet (chạy định kỳ)."""
     try:
         sheet = _lay_sheet_don_gian(_TB_SHEET, _TB_HEADERS)
         rows = sheet.get_all_values()
@@ -866,7 +866,7 @@ def xoa_thong_bao_cu():
             return
         headers = rows[0]
         idx_time = headers.index("Thoi_Gian")
-        nguong = datetime.now() - timedelta(hours=48)
+        nguong = datetime.now() - timedelta(weeks=2)
         # Tìm các hàng cần xóa (từ dưới lên để không lệch index)
         rows_to_delete = []
         for i, row in enumerate(rows[1:], start=2):
@@ -5593,7 +5593,7 @@ def inject_css():
 @st.dialog("🔔 Thông Báo", width="large")
 def dialog_thong_bao(ho_ten: str):
     """Dialog hiển thị danh sách thông báo của user."""
-    # Dọn thông báo cũ hơn 48 giờ (chạy 1 lần mỗi session)
+    # Dọn thông báo cũ hơn 2 tuần (chạy 1 lần mỗi session)
     if not st.session_state.get("_da_xoa_tb_cu", False):
         xoa_thong_bao_cu()
         st.session_state["_da_xoa_tb_cu"] = True
