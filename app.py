@@ -4978,8 +4978,11 @@ def giao_dien_nhan_vien():
             df_pd_all = lay_danh_sach_cong_viec()
 
         # Lọc: Người Phê Duyệt == ten_nhan_vien VÀ trạng thái "Đang Kiểm Tra"
+        _col_pd = "Người Phê Duyệt"
+        if _col_pd not in df_pd_all.columns:
+            df_pd_all[_col_pd] = ""
         df_pd = df_pd_all[
-            (df_pd_all["Người Phê Duyệt"].fillna("").str.strip().str.lower() == ten_nhan_vien.lower()) &
+            (df_pd_all[_col_pd].fillna("").str.strip().str.lower() == ten_nhan_vien.lower()) &
             (df_pd_all["Trạng Thái"].fillna("") == "Đang Kiểm Tra")
         ].copy()
 
