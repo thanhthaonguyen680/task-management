@@ -2323,6 +2323,10 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     def _cb_cv_done(i):
         val = st.session_state.get(f"dlg_cv_ck_{task_id}_{i}", False)
         st.session_state[_cv_key][i]["done"] = val
+        if val:
+            st.session_state[_cv_key][i]["ngay_hoan_thanh"] = datetime.now().strftime("%Y-%m-%d")
+        else:
+            st.session_state[_cv_key][i].pop("ngay_hoan_thanh", None)
         _save_cv_to_sheet(task_id, _cv_key)
 
     def _cb_cv_nv(i):
@@ -3340,8 +3344,8 @@ def giao_dien_admin():
     """Giao diện quản lý dành cho Admin — 4 tab ngang: Cài Đặt / Nhân Viên / Tạo Task / Tổng Quan."""
     st.header("🔧 Bảng Điều Khiển Admin")
 
-    tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_tong_quan, tab_board = st.tabs(
-        ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "📊  Tổng Quan", "🗂️  Bảng Quản Lý"]
+    tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_tong_quan, tab_board, tab_cvc = st.tabs(
+        ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "📊  Tổng Quan", "🗂️  Bảng Quản Lý", "📋  Công Việc Con"]
     )
 
     # ── Helper: render section quản lý 1 field đơn ───────────────────────────
@@ -4104,6 +4108,189 @@ def giao_dien_admin():
 
         # ── KANBAN BOARD ──────────────────────────────────────────
         _render_kanban_board(df_board, ds_tt_board, board_key="adm_kb")
+
+    # ========================================================
+    # Tab 6: Quản Lý Công Việc Con
+    # ========================================================
+    with tab_cvc:
+        st.subheader("📋 Quản Lý Công Việc Con")
+
+        col_ref_cvc, _ = st.columns([1, 4])
+        with col_ref_cvc:
+            if st.button("🔄 Làm mới", key="adm_cvc_refresh"):
+                lay_danh_sach_cong_viec.clear()
+                st.rerun()
+
+        with st.spinner("Đang tải dữ liệu..."):
+            df_all_cvc = lay_danh_sach_cong_viec()
+
+        if df_all_cvc.empty:
+            st.info("ℹ️ Chưa có công việc nào.")
+        else:
+            # Flatten tất cả công việc con ra từng dòng
+            today = datetime.today().date()
+            rows_cvc = []
+            stt = 0
+            for _, task_row in df_all_cvc.iterrows():
+                raw = task_row.get("Công Việc Con", "") or "[]"
+                try:
+                    ds_cv = json.loads(raw) if raw else []
+                except Exception:
+                    ds_cv = []
+                if not isinstance(ds_cv, list) or not ds_cv:
+                    continue
+
+                han_str  = str(task_row.get("Hạn Hoàn Thành", "") or "")
+                han_date = None
+                try:
+                    if han_str:
+                        han_date = datetime.strptime(han_str[:10], "%Y-%m-%d").date()
+                except Exception:
+                    pass
+
+                for cv in ds_cv:
+                    if not isinstance(cv, dict):
+                        continue
+                    stt += 1
+                    ten_cv   = cv.get("ten", cv.get("Tên", ""))
+                    nv       = cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))) or ""
+                    done     = bool(cv.get("done", False))
+                    ngay_ht  = cv.get("ngay_hoan_thanh", "")
+
+                    # Tính Tình Trạng (deadline-based)
+                    if done and ngay_ht:
+                        try:
+                            ht_date = datetime.strptime(ngay_ht[:10], "%Y-%m-%d").date()
+                            if han_date:
+                                if ht_date < han_date:
+                                    tinh_trang_td = "Trước hạn"
+                                elif ht_date == han_date:
+                                    tinh_trang_td = "Đúng hạn"
+                                else:
+                                    tinh_trang_td = "Quá hạn"
+                            else:
+                                tinh_trang_td = "Hoàn thành"
+                        except Exception:
+                            tinh_trang_td = "Hoàn thành"
+                    elif done:
+                        tinh_trang_td = "Hoàn thành"
+                    elif han_date and today > han_date:
+                        tinh_trang_td = "Quá hạn"
+                    elif han_date and today == han_date:
+                        tinh_trang_td = "Đúng hạn"
+                    else:
+                        tinh_trang_td = "Chưa xong"
+
+                    rows_cvc.append({
+                        "STT":            stt,
+                        "Tên Công Ty":    task_row.get("Công Ty", ""),
+                        "Tên Công Việc":  task_row.get("Tên Công Việc", ""),
+                        "Công Suất":      task_row.get("Công Suất", ""),
+                        "Mã Số":          task_row.get("Mã Số", ""),
+                        "Công Việc Con":  ten_cv,
+                        "Nhân Viên":      nv,
+                        "Ngày Hoàn Thành": ngay_ht if done and ngay_ht else ("✅" if done else ""),
+                        "Trạng Thái":     task_row.get("Trạng Thái", ""),
+                        "Loại Máy":       task_row.get("Loại Máy", ""),
+                        "Tình Trạng":     tinh_trang_td,
+                    })
+
+            if not rows_cvc:
+                st.info("ℹ️ Chưa có công việc con nào.")
+            else:
+                df_cvc = pd.DataFrame(rows_cvc)
+
+                # ── Bộ lọc ──
+                col_f1, col_f2, col_f3 = st.columns(3)
+                with col_f1:
+                    ds_nv_cvc = sorted(df_cvc["Nhân Viên"].dropna().unique().tolist())
+                    loc_nv_cvc = st.multiselect("👤 Lọc nhân viên", ds_nv_cvc, key="cvc_loc_nv", placeholder="Tất cả")
+                with col_f2:
+                    ds_ct_cvc = sorted(df_cvc["Tên Công Ty"].dropna().unique().tolist())
+                    loc_ct_cvc = st.multiselect("🏢 Lọc công ty", ds_ct_cvc, key="cvc_loc_ct", placeholder="Tất cả")
+                with col_f3:
+                    ds_tt_cvc = sorted(df_cvc["Tình Trạng"].dropna().unique().tolist())
+                    loc_tt_cvc = st.multiselect("📊 Lọc tình trạng", ds_tt_cvc, key="cvc_loc_tt", placeholder="Tất cả")
+
+                df_show_cvc = df_cvc.copy()
+                if loc_nv_cvc:
+                    df_show_cvc = df_show_cvc[df_show_cvc["Nhân Viên"].isin(loc_nv_cvc)]
+                if loc_ct_cvc:
+                    df_show_cvc = df_show_cvc[df_show_cvc["Tên Công Ty"].isin(loc_ct_cvc)]
+                if loc_tt_cvc:
+                    df_show_cvc = df_show_cvc[df_show_cvc["Tình Trạng"].isin(loc_tt_cvc)]
+
+                # ── KPI nhanh ──
+                total = len(df_show_cvc)
+                done_count  = len(df_show_cvc[df_show_cvc["Ngày Hoàn Thành"] != ""])
+                qua_han     = len(df_show_cvc[df_show_cvc["Tình Trạng"] == "Quá hạn"])
+                truoc_han   = len(df_show_cvc[df_show_cvc["Tình Trạng"] == "Trước hạn"])
+                kpi_cols = st.columns(4)
+                kpi_cols[0].metric("📋 Tổng việc con", total)
+                kpi_cols[1].metric("✅ Hoàn thành", done_count)
+                kpi_cols[2].metric("🔴 Quá hạn", qua_han)
+                kpi_cols[3].metric("🟢 Trước hạn", truoc_han)
+
+                st.divider()
+
+                # ── Bảng HTML đẹp ──
+                _mau_tinh_trang = {
+                    "Trước hạn":  ("#dcfce7", "#16a34a"),
+                    "Đúng hạn":   ("#fef9c3", "#d97706"),
+                    "Quá hạn":    ("#fee2e2", "#dc2626"),
+                    "Hoàn thành": ("#dbeafe", "#1d4ed8"),
+                    "Chưa xong":  ("#f3f4f6", "#6b7280"),
+                }
+                cols_show = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
+                             "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
+                             "Loại Máy", "Tình Trạng"]
+                header_html = "".join(f"<th>{c}</th>" for c in cols_show)
+                rows_html = ""
+                for _, r in df_show_cvc.iterrows():
+                    cells = ""
+                    for c in cols_show:
+                        val = str(r.get(c, "") or "")
+                        if c == "Tình Trạng":
+                            bg, fg = _mau_tinh_trang.get(val, ("#f3f4f6", "#6b7280"))
+                            cells += (
+                                f'<td><span style="background:{bg};color:{fg};padding:3px 10px;'
+                                f'border-radius:20px;font-weight:700;font-size:0.82rem;'
+                                f'border:1.5px solid {fg}40;white-space:nowrap;">{val}</span></td>'
+                            )
+                        elif c == "STT":
+                            cells += f'<td style="color:#7c3aed;font-weight:700;">{val}</td>'
+                        elif c == "Công Việc Con":
+                            cells += f'<td><strong>{val}</strong></td>'
+                        elif c == "Tên Công Ty":
+                            cells += f'<td style="color:#1e1b4b;font-weight:600;">{val}</td>'
+                        else:
+                            cells += f"<td>{val}</td>"
+                    rows_html += f"<tr>{cells}</tr>"
+
+                html_cvc = f"""
+                <style>
+                .cvc-table-wrap{{overflow-x:auto;border-radius:16px;
+                    box-shadow:0 4px 24px rgba(102,126,234,0.13);margin-top:0.5rem;}}
+                .cvc-table{{width:100%;border-collapse:collapse;
+                    font-family:'Be Vietnam Pro',sans-serif;font-size:0.86rem;
+                    background:white;border-radius:16px;overflow:hidden;}}
+                .cvc-table thead tr{{background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);}}
+                .cvc-table thead th{{color:white;font-weight:700;padding:12px 14px;
+                    text-align:left;white-space:nowrap;border:none;font-size:0.82rem;
+                    text-transform:uppercase;}}
+                .cvc-table tbody tr{{border-bottom:1px solid #f0f0f5;}}
+                .cvc-table tbody tr:nth-child(even){{background:#fffbeb;}}
+                .cvc-table tbody tr:hover{{background:#fef3c7!important;}}
+                .cvc-table tbody td{{padding:10px 14px;color:#374151;
+                    vertical-align:middle;white-space:nowrap;}}
+                </style>
+                <div class="cvc-table-wrap">
+                <table class="cvc-table">
+                <thead><tr>{header_html}</tr></thead>
+                <tbody>{rows_html}</tbody>
+                </table></div>"""
+                st.markdown(html_cvc, unsafe_allow_html=True)
+                st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con")
 
 
 def giao_dien_nhan_vien():
