@@ -1340,6 +1340,45 @@ def cap_nhat_checklist(task_id: int, checklist: list):
         lay_danh_sach_cong_viec.clear()
 
 
+# Ánh xạ tên field → số cột trong sheet Tasks
+_COL_MAP_TASK = {
+    "Công Ty":      2,   # B
+    "Công Số":      3,   # C
+    "Năm":          4,   # D
+    "Tên Công Việc":5,   # E
+    "Mô Tả":        6,   # F
+    "Nhân Viên":    7,   # G
+    "Trạng Thái":   8,   # H
+    "Hạn Hoàn Thành":10, # J
+    "Người Phê Duyệt":12,# L
+    "Công Đoạn":    15,  # O
+    "Loại Máy":     16,  # P
+    "Tình Trạng":   17,  # Q
+    "Công Suất":    18,  # R
+    "Số Cực":       19,  # S
+    "Mã Số":        20,  # T
+    "Số PO Nội Bộ": 21,  # U
+    "Số PO KH/HĐ":  22,  # V
+    "Số Báo Giá":   23,  # W
+}
+
+
+def cap_nhat_nhieu_truong_task(task_id: int, gia_tri: dict):
+    """Cập nhật nhiều trường của task trong 1 lần kết nối.
+    gia_tri: {tên_cột: giá_trị_mới}
+    """
+    sheet = _lay_sheet_fresh()
+    o_tim = sheet.find(str(task_id), in_column=1)
+    if not o_tim:
+        return
+    r = o_tim.row
+    for ten_col, val in gia_tri.items():
+        col_num = _COL_MAP_TASK.get(ten_col)
+        if col_num:
+            sheet.update_cell(r, col_num, str(val))
+    lay_danh_sach_cong_viec.clear()
+
+
 # ============================================================
 # QUẢN LÝ TÀI KHOẢN NGƯỜI DÙNG (USERS SHEET)
 # ============================================================
@@ -2368,30 +2407,66 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         with st.spinner("Đang lưu..."):
             cap_nhat_ngay_ket_thuc(task_id, _nkt_str)
 
-    # ── Thông số kỹ thuật / thương mại ──────────────────────────────────────
-    _thong_so = {
-        "🔧 Loại Máy":     hang.get("Loại Máy", ""),
-        "🛠️ Tình Trạng":   hang.get("Tình Trạng", ""),
-        "⚡ Công Suất":    hang.get("Công Suất", ""),
-        "🔩 Số Cực":       hang.get("Số Cực", ""),
-        "🏷️ Mã Số":        hang.get("Mã Số", ""),
-        "📄 Số PO Nội Bộ": hang.get("Số PO Nội Bộ", ""),
-        "📋 Số PO KH/HĐ":  hang.get("Số PO KH/HĐ", ""),
-        "💰 Số Báo Giá":   hang.get("Số Báo Giá", ""),
+    # ── Thông số kỹ thuật / thương mại (có thể chỉnh sửa) ───────────────────
+    st.markdown("---")
+    st.markdown("**🔧 Thông số kỹ thuật**")
+
+    _ds_loai_may   = [""] + lay_ten_cac_loai_may()
+    _ds_tinh_trang = [""] + lay_ten_cac_tinh_trang()
+
+    _lm_cur  = hang.get("Loại Máy", "") or ""
+    _tt_cur  = hang.get("Tình Trạng", "") or ""
+    _cs_cur  = hang.get("Công Suất", "") or ""
+    _sc_cur  = hang.get("Số Cực", "") or ""
+    _ms_cur  = hang.get("Mã Số", "") or ""
+    _po_cur  = hang.get("Số PO Nội Bộ", "") or ""
+    _pkh_cur = hang.get("Số PO KH/HĐ", "") or ""
+    _bg_cur  = hang.get("Số Báo Giá", "") or ""
+
+    _col1, _col2 = st.columns(2)
+    with _col1:
+        _lm_idx = _ds_loai_may.index(_lm_cur) if _lm_cur in _ds_loai_may else 0
+        _lm_new = st.selectbox("🔧 Loại Máy", _ds_loai_may, index=_lm_idx, key=f"edit_lm_{task_id}")
+    with _col2:
+        _tt_idx = _ds_tinh_trang.index(_tt_cur) if _tt_cur in _ds_tinh_trang else 0
+        _tt_new = st.selectbox("🛠️ Tình Trạng", _ds_tinh_trang, index=_tt_idx, key=f"edit_tt_{task_id}")
+
+    _col3, _col4 = st.columns(2)
+    with _col3:
+        _cs_new = st.text_input("⚡ Công Suất", value=_cs_cur, key=f"edit_cs_{task_id}")
+    with _col4:
+        _sc_new = st.text_input("🔩 Số Cực", value=_sc_cur, key=f"edit_sc_{task_id}")
+
+    _col5, _col6 = st.columns(2)
+    with _col5:
+        _ms_new = st.text_input("🏷️ Mã Số", value=_ms_cur, key=f"edit_ms_{task_id}")
+    with _col6:
+        _po_new = st.text_input("📄 Số PO Nội Bộ", value=_po_cur, key=f"edit_po_{task_id}")
+
+    _col7, _col8 = st.columns(2)
+    with _col7:
+        _pkh_new = st.text_input("📋 Số PO KH/HĐ", value=_pkh_cur, key=f"edit_pkh_{task_id}")
+    with _col8:
+        _bg_new = st.text_input("💰 Số Báo Giá", value=_bg_cur, key=f"edit_bg_{task_id}")
+
+    _thay_doi = {
+        k: v for k, v in {
+            "Loại Máy":    _lm_new,
+            "Tình Trạng":  _tt_new,
+            "Công Suất":   _cs_new,
+            "Số Cực":      _sc_new,
+            "Mã Số":       _ms_new,
+            "Số PO Nội Bộ":_po_new,
+            "Số PO KH/HĐ": _pkh_new,
+            "Số Báo Giá":  _bg_new,
+        }.items()
+        if v != hang.get(k, "") and not (v == "" and not hang.get(k, ""))
     }
-    _co_du_lieu = {k: v for k, v in _thong_so.items() if v and str(v).strip()}
-    if _co_du_lieu:
-        st.markdown("---")
-        _ts_html = "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin:4px 0;'>"
-        for _label, _val in _co_du_lieu.items():
-            _ts_html += (
-                f"<div style='min-width:0;'>"
-                f"<div style='font-size:0.75rem;color:#6b7280;font-weight:600;margin-bottom:2px;'>{_label}</div>"
-                f"<div style='font-size:0.92rem;color:#09ab3b;font-weight:700;word-break:break-word;font-family:monospace;'>{_val}</div>"
-                f"</div>"
-            )
-        _ts_html += "</div>"
-        st.markdown(_ts_html, unsafe_allow_html=True)
+    if _thay_doi:
+        if st.button("💾 Lưu thông số", key=f"save_ts_{task_id}", type="primary", use_container_width=True):
+            with st.spinner("Đang lưu..."):
+                cap_nhat_nhieu_truong_task(task_id, _thay_doi)
+            st.success("✅ Đã lưu!")
 
     if hang.get("Mô Tả"):
         with st.expander("📝 Xem mô tả chi tiết"):
@@ -2443,6 +2518,11 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         st.session_state[_cl_key][idx]["done"] = val
         cap_nhat_checklist(task_id, st.session_state[_cl_key])
 
+    def _cb_cl_text(idx):
+        val = st.session_state.get(f"dlg_cl_txt_{task_id}_{idx}", "")
+        st.session_state[_cl_key][idx]["text"] = val
+        cap_nhat_checklist(task_id, st.session_state[_cl_key])
+
     for _ci, _cit in enumerate(_checklist):
         if isinstance(_cit, str):
             _cit = {"text": _cit, "done": False}
@@ -2456,7 +2536,12 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                         label_visibility="collapsed",
                         on_change=_cb_cl_done, args=(_ci,))
         with col_txt:
-            st.markdown(f"<p>{_txt0}</p>", unsafe_allow_html=True)
+            st.text_input(
+                "", value=_txt0,
+                key=f"dlg_cl_txt_{task_id}_{_ci}",
+                label_visibility="collapsed",
+                on_change=_cb_cl_text, args=(_ci,),
+            )
 
     st.divider()
 
@@ -2646,26 +2731,24 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                 else:
                     st.warning("Chưa chọn file!")
 
-    # ── Thêm công việc con từ danh sách ──────────────────────
-    _ds_cd_all = ["-- Chọn công đoạn --"] + lay_ten_cac_cong_doan()
+    # ── Thêm công việc con — nhập tay tên công đoạn ──────────
     _cv_add_v  = f"dlg_cv_add_v_{task_id}"
     if _cv_add_v not in st.session_state: st.session_state[_cv_add_v] = 0
     _v = st.session_state[_cv_add_v]
 
     col_cd, col_nv_add, col_btn_add = st.columns([3, 3, 1], vertical_alignment="bottom")
     with col_cd:
-        st.selectbox("Công đoạn", options=_ds_cd_all,
-                     key=f"dlg_cv_new_cd_{task_id}_{_v}",
-                     label_visibility="visible")
+        st.text_input("Công đoạn", placeholder="Nhập tên công đoạn...",
+                      key=f"dlg_cv_new_cd_{task_id}_{_v}")
     with col_nv_add:
         st.selectbox("Nhân viên", options=_ds_nv_cv,
                      key=f"dlg_cv_new_nv_{task_id}_{_v}",
                      label_visibility="visible")
     with col_btn_add:
         def _cb_cv_add():
-            cd_v  = st.session_state.get(f"dlg_cv_new_cd_{task_id}_{_v}", "-- Chọn công đoạn --")
+            cd_v  = st.session_state.get(f"dlg_cv_new_cd_{task_id}_{_v}", "").strip()
             nv_v  = st.session_state.get(f"dlg_cv_new_nv_{task_id}_{_v}", "-- Không chọn --")
-            if cd_v and cd_v != "-- Chọn công đoạn --":
+            if cd_v:
                 nv_moi = "" if nv_v == "-- Không chọn --" else nv_v
                 st.session_state[_cv_key].append({
                     "ten":       cd_v,
@@ -3453,9 +3536,27 @@ def _task_dialog(hang_dict, ds_tt):
         f"{tt}</div>",
         unsafe_allow_html=True,
     )
-    st.markdown(f"#### {ten}")
-    if cty:
-        st.caption(f"🏢 {cty}")
+    # ── Tên công việc có thể chỉnh sửa ──────────────────────────
+    _ten_new = st.text_input(
+        "📌 Tên công việc",
+        value=ten,
+        key=f"dlg_ten_{tid}",
+        label_visibility="collapsed",
+    )
+    if _ten_new and _ten_new != ten:
+        cap_nhat_nhieu_truong_task(int(tid), {"Tên Công Việc": _ten_new})
+    # ── Công ty có thể chỉnh sửa ─────────────────────────────────
+    _ds_cty = [""] + lay_ten_cac_cong_ty()
+    _cty_idx = _ds_cty.index(cty) if cty in _ds_cty else 0
+    _cty_new = st.selectbox(
+        "🏢 Công ty",
+        _ds_cty,
+        index=_cty_idx,
+        key=f"dlg_cty_{tid}",
+        label_visibility="collapsed",
+    )
+    if _cty_new != cty:
+        cap_nhat_nhieu_truong_task(int(tid), {"Công Ty": _cty_new})
     st.divider()
     _fragment_chi_tiet_task(hang_dict, ds_tt)
 
