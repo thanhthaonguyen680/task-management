@@ -4570,7 +4570,7 @@ def giao_dien_admin():
                     _match_cvc = df_show_cvc[df_show_cvc["_task_id"].astype(str) == _sel_id_cvc]
                     if not _match_cvc.empty:
                         _ds_tt_dlg_cvc = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-                        _task_dialog(_match_cvc.iloc[0]["_task_dict"], _ds_tt_dlg_cvc)
+                        st.session_state["_pending_dlg"] = (_match_cvc.iloc[0]["_task_dict"], _ds_tt_dlg_cvc)
 
                 # ── Xuất Excel ──
                 import io
@@ -4860,7 +4860,7 @@ def giao_dien_admin():
                     _match_tdm = df_show_tdm[df_show_tdm["_task_id"].astype(str) == _sel_id_tdm]
                     if not _match_tdm.empty:
                         _ds_tt_dlg_tdm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-                        _task_dialog(_match_tdm.iloc[0]["_task_dict"], _ds_tt_dlg_tdm)
+                        st.session_state["_pending_dlg"] = (_match_tdm.iloc[0]["_task_dict"], _ds_tt_dlg_tdm)
 
                 # ── Xuất Excel ──
                 import io
@@ -4906,6 +4906,11 @@ def giao_dien_admin():
                     key="tdm_xuat_excel",
                     use_container_width=False,
                 )
+
+    # ── Gọi dialog 1 lần duy nhất cuối render để tránh DuplicateElementId ──
+    _pdlg = st.session_state.pop("_pending_dlg", None)
+    if _pdlg:
+        _task_dialog(_pdlg[0], _pdlg[1])
 
 
 def giao_dien_nhan_vien():
