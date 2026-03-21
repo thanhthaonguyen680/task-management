@@ -4811,10 +4811,10 @@ def giao_dien_nhan_vien():
         st.session_state["_last_nv_load"] = ten_nhan_vien
 
     # ---- Tabs ----
-    tab_cong_viec, tab_phe_duyet, tab_tao_task = st.tabs([
+    tab_cong_viec, tab_tao_task, tab_phe_duyet = st.tabs([
         "🗂️ Bảng Quản Lý Công Việc",
-        "✅ Việc Cần Phê Duyệt",
-        "➕ Tạo Công Việc Mới"
+        "➕ Tạo Công Việc Mới",
+        "✅ Việc Cần Phê Duyệt"
     ])
 
     # ========================================================
