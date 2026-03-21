@@ -4109,9 +4109,9 @@ def giao_dien_admin():
                             so_po_kh=adm_so_po_kh.strip(),
                             so_bao_gia=adm_so_bao_gia.strip(),
                         )
-                    st.session_state[f"{_ADM_PREFIX}_checklist"]    = []
-                    st.session_state[f"{_ADM_PREFIX}_cong_viec_con"] = []
-                    st.session_state[f"{_ADM_PREFIX}_cv_seeded"]     = False
+                    st.session_state.pop(f"{_ADM_PREFIX}_checklist", None)
+                    st.session_state.pop(f"{_ADM_PREFIX}_cong_viec_con", None)
+                    st.session_state.pop(f"{_ADM_PREFIX}_cv_seeded", None)
                     for _k in ["adm_ten_task", "adm_mo_ta", "adm_cong_suat", "adm_so_cuc",
                                "adm_ma_so", "adm_so_po_noi_bo", "adm_so_po_kh", "adm_so_bao_gia"]:
                         st.session_state.pop(_k, None)
@@ -5039,8 +5039,9 @@ def giao_dien_nhan_vien():
                             so_po_kh        = nv_so_po_kh.strip(),
                             so_bao_gia      = nv_so_bao_gia.strip(),
                         )
-                    st.session_state[_cl_key] = []
-                    st.session_state[_cv_key] = []
+                    st.session_state.pop(_cl_key, None)
+                    st.session_state.pop(_cv_key, None)
+                    st.session_state.pop(f"{_nv_prefix}_cv_seeded", None)
                     # Xoá form fields
                     for _k in [f"{_nv_prefix}_ten", f"{_nv_prefix}_mo_ta"]:
                         st.session_state.pop(_k, None)
