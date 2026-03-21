@@ -3397,6 +3397,21 @@ def _save_cv_to_sheet(task_id, cv_key):
 # ============================================================
 # KANBAN BOARD HELPER
 # ============================================================
+def xoa_cong_viec(task_id) -> bool:
+    """Xóa công việc khỏi Google Sheets theo ID. Trả về True nếu thành công."""
+    try:
+        sheet = lay_sheet()
+        o_tim = sheet.find(str(task_id), in_column=1)
+        if o_tim:
+            sheet.delete_rows(o_tim.row)
+            lay_danh_sach_cong_viec.clear()
+            return True
+        return False
+    except Exception as _e:
+        print(f"[xoa_cong_viec ERROR] {_e}")
+        return False
+
+
 @st.dialog("📋 Chi tiết & Chỉnh sửa công việc", width="large")
 def _task_dialog(hang_dict, ds_tt):
     """Dialog to hiển thị chi tiết và chỉnh sửa task."""
@@ -3404,19 +3419,47 @@ def _task_dialog(hang_dict, ds_tt):
     ten  = hang_dict.get("Tên Công Việc", "")
     cty  = hang_dict.get("Công Ty", "")
     tt   = hang_dict.get("Trạng Thái", "")
-    mau  = _STATUS_BG.get(tt, "#607d8b")
-    mau_fg = "#1a1a1a" if mau in ("#f9c74f", "#ffd166") else "#ffffff"
     dlg_txt, dlg_bg = _STATUS_HEADER_COLOR.get(tt, ("#37474f", "#eceff1"))
-    st.markdown(
-        f"<div style='background:{dlg_bg};color:{dlg_txt};border-radius:7px;"
-        f"padding:6px 14px;font-weight:800;font-size:0.85rem;margin-bottom:10px;"
-        f"border:1.5px solid {dlg_txt}44;display:inline-block;'>"
-        f"{tt}</div>",
-        unsafe_allow_html=True,
-    )
+
+    _confirm_key = f"_xoa_confirm_{tid}"
+
+    # ── Header: badge trạng thái + nút Xóa ──
+    col_badge, col_del = st.columns([5, 1])
+    with col_badge:
+        st.markdown(
+            f"<div style='background:{dlg_bg};color:{dlg_txt};border-radius:7px;"
+            f"padding:6px 14px;font-weight:800;font-size:0.85rem;margin-bottom:10px;"
+            f"border:1.5px solid {dlg_txt}44;display:inline-block;'>"
+            f"{tt}</div>",
+            unsafe_allow_html=True,
+        )
+    with col_del:
+        if st.button("🗑️ Xóa", key=f"btn_xoa_{tid}", help="Xóa công việc này"):
+            st.session_state[_confirm_key] = True
+
     st.markdown(f"#### {ten}")
     if cty:
         st.caption(f"🏢 {cty}")
+
+    # ── Xác nhận xóa ──
+    if st.session_state.get(_confirm_key):
+        st.divider()
+        st.warning(f"⚠️ Bạn có muốn xoá công việc **{ten}** này không? Hành động này không thể hoàn tác.")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅ OK — Xoá", key=f"ok_xoa_{tid}", type="primary", use_container_width=True):
+                ok = xoa_cong_viec(tid)
+                st.session_state.pop(_confirm_key, None)
+                if ok:
+                    st.rerun()
+                else:
+                    st.error("❌ Không tìm thấy công việc để xóa.")
+        with c2:
+            if st.button("❌ Đóng", key=f"cancel_xoa_{tid}", use_container_width=True):
+                st.session_state.pop(_confirm_key, None)
+                st.rerun()
+        return  # Không hiện phần còn lại khi đang xác nhận
+
     st.divider()
     _fragment_chi_tiet_task(hang_dict, ds_tt)
 
