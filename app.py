@@ -1095,15 +1095,23 @@ def _fetch_tasks_cached() -> pd.DataFrame:
 def lay_danh_sach_cong_viec() -> pd.DataFrame:
     """
     Lấy toàn bộ danh sách công việc từ sheet 'Tasks'.
-    Wrapper không cache: nếu API lỗi trả về empty mà không lưu vào cache,
-    để lần gọi tiếp theo tự thử lại ngay.
+    Wrapper không cache: nếu API lỗi, tự clear connection cũ và retry 1 lần
+    với kết nối mới trước khi trả về empty.
     """
     try:
         return _fetch_tasks_cached()
     except Exception as _e:
         import traceback
-        print(f"[lay_danh_sach_cong_viec ERROR] {_e}\n{traceback.format_exc()}")
-        return pd.DataFrame(columns=_TASK_HEADERS[:11])
+        print(f"[lay_danh_sach_cong_viec lần 1 lỗi] {_e}")
+        # Connection cũ bị stale — clear và retry với kết nối mới
+        try:
+            lay_sheet.clear()
+            _lay_bang_tinh.clear()
+            _fetch_tasks_cached.clear()
+            return _fetch_tasks_cached()
+        except Exception as _e2:
+            print(f"[lay_danh_sach_cong_viec lần 2 lỗi] {_e2}\n{traceback.format_exc()}")
+            return pd.DataFrame(columns=_TASK_HEADERS[:11])
 
 
 # Cho phép gọi lay_danh_sach_cong_viec.clear() như trước
@@ -3554,6 +3562,20 @@ def giao_dien_admin():
         ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "🗂️  Bảng Quản Lý", "📋  Công Việc Con", "🔩  Theo Dõi Tiến Độ Máy"]
     )
 
+    # CSS chung cho cả bảng CVC và TDM (AgGrid)
+    _aggrid_css = {
+        ".ag-header": {"background": "linear-gradient(135deg,#f59e0b 0%,#d97706 100%) !important"},
+        ".ag-header-cell-text": {"color": "white !important", "font-weight": "700 !important",
+                                 "font-size": "0.8rem !important", "text-transform": "uppercase !important"},
+        ".ag-header-icon": {"color": "white !important"},
+        ".ag-header-cell-resize::after": {"background-color": "rgba(255,255,255,0.25) !important"},
+        ".ag-row-even": {"background-color": "#fffbeb !important"},
+        ".ag-row-odd": {"background-color": "#ffffff !important"},
+        ".ag-row-hover": {"background-color": "#fef3c7 !important"},
+        ".ag-row-selected": {"background-color": "#fde68a !important"},
+        ".ag-cell": {"font-size": "0.86rem !important", "color": "#374151 !important"},
+    }
+
     # ── Helper: render section quản lý 1 field đơn ───────────────────────────
     def _section_don_gian(
         ten_section: str,
@@ -4340,19 +4362,6 @@ def giao_dien_admin():
                 # ── Bảng AgGrid (click hàng để xem chi tiết) ──
                 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
                 from st_aggrid.shared import JsCode
-
-                _aggrid_css = {
-                    ".ag-header": {"background": "linear-gradient(135deg,#f59e0b 0%,#d97706 100%) !important"},
-                    ".ag-header-cell-text": {"color": "white !important", "font-weight": "700 !important",
-                                             "font-size": "0.8rem !important", "text-transform": "uppercase !important"},
-                    ".ag-header-icon": {"color": "white !important"},
-                    ".ag-header-cell-resize::after": {"background-color": "rgba(255,255,255,0.25) !important"},
-                    ".ag-row-even": {"background-color": "#fffbeb !important"},
-                    ".ag-row-odd": {"background-color": "#ffffff !important"},
-                    ".ag-row-hover": {"background-color": "#fef3c7 !important"},
-                    ".ag-row-selected": {"background-color": "#fde68a !important"},
-                    ".ag-cell": {"font-size": "0.86rem !important", "color": "#374151 !important"},
-                }
 
                 cols_show = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
                              "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
