@@ -1051,67 +1051,63 @@ def them_nguoi_cong_doan(ho_ten: str, cong_doan: str) -> int:
     return result
 
 
-@st.cache_data(ttl=60)
-def lay_danh_sach_cong_viec() -> pd.DataFrame:
-    """
-    Lấy toàn bộ danh sách công việc từ sheet 'Tasks'.
+_TASK_HEADERS = [
+    "ID", "Công Ty", "Công Số", "Năm", "Tên Công Việc", "Mô Tả",
+    "Nhân Viên", "Trạng Thái", "Ngày Tạo", "Hạn Hoàn Thành",
+    "Link Ảnh", "Người Phê Duyệt", "Checklist", "Công Việc Con", "Công Đoạn",
+    "Loại Máy", "Tình Trạng",
+    "Công Suất", "Số Cực", "Mã Số", "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá",
+    "Ngày Kết Thúc", "Ảnh Đo Lường"
+]
 
-    Cấu trúc cột Google Sheets:
-    A:ID | B:Công Ty | C:Công Số | D:Năm | E:Tên Công Việc | F:Mô Tả
-    G:Nhân Viên | H:Trạng Thái | I:Ngày Tạo | J:Hạn Hoàn Thành | K:Link Ảnh | L:Xem Ảnh
-    """
-    # 23 cột A→W (chỉ lấy đúng số cột này — tránh lỗi duplicate header từ cột trống)
-    _HEADERS = [
-        "ID", "Công Ty", "Công Số", "Năm", "Tên Công Việc", "Mô Tả",
-        "Nhân Viên", "Trạng Thái", "Ngày Tạo", "Hạn Hoàn Thành",
-        "Link Ảnh", "Người Phê Duyệt", "Checklist", "Công Việc Con", "Công Đoạn",
-        "Loại Máy", "Tình Trạng",
-        "Công Suất", "Số Cực", "Mã Số", "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá",
-        "Ngày Kết Thúc", "Ảnh Đo Lường"
-    ]
-    _N = len(_HEADERS)
-    _COT_TRONG = _HEADERS[:11]  # các cột hiển thị chính
-    try:
-        sheet   = lay_sheet()
-        allvals = sheet.get_all_values()
-    except (ConnectionError, OSError, Exception) as _e:
-        import traceback
-        print(f"[lay_danh_sach_cong_viec ERROR] {_e}\n{traceback.format_exc()}")
-        return pd.DataFrame(columns=_COT_TRONG)
+
+@st.cache_data(ttl=60)
+def _fetch_tasks_cached() -> pd.DataFrame:
+    """Fetch raw tasks from Google Sheets — raises on error (not cached on failure)."""
+    _N = len(_TASK_HEADERS)
+    sheet   = lay_sheet()           # raises on failure → not cached
+    allvals = sheet.get_all_values()  # raises on failure → not cached
     if len(allvals) <= 1:
-        return pd.DataFrame(columns=_COT_TRONG)
-    # Dùng tên cột cố định (không đọc từ row 1) — tránh lỗi duplicate
+        return pd.DataFrame(columns=_TASK_HEADERS)
     rows = [r[:_N] for r in allvals[1:] if any(r[:_N])]
-    # Pad các hàng ngắn hơn _N cột (task cũ tạo trước khi thêm cột mới)
     rows_padded = [r + [""] * (_N - len(r)) for r in rows]
     try:
-        df = pd.DataFrame(rows_padded, columns=_HEADERS) if rows_padded else pd.DataFrame(columns=_HEADERS)
+        df = pd.DataFrame(rows_padded, columns=_TASK_HEADERS) if rows_padded else pd.DataFrame(columns=_TASK_HEADERS)
     except Exception:
-        # Fallback: tạo từng hàng an toàn
-        df = pd.DataFrame([dict(zip(_HEADERS, r)) for r in rows_padded]) if rows_padded else pd.DataFrame(columns=_HEADERS)
-    # Tương thích ngược: map các cột tiếng Anh cũ nếu cần
+        df = pd.DataFrame([dict(zip(_TASK_HEADERS, r)) for r in rows_padded]) if rows_padded else pd.DataFrame(columns=_TASK_HEADERS)
     df.rename(columns={
-        "Cong_Ty":      "Công Ty",
-        "Cong_So":      "Công Số",
-        "Nam":          "Năm",
-        "Task_Name":    "Tên Công Việc",
-        "Description":  "Mô Tả",
-        "Assigned_To":  "Nhân Viên",
-        "Status":       "Trạng Thái",
-        "Created_Date": "Ngày Tạo",
-        "Deadline":     "Hạn Hoàn Thành",
-        "Image_URL":    "Link Ảnh",
+        "Cong_Ty": "Công Ty", "Cong_So": "Công Số", "Nam": "Năm",
+        "Task_Name": "Tên Công Việc", "Description": "Mô Tả",
+        "Assigned_To": "Nhân Viên", "Status": "Trạng Thái",
+        "Created_Date": "Ngày Tạo", "Deadline": "Hạn Hoàn Thành",
+        "Image_URL": "Link Ảnh",
     }, inplace=True)
     if "Trạng Thái" in df.columns:
         df["Trạng Thái"] = df["Trạng Thái"].replace({
-            "Todo":  "Chờ Làm",
-            "Doing": "Đang Làm",
-            "Done":  "Hoàn Thành",
+            "Todo": "Chờ Làm", "Doing": "Đang Làm", "Done": "Hoàn Thành",
         })
     for col in ["Công Ty", "Công Số", "Năm", "Người Phê Duyệt", "Checklist", "Công Việc Con"]:
         if col not in df.columns:
             df[col] = ""
     return df
+
+
+def lay_danh_sach_cong_viec() -> pd.DataFrame:
+    """
+    Lấy toàn bộ danh sách công việc từ sheet 'Tasks'.
+    Wrapper không cache: nếu API lỗi trả về empty mà không lưu vào cache,
+    để lần gọi tiếp theo tự thử lại ngay.
+    """
+    try:
+        return _fetch_tasks_cached()
+    except Exception as _e:
+        import traceback
+        print(f"[lay_danh_sach_cong_viec ERROR] {_e}\n{traceback.format_exc()}")
+        return pd.DataFrame(columns=_TASK_HEADERS[:11])
+
+
+# Cho phép gọi lay_danh_sach_cong_viec.clear() như trước
+lay_danh_sach_cong_viec.clear = _fetch_tasks_cached.clear
 
 
 def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: str,
