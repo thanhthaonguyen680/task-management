@@ -1068,8 +1068,10 @@ def _fetch_tasks_cached() -> pd.DataFrame:
     sheet   = lay_sheet()           # raises on failure → not cached
     allvals = sheet.get_all_values()  # raises on failure → not cached
     if len(allvals) <= 1:
-        return pd.DataFrame(columns=_TASK_HEADERS)
+        raise RuntimeError("Tasks sheet returned no data — possible stale connection")
     rows = [r[:_N] for r in allvals[1:] if any(r[:_N])]
+    if not rows:
+        raise RuntimeError("Tasks sheet has header but no data rows — possible stale connection")
     rows_padded = [r + [""] * (_N - len(r)) for r in rows]
     try:
         df = pd.DataFrame(rows_padded, columns=_TASK_HEADERS) if rows_padded else pd.DataFrame(columns=_TASK_HEADERS)
