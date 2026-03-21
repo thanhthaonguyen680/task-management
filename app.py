@@ -826,13 +826,21 @@ def them_thong_bao(nguoi_nhan: str, noi_dung: str, task_id: int = 0, loai: str =
 
 
 def them_thong_bao_tat_ca(noi_dung: str, task_id: int = 0, loai: str = "general", tru_nguoi: str = ""):
-    """Gửi thông báo cho tất cả nhân viên trong hệ thống (trừ người tạo nếu có)."""
+    """Gửi thông báo cho tất cả nhân viên trong hệ thống (trừ người tạo nếu có).
+    Dùng append_rows() để ghi một lần thay vì N lần riêng lẻ.
+    """
     try:
         df_users = lay_danh_sach_users()
-        for _, row in df_users.iterrows():
+        sheet = _lay_sheet_don_gian(_TB_SHEET, _TB_HEADERS)
+        id_bat_dau = len(sheet.col_values(1))  # 1 API call để lấy offset ID
+        thoi_gian = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        hang_moi = []
+        for i, (_, row) in enumerate(df_users.iterrows()):
             ten = str(row.get("HoTen", "")).strip()
             if ten and ten != tru_nguoi:
-                them_thong_bao(ten, noi_dung, task_id, loai)
+                hang_moi.append([id_bat_dau + len(hang_moi), ten, noi_dung, str(task_id), loai, thoi_gian, "0"])
+        if hang_moi:
+            sheet.append_rows(hang_moi, value_input_option="RAW")
     except Exception:
         pass
 
@@ -1139,10 +1147,12 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
     U:So_PO_Noi_Bo | V:So_PO_KH | W:So_Bao_Gia
     """
     sheet = _lay_sheet_fresh()  # Luôn dùng connection mới cho thao tác ghi
-    # ID = max ID hiện tại + 1 (tránh trùng khi dữ liệu có hàng trống hoặc xoá)
-    _ids_hien_co = sheet.col_values(1)[1:]  # bỏ header
+    # Đọc col A 1 lần duy nhất — dùng để tính cả ID mới lẫn vị trí hàng mới
+    _col_a = sheet.col_values(1)          # 1 API call thay vì 2
+    _ids_hien_co = _col_a[1:]            # bỏ header
     _so_ids = [int(x) for x in _ids_hien_co if str(x).strip().isdigit()]
     id_moi   = (max(_so_ids) + 1) if _so_ids else 1
+    _dong_moi = len(_col_a) + 1          # row tiếp theo
     ngay_tao = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     hang_moi = [
@@ -1173,9 +1183,6 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
         "{}",                                                 # Y: Ảnh Đo Lường (JSON)
     ]
 
-    # Tự tính row tiếp theo
-    _so_hang_hien_co = len(sheet.col_values(1))
-    _dong_moi = _so_hang_hien_co + 1
     sheet.update(f"A{_dong_moi}:Y{_dong_moi}", [hang_moi])
     # Chỉ clear data cache — KHÔNG clear lay_sheet/_lay_bang_tinh để tránh
     # force reconnect làm chậm hoặc lỗi lần đọc tiếp theo
@@ -1207,7 +1214,7 @@ def cap_nhat_trang_thai(task_id: int, trang_thai_moi: str):
     """
     Cập nhật trạng thái (Status) của công việc theo ID.
     """
-    sheet = lay_sheet()
+    sheet = _lay_sheet_fresh()
     o_tim = sheet.find(str(task_id), in_column=1)
     if o_tim:
         sheet.update_cell(o_tim.row, 8, trang_thai_moi)
@@ -1218,7 +1225,7 @@ def cap_nhat_ngay_ket_thuc(task_id: int, ngay_ket_thuc: str):
     """
     Cập nhật Ngày Kết Thúc (cột X, cột 24) của công việc theo ID.
     """
-    sheet = lay_sheet()
+    sheet = _lay_sheet_fresh()
     o_tim = sheet.find(str(task_id), in_column=1)
     if o_tim:
         sheet.update_cell(o_tim.row, 24, ngay_ket_thuc)
@@ -1229,7 +1236,7 @@ def cap_nhat_han_hoan_thanh(task_id: int, han: str):
     """
     Cập nhật Hạn Hoàn Thành (cột J, cột 10) của công việc theo ID.
     """
-    sheet = lay_sheet()
+    sheet = _lay_sheet_fresh()
     o_tim = sheet.find(str(task_id), in_column=1)
     if o_tim:
         sheet.update_cell(o_tim.row, 10, han)
@@ -1248,7 +1255,7 @@ def doc_anh_do_luong(gia_tri: str) -> dict:
 
 def cap_nhat_anh_do_luong(task_id: int, anh_dict: dict):
     """Ghi toàn bộ dict ảnh đo lường (cột Y = col 25) lên Google Sheets."""
-    sheet = lay_sheet()
+    sheet = _lay_sheet_fresh()
     o_tim = sheet.find(str(task_id), in_column=1)
     if o_tim:
         sheet.update_cell(o_tim.row, 25, json.dumps(anh_dict, ensure_ascii=False))
@@ -1281,7 +1288,7 @@ def cap_nhat_url_anh(task_id: int, url_anh: str):
         task_id: ID công việc cần cập nhật
         url_anh: URL ảnh mới trên Cloudinary
     """
-    sheet = lay_sheet()
+    sheet = _lay_sheet_fresh()
     o_tim = sheet.find(str(task_id), in_column=1)
     if o_tim:
         so_hang = o_tim.row
@@ -1305,7 +1312,7 @@ def xoa_url_anh(task_id: int, url_xoa: str):
     """
     Xoá một URL ảnh khỏi danh sách ảnh của task.
     """
-    sheet = lay_sheet()
+    sheet = _lay_sheet_fresh()
     o_tim = sheet.find(str(task_id), in_column=1)
     if o_tim:
         so_hang = o_tim.row
@@ -1326,7 +1333,7 @@ def xoa_url_anh(task_id: int, url_xoa: str):
 
 def cap_nhat_checklist(task_id: int, checklist: list):
     """Lưu danh sách checklist (JSON) vào cột M của task."""
-    sheet = lay_sheet()
+    sheet = _lay_sheet_fresh()
     o_tim = sheet.find(str(task_id), in_column=1)
     if o_tim:
         sheet.update_cell(o_tim.row, 13, json.dumps(checklist, ensure_ascii=False))
@@ -3394,7 +3401,7 @@ def _parse_date_display(val: str):
 def _save_cv_to_sheet(task_id, cv_key):
     data = st.session_state.get(cv_key, [])
     try:
-        _sh = lay_sheet()
+        _sh = _lay_sheet_fresh()
         _o  = _sh.find(str(task_id), in_column=1)
         if _o:
             _sh.update_cell(_o.row, 14, json.dumps(data, ensure_ascii=False))
