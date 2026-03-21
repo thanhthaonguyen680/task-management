@@ -1993,14 +1993,13 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
 
 
 # ============================================================
-# (Excel biên bản đã bỏ — dùng PDF bên trên)
+# TẠO EXCEL BIÊN BẢN NGHIỆM THU
 # ============================================================
-def tao_excel_nghiem_thu_UNUSED(thong_tin_task: dict) -> bytes:
+def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     """Tạo file Excel biên bản nghiệm thu theo mẫu Điện Cơ Ngọc Trâm."""
     import io
     from openpyxl import Workbook
-    from openpyxl.styles import (Font, PatternFill, Alignment, Border, Side,
-                                 GradientFill)
+    from openpyxl.styles import (Font, PatternFill, Alignment, Border, Side)
     from openpyxl.utils import get_column_letter
 
     # ── Parse dữ liệu ──────────────────────────────────────────
@@ -2060,10 +2059,10 @@ def tao_excel_nghiem_thu_UNUSED(thong_tin_task: dict) -> bytes:
     ws.title = "Biên Bản Nghiệm Thu"
 
     # Độ rộng cột (A=STT, B=Hạng mục, C=Ngày, D=Thông qua)
-    ws.column_dimensions["A"].width = 6
-    ws.column_dimensions["B"].width = 52
-    ws.column_dimensions["C"].width = 18
-    ws.column_dimensions["D"].width = 18
+    ws.column_dimensions["A"].width = 8
+    ws.column_dimensions["B"].width = 50
+    ws.column_dimensions["C"].width = 20
+    ws.column_dimensions["D"].width = 20
 
     row = 1
 
@@ -2170,6 +2169,7 @@ def tao_excel_nghiem_thu_UNUSED(thong_tin_task: dict) -> bytes:
     row += 1
 
     # ── Footer thông tin tài liệu ────────────────────────────────
+    # Merge A:B cho label, C:D cho value để label không bị vỡ chữ
     footer_data = [
         ("Số Đặt Hàng / Order number", cong_so),
         ("Nhân viên / Technician",     nhan_vien),
@@ -2177,12 +2177,18 @@ def tao_excel_nghiem_thu_UNUSED(thong_tin_task: dict) -> bytes:
         ("Ngày ban hành / Edition date", "24/04/2025"),
     ]
     for lbl, val in footer_data:
-        _set_cell(ws, row, 1, lbl, bold=True, size=9,
-                  fill_color=BLUE_CELL, border=brd_all,
-                  h_align="left")
-        ws.merge_cells(f"B{row}:D{row}")
-        _set_cell(ws, row, 2, val, size=9, border=brd_all, h_align="left")
-        ws.row_dimensions[row].height = 16
+        ws.merge_cells(f"A{row}:B{row}")
+        c_lbl = ws.cell(row=row, column=1, value=lbl)
+        c_lbl.font      = _font(bold=True, size=9)
+        c_lbl.alignment = _align(h="left")
+        c_lbl.fill      = _fill(BLUE_CELL)
+        c_lbl.border    = brd_all
+        ws.merge_cells(f"C{row}:D{row}")
+        c_val = ws.cell(row=row, column=3, value=val)
+        c_val.font      = _font(size=9)
+        c_val.alignment = _align(h="left")
+        c_val.border    = brd_all
+        ws.row_dimensions[row].height = 18
         row += 1
 
     # ── Xuất bytes ──────────────────────────────────────────────
@@ -2703,20 +2709,37 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     tt_pdf = st.session_state.get(f"tt_select_{task_id}", trang_thai)
     if tt_pdf == "Đã Hoàn Thành - Giao Máy" or "Hoàn Thành" in tt_pdf:
         st.divider()
-        if st.button("📄 Tạo Biên Bản PDF", key=f"pdf_{task_id}", use_container_width=True):
-            with st.spinner("Đang tạo PDF..."):
-                df_moi = lay_danh_sach_cong_viec()
-                rows = df_moi[df_moi["ID"].astype(str) == str(task_id)]
-                if not rows.empty:
-                    du_lieu_pdf = tao_pdf_nghiem_thu(rows.iloc[0].to_dict())
-                    st.download_button(
-                        "💾 Tải Xuống PDF",
-                        data=du_lieu_pdf,
-                        file_name=f"BBNT_task_{task_id}.pdf",
-                        mime="application/pdf",
-                        key=f"dl_pdf_{task_id}",
-                        use_container_width=True,
-                    )
+        col_pdf, col_xl = st.columns(2)
+        with col_pdf:
+            if st.button("📄 Tạo Biên Bản PDF", key=f"pdf_{task_id}", use_container_width=True):
+                with st.spinner("Đang tạo PDF..."):
+                    df_moi = lay_danh_sach_cong_viec()
+                    rows = df_moi[df_moi["ID"].astype(str) == str(task_id)]
+                    if not rows.empty:
+                        du_lieu_pdf = tao_pdf_nghiem_thu(rows.iloc[0].to_dict())
+                        st.download_button(
+                            "💾 Tải Xuống PDF",
+                            data=du_lieu_pdf,
+                            file_name=f"BBNT_task_{task_id}.pdf",
+                            mime="application/pdf",
+                            key=f"dl_pdf_{task_id}",
+                            use_container_width=True,
+                        )
+        with col_xl:
+            if st.button("📊 Tạo Biên Bản Excel", key=f"xl_{task_id}", use_container_width=True):
+                with st.spinner("Đang tạo Excel..."):
+                    df_moi = lay_danh_sach_cong_viec()
+                    rows = df_moi[df_moi["ID"].astype(str) == str(task_id)]
+                    if not rows.empty:
+                        du_lieu_excel = tao_excel_nghiem_thu(rows.iloc[0].to_dict())
+                        st.download_button(
+                            "💾 Tải Xuống Excel",
+                            data=du_lieu_excel,
+                            file_name=f"BBNT_task_{task_id}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"dl_xl_{task_id}",
+                            use_container_width=True,
+                        )
 
 
 # ============================================================
