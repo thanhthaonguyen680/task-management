@@ -2468,9 +2468,20 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                 cap_nhat_nhieu_truong_task(task_id, _thay_doi)
             st.success("✅ Đã lưu!")
 
-    if hang.get("Mô Tả"):
-        with st.expander("📝 Xem mô tả chi tiết"):
-            st.write(hang.get("Mô Tả", ""))
+    # ── Mô Tả (có thể chỉnh sửa / thêm mới) ─────────────────
+    _mo_ta_cur = hang.get("Mô Tả", "") or ""
+    _mo_ta_new = st.text_area(
+        "📝 Mô tả công việc",
+        value=_mo_ta_cur,
+        placeholder="Nhập mô tả công việc...",
+        key=f"edit_mo_ta_{task_id}",
+        height=100,
+    )
+    if _mo_ta_new != _mo_ta_cur:
+        if st.button("💾 Lưu mô tả", key=f"save_mo_ta_{task_id}", use_container_width=True):
+            with st.spinner("Đang lưu..."):
+                cap_nhat_nhieu_truong_task(task_id, {"Mô Tả": _mo_ta_new})
+            st.success("✅ Đã lưu!")
 
     st.divider()
 
@@ -2542,6 +2553,28 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                 label_visibility="collapsed",
                 on_change=_cb_cl_text, args=(_ci,),
             )
+
+    # ── Thêm mục checklist mới ────────────────────────────────
+    _cl_new_key = f"dlg_cl_new_{task_id}"
+    _cl_new_v   = f"dlg_cl_new_v_{task_id}"
+    if _cl_new_v not in st.session_state:
+        st.session_state[_cl_new_v] = 0
+
+    col_inp, col_add = st.columns([8, 1], gap="small")
+    with col_inp:
+        st.text_input(
+            "", placeholder="➕ Thêm mục checklist...",
+            key=f"{_cl_new_key}_{st.session_state[_cl_new_v]}",
+            label_visibility="collapsed",
+        )
+    with col_add:
+        def _cb_cl_add():
+            _txt = st.session_state.get(f"{_cl_new_key}_{st.session_state[_cl_new_v]}", "").strip()
+            if _txt:
+                st.session_state[_cl_key].append({"text": _txt, "done": False})
+                cap_nhat_checklist(task_id, st.session_state[_cl_key])
+                st.session_state[_cl_new_v] += 1  # reset input
+        st.button("➕", key=f"dlg_cl_add_btn_{task_id}", on_click=_cb_cl_add, use_container_width=True)
 
     st.divider()
 
