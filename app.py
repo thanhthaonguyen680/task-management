@@ -1993,9 +1993,9 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
 
 
 # ============================================================
-# TẠO EXCEL BIÊN BẢN NGHIỆM THU
+# (Excel biên bản đã bỏ — dùng PDF bên trên)
 # ============================================================
-def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
+def tao_excel_nghiem_thu_UNUSED(thong_tin_task: dict) -> bytes:
     """Tạo file Excel biên bản nghiệm thu theo mẫu Điện Cơ Ngọc Trâm."""
     import io
     from openpyxl import Workbook
@@ -2703,17 +2703,17 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     tt_pdf = st.session_state.get(f"tt_select_{task_id}", trang_thai)
     if tt_pdf == "Đã Hoàn Thành - Giao Máy" or "Hoàn Thành" in tt_pdf:
         st.divider()
-        if st.button("📊 Tạo Biên Bản Excel", key=f"pdf_{task_id}", use_container_width=True):
-            with st.spinner("Đang tạo Excel..."):
+        if st.button("📄 Tạo Biên Bản PDF", key=f"pdf_{task_id}", use_container_width=True):
+            with st.spinner("Đang tạo PDF..."):
                 df_moi = lay_danh_sach_cong_viec()
                 rows = df_moi[df_moi["ID"].astype(str) == str(task_id)]
                 if not rows.empty:
-                    du_lieu_excel = tao_excel_nghiem_thu(rows.iloc[0].to_dict())
+                    du_lieu_pdf = tao_pdf_nghiem_thu(rows.iloc[0].to_dict())
                     st.download_button(
-                        "💾 Tải Xuống Excel",
-                        data=du_lieu_excel,
-                        file_name=f"BBNT_task_{task_id}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "💾 Tải Xuống PDF",
+                        data=du_lieu_pdf,
+                        file_name=f"BBNT_task_{task_id}.pdf",
+                        mime="application/pdf",
                         key=f"dl_pdf_{task_id}",
                         use_container_width=True,
                     )
