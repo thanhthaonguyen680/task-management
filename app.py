@@ -2270,7 +2270,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # ═══════════════════════════════════════════════════════════
 
     IMAGE_PAGES = [
-        ("1/5", 55, [
+        ("1/5", 75, [
             ("Stator 1 coil resistance",
              "Điện trở cuộn dây Stator 1",
              ["U1 – U2", "V1 – V2", "W1 – W2"],
@@ -2280,7 +2280,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
              ["PTC", "PT100", "HEATER"],
              ["PTC", "PT100", "HEATER"]),
         ]),
-        ("2/5", 50, [
+        ("2/5", 68, [
             ("No-load test", "Kiểm tra không tải",
              ["Frequency / Tần số", "Voltage / Điện áp", "Current / Dòng điện"],
              ["Tần số", "Voltage", "Dòng điện"]),
@@ -2291,14 +2291,14 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
              ["Radial ↔ NDE / AS", "Radial ↕ NDE / AS", "Axial (X) NDE / AS"],
              ["Radial ↔ NDE / AS", "Radial ↑ NDE / AS", "Axial (X) NDE / AS"]),
         ]),
-        ("3/5", 55, [
+        ("3/5", 75, [
             ("Engine overview", "Tổng quan động cơ",
              ["Engine / Động cơ", "Nameplate / Bảng tên", "Quạt làm mát / Cooling fan"],
              ["Engine / Động cơ", "Nameplate / Bảng tên", "Quạt làm mát / Cooling fan"]),
             ("Nắp động cơ", "",
              ["DE", "NDE"], ["Nắp DE", "Nắp NDE"]),
         ]),
-        ("4/5", 42, [
+        ("4/5", 58, [
             ("Trục động cơ", "",
              ["Bạc đạn DE", "Bạc đạn NDE"], ["Bạc đạn DE", "Bạc đạn NDE"]),
             ("", "",
@@ -2309,7 +2309,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             ("Bearing / Vòng bi", "",
              ["DE", "NDE"], ["Vòng bi DE", "Vòng bi NDE"]),
         ]),
-        ("5/5", 50, [
+        ("5/5", 68, [
             ("Grease pump", "Bơm mỡ bôi trơn",
              ["Bearing / Vòng bi", "Grease cap / Mặt gam"],
              ["Vòng bi bơm mỡ", "Mặt gam"]),
