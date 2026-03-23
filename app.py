@@ -2135,8 +2135,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "Biên Bản"
-    ws.column_dimensions["A"].width = 6
-    for ci in "BCDEF":
+    for ci in "ABCDEF":
         ws.column_dimensions[ci].width = COL_W
 
     row = 1
