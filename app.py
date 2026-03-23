@@ -2035,11 +2035,16 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
 # TẠO EXCEL BIÊN BẢN NGHIỆM THU
 # ============================================================
 def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
-    """Tạo file Excel biên bản nghiệm thu theo mẫu Điện Cơ Ngọc Trâm."""
+    """Tạo file Excel biên bản nghiệm thu — toàn bộ trên 1 sheet 'Biên Bản'.
+    Phần 1: Header công ty, tiêu đề BBNT, Engine/Customer, Section I-II, footer.
+    Phần 2: Tất cả bảng ảnh đo lường (IMAGE_PAGES 1/5→5/5) từ trên xuống.
+    Dùng 6 cột đều nhau (A-F) xuyên suốt.
+    """
     import io
     from openpyxl import Workbook
     from openpyxl.styles import (Font, PatternFill, Alignment, Border, Side)
     from openpyxl.utils import get_column_letter
+    from openpyxl.drawing.image import Image as XLImage
 
     # ── Parse dữ liệu ──────────────────────────────────────────
     ten_dong_co  = str(thong_tin_task.get("Tên Công Việc", ""))
@@ -2048,6 +2053,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     mo_ta        = str(thong_tin_task.get("Mô Tả", ""))
     nhan_vien    = str(thong_tin_task.get("Nhân Viên", ""))
     ngay_tao_str = str(thong_tin_task.get("Ngày Tạo", ""))
+    anh_do_luong = doc_anh_do_luong(
+        str(thong_tin_task.get("Ảnh Đo Lường", "") or ""))
+
     try:
         dt = datetime.strptime(ngay_tao_str[:10], "%Y-%m-%d")
         ngay_en = dt.strftime("%d %B %Y")
@@ -2061,7 +2069,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # ── Styles ──────────────────────────────────────────────────
     thin  = Side(style="thin",   color="000000")
     thick = Side(style="medium", color="000000")
-    brd_all  = Border(left=thin, right=thin, top=thin, bottom=thin)
+    brd_all   = Border(left=thin, right=thin, top=thin, bottom=thin)
     brd_thick = Border(left=thick, right=thick, top=thick, bottom=thick)
 
     BLUE_HDR  = "4472C4"
@@ -2080,36 +2088,44 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     def _align(h="center", v="center", wrap=True):
         return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
 
-    def _set_cell(ws, row, col, value="", bold=False, size=10, color="000000",
-                  h_align="center", v_align="center", fill_color=None,
-                  border=None, italic=False, wrap=True):
+    def _sc(row, col, value="", bold=False, size=10, color="000000",
+            h_align="center", fill_color=None, border=None, wrap=True):
+        """Set cell shorthand."""
         c = ws.cell(row=row, column=col, value=value)
-        c.font      = _font(bold=bold, size=size, color=color, italic=italic)
-        c.alignment = _align(h=h_align, v=v_align, wrap=wrap)
+        c.font      = _font(bold=bold, size=size, color=color)
+        c.alignment = _align(h=h_align, wrap=wrap)
         if fill_color:
             c.fill  = _fill(fill_color)
         if border:
             c.border = border
         return c
 
-    # ── Tạo workbook ────────────────────────────────────────────
+    # ── Tạo workbook — 1 sheet duy nhất ─────────────────────────
+    # Dùng 6 cột đều nhau (A-F) xuyên suốt:
+    #   A=6 (STT/label hẹp), B-F=25 (nội dung)
+    # Bảng 3 cột ảnh → merge cặp  A:B | C:D | E:F
+    # Bảng 2 cột ảnh → merge bộ 3 A:C | D:F
+    NCOLS = 6
+    COL_W = 25
+    COL_PX = COL_W * 7   # pixels xấp xỉ mỗi cột
+
     wb = Workbook()
     ws = wb.active
-    ws.title = "Biên Bản Nghiệm Thu"
-
-    # Độ rộng cột (A=STT, B=Hạng mục, C=Ngày, D=Thông qua)
-    ws.column_dimensions["A"].width = 8
-    ws.column_dimensions["B"].width = 50
-    ws.column_dimensions["C"].width = 20
-    ws.column_dimensions["D"].width = 20
+    ws.title = "Biên Bản"
+    ws.column_dimensions["A"].width = 6
+    for ci in "BCDEF":
+        ws.column_dimensions[ci].width = COL_W
 
     row = 1
 
+    # ═══════════════════════════════════════════════════════════
+    # PHẦN 1 — BIÊN BẢN NGHIỆM THU
+    # ═══════════════════════════════════════════════════════════
+
     # ── Header công ty ──────────────────────────────────────────
-    ws.merge_cells(f"A{row}:D{row}")
-    _set_cell(ws, row, 1,
-              "CÔNG TY TNHH MỘT THÀNH VIÊN ĐIỆN CƠ NGỌC TRÂM",
-              bold=True, size=13, color=PURPLE)
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1, "CÔNG TY TNHH MỘT THÀNH VIÊN ĐIỆN CƠ NGỌC TRÂM",
+        bold=True, size=13, color=PURPLE)
     ws.row_dimensions[row].height = 20
     row += 1
 
@@ -2118,117 +2134,293 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         "Website: ngoctrammotor.com   Mail: ctyngoctram1811@gmail.com",
         "MST: 3603238978  ĐT: 0907 042 043 (Mr.Hiệp) – 0908 062 291 (Ms.Linh)",
     ]:
-        ws.merge_cells(f"A{row}:D{row}")
-        _set_cell(ws, row, 1, txt, size=9)
+        ws.merge_cells(f"A{row}:F{row}")
+        _sc(row, 1, txt, size=9)
         ws.row_dimensions[row].height = 14
         row += 1
 
     row += 1  # khoảng trống
 
     # ── Tiêu đề BBNT ────────────────────────────────────────────
-    ws.merge_cells(f"A{row}:D{row}")
-    _set_cell(ws, row, 1, "REPAIR ACCEPTANCE CERTIFICATE", bold=True, size=12)
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1, "REPAIR ACCEPTANCE CERTIFICATE", bold=True, size=12)
     ws.row_dimensions[row].height = 18
     row += 1
 
-    ws.merge_cells(f"A{row}:D{row}")
-    c = _set_cell(ws, row, 1, "BIÊN BẢN NGHIỆM THU",
-                  bold=True, size=15, fill_color=BLUE_CELL, border=brd_thick)
+    ws.merge_cells(f"A{row}:F{row}")
+    c = ws.cell(row=row, column=1, value="BIÊN BẢN NGHIỆM THU")
+    c.font      = _font(bold=True, size=15)
+    c.alignment = _align()
+    c.fill      = _fill(BLUE_CELL)
+    c.border    = brd_thick
     ws.row_dimensions[row].height = 22
     row += 1
 
     row += 1  # khoảng trống
 
-    # ── Bảng thông tin Engine / Customer / Address ──────────────
+    # ── Bảng Engine / Customer / Address ────────────────────────
     for en_lbl, vi_lbl, val in [
         ("Engine",   "Động cơ",    ten_dong_co),
         ("Customer", "Khách hàng", khach_hang),
         ("Address",  "Địa chỉ",   ""),
     ]:
-        _set_cell(ws, row, 1, f"{en_lbl} / {vi_lbl}",
-                  bold=True, size=9, fill_color=BLUE_CELL, border=brd_all,
-                  h_align="left")
-        ws.merge_cells(f"B{row}:D{row}")
-        _set_cell(ws, row, 2, val, size=10, border=brd_all, h_align="left")
+        # A:B merged = label (31 chars), C:F merged = value (100 chars)
+        ws.merge_cells(f"A{row}:B{row}")
+        _sc(row, 1, f"{en_lbl} / {vi_lbl}",
+            bold=True, size=9, fill_color=BLUE_CELL, border=brd_all, h_align="left")
+        ws.merge_cells(f"C{row}:F{row}")
+        _sc(row, 3, val, size=10, border=brd_all, h_align="left")
         ws.row_dimensions[row].height = 18
         row += 1
 
     row += 1
 
     # ── Section I ────────────────────────────────────────────────
-    ws.merge_cells(f"A{row}:D{row}")
-    _set_cell(ws, row, 1,
-              "I. Time and place of the test / Thời gian và địa điểm kiểm tra",
-              bold=True, size=10, h_align="left")
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1,
+        "I. Time and place of the test / Thời gian và địa điểm kiểm tra",
+        bold=True, size=10, h_align="left")
     row += 1
 
-    ws.merge_cells(f"A{row}:D{row}")
-    _set_cell(ws, row, 1,
-              f"At 7:30 AM on {ngay_en}, at Ngoc Tram Motor",
-              size=10, h_align="left")
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1, f"At 7:30 AM on {ngay_en}, at Ngoc Tram Motor",
+        size=10, h_align="left")
     row += 1
 
-    ws.merge_cells(f"A{row}:D{row}")
-    _set_cell(ws, row, 1,
-              f"Lúc 7h30 - {ngay_vi}, tại Điện cơ Ngọc Trâm",
-              size=9, h_align="left")
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1, f"Lúc 7h30 - {ngay_vi}, tại Điện cơ Ngọc Trâm",
+        size=9, h_align="left")
     row += 1
     row += 1
 
-    # ── Section II: Header bảng 12 hạng mục ─────────────────────
-    ws.merge_cells(f"A{row}:D{row}")
-    _set_cell(ws, row, 1,
-              "II. Hạng mục sửa chữa / Repair catalog",
-              bold=True, size=10, h_align="left")
+    # ── Section II ───────────────────────────────────────────────
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1, "II. Hạng mục sửa chữa / Repair catalog",
+        bold=True, size=10, h_align="left")
     row += 1
 
-    # Header hàng bảng
-    for col_i, (txt, width) in enumerate([
-        ("STT", 6), ("Repair catalog / Hạng mục sửa chữa", 52),
-        ("Date / Ngày", 18), ("Passed / Thông qua", 18)
-    ], start=1):
-        _set_cell(ws, row, col_i, txt,
-                  bold=True, size=9, color=WHITE,
-                  fill_color=BLUE_HDR, border=brd_all)
+    # Header bảng: A=STT(6) | B:D merged=Repair catalog | E=Date | F=Passed
+    _sc(row, 1, "STT", bold=True, size=9, color=WHITE,
+        fill_color=BLUE_HDR, border=brd_all)
+    ws.merge_cells(f"B{row}:D{row}")
+    _sc(row, 2, "Repair catalog / Hạng mục sửa chữa",
+        bold=True, size=9, color=WHITE, fill_color=BLUE_HDR, border=brd_all)
+    _sc(row, 5, "Date / Ngày", bold=True, size=9, color=WHITE,
+        fill_color=BLUE_HDR, border=brd_all)
+    _sc(row, 6, "Passed / Thông qua", bold=True, size=9, color=WHITE,
+        fill_color=BLUE_HDR, border=brd_all)
     ws.row_dimensions[row].height = 20
     row += 1
 
-    # 12 dòng hạng mục
     for i in range(1, 13):
         noi_dung = hang_muc[i - 1] if (i - 1) < len(hang_muc) else ""
         fill = YELLOW if i % 2 == 0 else WHITE
-        _set_cell(ws, row, 1, f"{i}", size=9, border=brd_all, fill_color=fill)
-        _set_cell(ws, row, 2, noi_dung, size=9, border=brd_all,
-                  h_align="left", fill_color=fill)
-        _set_cell(ws, row, 3, "", size=9, border=brd_all, fill_color=fill)
-        _set_cell(ws, row, 4, "", size=9, border=brd_all, fill_color=fill)
+        _sc(row, 1, f"{i}", size=9, border=brd_all, fill_color=fill)
+        ws.merge_cells(f"B{row}:D{row}")
+        _sc(row, 2, noi_dung, size=9, border=brd_all,
+            h_align="left", fill_color=fill)
+        _sc(row, 5, "", size=9, border=brd_all, fill_color=fill)
+        _sc(row, 6, "", size=9, border=brd_all, fill_color=fill)
         ws.row_dimensions[row].height = 16
         row += 1
 
     row += 1
 
-    # ── Footer thông tin tài liệu ────────────────────────────────
-    # Merge A:B cho label, C:D cho value để label không bị vỡ chữ
-    footer_data = [
-        ("Số Đặt Hàng / Order number", cong_so),
-        ("Nhân viên / Technician",     nhan_vien),
-        ("Tài liệu quản lý",           "QT-NT-029-1A"),
-        ("Ngày ban hành / Edition date", "24/04/2025"),
-    ]
-    for lbl, val in footer_data:
-        ws.merge_cells(f"A{row}:B{row}")
+    # ── Footer ──────────────────────────────────────────────────
+    for lbl, val in [
+        ("Số Đặt Hàng / Order number",   cong_so),
+        ("Nhân viên / Technician",        nhan_vien),
+        ("Tài liệu quản lý",              "QT-NT-029-1A"),
+        ("Ngày ban hành / Edition date",  "24/04/2025"),
+    ]:
+        # A:C merged = label (56 chars), D:F merged = value (75 chars)
+        ws.merge_cells(f"A{row}:C{row}")
         c_lbl = ws.cell(row=row, column=1, value=lbl)
         c_lbl.font      = _font(bold=True, size=9)
         c_lbl.alignment = _align(h="left")
         c_lbl.fill      = _fill(BLUE_CELL)
         c_lbl.border    = brd_all
-        ws.merge_cells(f"C{row}:D{row}")
-        c_val = ws.cell(row=row, column=3, value=val)
+        ws.merge_cells(f"D{row}:F{row}")
+        c_val = ws.cell(row=row, column=4, value=val)
         c_val.font      = _font(size=9)
         c_val.alignment = _align(h="left")
         c_val.border    = brd_all
         ws.row_dimensions[row].height = 18
         row += 1
+
+    # ═══════════════════════════════════════════════════════════
+    # PHẦN 2 — ẢNH ĐO LƯỜNG (IMAGE_PAGES 1/5 → 5/5)
+    # Tiếp tục trên cùng sheet, cuộn xuống từ phần BBNT
+    # ═══════════════════════════════════════════════════════════
+
+    IMAGE_PAGES = [
+        ("1/5", 55, [
+            ("Stator 1 coil resistance",
+             "Điện trở cuộn dây Stator 1",
+             ["U1 – U2", "V1 – V2", "W1 – W2"],
+             ["U1–U2",   "V1–V2",   "W1–W2"]),
+            ("Resistance of the temperature sensor",
+             "Điện trở của cảm biến nhiệt độ",
+             ["PTC", "PT100", "HEATER"],
+             ["PTC", "PT100", "HEATER"]),
+        ]),
+        ("2/5", 50, [
+            ("No-load test", "Kiểm tra không tải",
+             ["Frequency / Tần số", "Voltage / Điện áp", "Current / Dòng điện"],
+             ["Tần số", "Voltage", "Dòng điện"]),
+            ("", "",
+             ["Radial ↔ DE / AS", "Radial ↕ DE / AS", "Axial (X) DE / AS"],
+             ["Radial ↔ DE / AS", "Radial ↑ DE / AS", "Axial (X) DE / AS"]),
+            ("", "",
+             ["Radial ↔ NDE / AS", "Radial ↕ NDE / AS", "Axial (X) NDE / AS"],
+             ["Radial ↔ NDE / AS", "Radial ↑ NDE / AS", "Axial (X) NDE / AS"]),
+        ]),
+        ("3/5", 55, [
+            ("Engine overview", "Tổng quan động cơ",
+             ["Engine / Động cơ", "Nameplate / Bảng tên", "Quạt làm mát / Cooling fan"],
+             ["Engine / Động cơ", "Nameplate / Bảng tên", "Quạt làm mát / Cooling fan"]),
+            ("Nắp động cơ", "",
+             ["DE", "NDE"], ["Nắp DE", "Nắp NDE"]),
+        ]),
+        ("4/5", 42, [
+            ("Trục động cơ", "",
+             ["Bạc đạn DE", "Bạc đạn NDE"], ["Bạc đạn DE", "Bạc đạn NDE"]),
+            ("", "",
+             ["Phớt", "Đầu ren, chốt lavet", "Cánh quạt làm mát"],
+             ["Phớt", "Đầu ren, chốt lavet", "Cánh quạt làm mát"]),
+            ("Phớt chặn", "",
+             ["Phớt 1", "Phớt 2"], ["Phớt chặn 1", "Phớt chặn 2"]),
+            ("Bearing / Vòng bi", "",
+             ["DE", "NDE"], ["Vòng bi DE", "Vòng bi NDE"]),
+        ]),
+        ("5/5", 50, [
+            ("Grease pump", "Bơm mỡ bôi trơn",
+             ["Bearing / Vòng bi", "Grease cap / Mặt gam"],
+             ["Vòng bi bơm mỡ", "Mặt gam"]),
+            ("Coil", "Cuộn dây",
+             ["Vào dây", "Đai đấu"], ["Vào dây", "Đai đầu"]),
+            ("Cân bằng động", "",
+             ["Gá lên máy", "Sau khi cân"], ["Gá lên máy", "Sau khi cân"]),
+        ]),
+    ]
+
+    # ── Tải ảnh vào BytesIO ngay (không giữ file path) ──────────
+    _all_skeys: list = []
+    for _, _, tbls in IMAGE_PAGES:
+        for _, _, _, skeys in tbls:
+            _all_skeys.extend(skeys)
+
+    _img_cache: dict = {}   # key → BytesIO | None
+    for key in _all_skeys:
+        if key not in _img_cache:
+            urls = anh_do_luong.get(key, [])
+            _img_cache[key] = None
+            if urls:
+                tmp = _tai_anh_tam(urls[0])
+                if tmp and os.path.exists(tmp):
+                    try:
+                        with open(tmp, "rb") as _f:
+                            _img_cache[key] = io.BytesIO(_f.read())
+                    except Exception:
+                        pass
+                    try:
+                        os.unlink(tmp)
+                    except Exception:
+                        pass
+
+    def _col_ranges(n: int) -> list:
+        if n == 3:
+            return [(1, 2), (3, 4), (5, 6)]   # A:B | C:D | E:F
+        if n == 2:
+            return [(1, 3), (4, 6)]            # A:C | D:F
+        step = NCOLS // n
+        return [(i * step + 1, (i + 1) * step) for i in range(n)]
+
+    row += 1  # dòng trống ngăn cách BBNT và phần ảnh
+
+    for page_str, img_h_mm, tables in IMAGE_PAGES:
+        # ── Header NT mini (2 hàng) ──────────────────────────────
+        ws.merge_cells(f"A{row}:A{row+1}")
+        _sc(row, 1, "NT", bold=True, size=11, border=brd_all)
+
+        ws.merge_cells(f"B{row}:C{row}")
+        _sc(row, 2, "Quotation / Báo giá:", size=8, border=brd_all)
+        ws.merge_cells(f"D{row}:E{row}")
+        _sc(row, 4, "Engine number / Số máy:", size=8, border=brd_all)
+        _sc(row, 6, f"Order number / Số ĐH: {cong_so}", size=8, border=brd_all)
+
+        ws.merge_cells(f"B{row+1}:C{row+1}")
+        _sc(row + 1, 2,
+            "Management document / Tài liệu quản lý: QT-NT-029-1A",
+            size=7, border=brd_all)
+        ws.merge_cells(f"D{row+1}:E{row+1}")
+        _sc(row + 1, 4, "Edition date / Ngày ban hành: 24/04/2025",
+            size=7, border=brd_all)
+        _sc(row + 1, 6, f"Page / Trang: {page_str}", size=8, border=brd_all)
+        ws.row_dimensions[row].height     = 16
+        ws.row_dimensions[row + 1].height = 16
+        row += 3   # 2 hàng header + 1 trống
+
+        img_row_h_pt = img_h_mm * 2.835
+        img_h_px     = int(img_row_h_pt * 4 / 3)
+
+        for ten_en, ten_vi, display_labels, storage_keys in tables:
+            n      = len(display_labels)
+            ranges = _col_ranges(n)
+
+            # -- Tiêu đề bảng (xanh đậm) --
+            if ten_en:
+                ws.merge_cells(f"A{row}:F{row}")
+                title_txt = f"{ten_en} / {ten_vi}" if ten_vi else ten_en
+                tc = ws.cell(row=row, column=1, value=title_txt)
+                tc.font      = Font(bold=True, size=10, color="FFFFFF",
+                                    name="Times New Roman")
+                tc.alignment = Alignment(horizontal="center", vertical="center")
+                tc.fill      = PatternFill("solid", fgColor=BLUE_HDR)
+                tc.border    = brd_all
+                ws.row_dimensions[row].height = 20
+                row += 1
+
+            # -- Nhãn cột (xanh nhạt) --
+            for lbl, (c1, c2) in zip(display_labels, ranges):
+                if c1 != c2:
+                    ws.merge_cells(
+                        f"{get_column_letter(c1)}{row}:"
+                        f"{get_column_letter(c2)}{row}")
+                lc = ws.cell(row=row, column=c1, value=lbl)
+                lc.font      = Font(bold=True, size=9, name="Times New Roman")
+                lc.alignment = Alignment(horizontal="center", vertical="center",
+                                         wrap_text=True)
+                lc.fill      = PatternFill("solid", fgColor=BLUE_CELL)
+                lc.border    = brd_all
+            ws.row_dimensions[row].height = 18
+            row += 1
+
+            # -- Hàng ảnh --
+            ws.row_dimensions[row].height = img_row_h_pt
+            for key, (c1, c2) in zip(storage_keys, ranges):
+                cell_ref = f"{get_column_letter(c1)}{row}"
+                if c1 != c2:
+                    ws.merge_cells(
+                        f"{get_column_letter(c1)}{row}:"
+                        f"{get_column_letter(c2)}{row}")
+                ws.cell(row=row, column=c1).border = brd_all
+
+                img_bio = _img_cache.get(key)
+                if img_bio is not None:
+                    try:
+                        img_bio.seek(0)
+                        xl_img        = XLImage(io.BytesIO(img_bio.read()))
+                        n_cols        = c2 - c1 + 1
+                        xl_img.width  = n_cols * COL_PX - 4
+                        xl_img.height = img_h_px - 4
+                        ws.add_image(xl_img, cell_ref)
+                    except Exception:
+                        pass
+            row += 1
+            row += 1  # trống giữa các bảng
+
+        row += 1  # khoảng cách giữa các trang
 
     # ── Xuất bytes ──────────────────────────────────────────────
     buf = io.BytesIO()
