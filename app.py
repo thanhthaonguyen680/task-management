@@ -2045,6 +2045,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     from openpyxl.styles import (Font, PatternFill, Alignment, Border, Side)
     from openpyxl.utils import get_column_letter
     from openpyxl.drawing.image import Image as XLImage
+    from openpyxl.drawing.spreadsheet_drawing import TwoCellAnchor, AnchorMarker
 
     # ── Parse dữ liệu ──────────────────────────────────────────
     ten_dong_co  = str(thong_tin_task.get("Tên Công Việc", ""))
@@ -2107,7 +2108,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # Bảng 2 cột ảnh → merge bộ 3 A:C | D:F
     NCOLS = 6
     COL_W = 25
-    COL_PX = COL_W * 7   # pixels xấp xỉ mỗi cột
+    # COL_PX không còn dùng (dùng TwoCellAnchor thay thế)
 
     wb = Workbook()
     ws = wb.active
@@ -2362,7 +2363,6 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         row += 3   # 2 hàng header + 1 trống
 
         img_row_h_pt = img_h_mm * 2.835
-        img_h_px     = int(img_row_h_pt * 4 / 3)
 
         for ten_en, ten_vi, display_labels, storage_keys in tables:
             n      = len(display_labels)
@@ -2410,11 +2410,18 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                 if img_bio is not None:
                     try:
                         img_bio.seek(0)
-                        xl_img        = XLImage(io.BytesIO(img_bio.read()))
-                        n_cols        = c2 - c1 + 1
-                        xl_img.width  = n_cols * COL_PX - 4
-                        xl_img.height = img_h_px - 4
-                        ws.add_image(xl_img, cell_ref)
+                        xl_img = XLImage(io.BytesIO(img_bio.read()))
+                        # Dùng TwoCellAnchor để ảnh căng đúng khung ô
+                        PAD = 9144   # ~1pt padding (đơn vị EMU)
+                        _anchor = TwoCellAnchor()
+                        _anchor._from = AnchorMarker(
+                            col=c1 - 1, colOff=PAD,
+                            row=row - 1, rowOff=PAD)
+                        _anchor.to = AnchorMarker(
+                            col=c2, colOff=-PAD,
+                            row=row, rowOff=-PAD)
+                        xl_img.anchor = _anchor
+                        ws.add_image(xl_img)
                     except Exception:
                         pass
             row += 1
