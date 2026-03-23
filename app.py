@@ -2101,6 +2101,21 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             c.border = border
         return c
 
+    def _brd_merge(row, c1, c2, brd, r_end=None):
+        """Set outer borders on ALL cells of a merged range (not just top-left).
+        This is needed because openpyxl only renders the border from the top-left
+        cell of a merge; the right/bottom edges of the merge are missing otherwise.
+        """
+        _re = r_end if r_end is not None else row
+        for r in range(row, _re + 1):
+            for c in range(c1, c2 + 1):
+                left   = brd.left   if c == c1 else Side(style=None)
+                right  = brd.right  if c == c2 else Side(style=None)
+                top    = brd.top    if r == row else Side(style=None)
+                bottom = brd.bottom if r == _re  else Side(style=None)
+                ws.cell(row=r, column=c).border = Border(
+                    left=left, right=right, top=top, bottom=bottom)
+
     # ── Tạo workbook — 1 sheet duy nhất ─────────────────────────
     # Dùng 6 cột đều nhau (A-F) xuyên suốt:
     #   A=6 (STT/label hẹp), B-F=25 (nội dung)
@@ -2343,20 +2358,25 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         # ── Header NT mini (2 hàng) ──────────────────────────────
         ws.merge_cells(f"A{row}:A{row+1}")
         _sc(row, 1, "NT", bold=True, size=11, border=brd_all)
+        _brd_merge(row, 1, 1, brd_all, r_end=row + 1)
 
         ws.merge_cells(f"B{row}:C{row}")
         _sc(row, 2, "Quotation / Báo giá:", size=8, border=brd_all)
+        _brd_merge(row, 2, 3, brd_all)
         ws.merge_cells(f"D{row}:E{row}")
         _sc(row, 4, "Engine number / Số máy:", size=8, border=brd_all)
+        _brd_merge(row, 4, 5, brd_all)
         _sc(row, 6, f"Order number / Số ĐH: {cong_so}", size=8, border=brd_all)
 
         ws.merge_cells(f"B{row+1}:C{row+1}")
         _sc(row + 1, 2,
             "Management document / Tài liệu quản lý: QT-NT-029-1A",
             size=7, border=brd_all)
+        _brd_merge(row + 1, 2, 3, brd_all)
         ws.merge_cells(f"D{row+1}:E{row+1}")
         _sc(row + 1, 4, "Edition date / Ngày ban hành: 24/04/2025",
             size=7, border=brd_all)
+        _brd_merge(row + 1, 4, 5, brd_all)
         _sc(row + 1, 6, f"Page / Trang: {page_str}", size=8, border=brd_all)
         ws.row_dimensions[row].height     = 16
         ws.row_dimensions[row + 1].height = 16
@@ -2378,6 +2398,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                 tc.alignment = Alignment(horizontal="center", vertical="center")
                 tc.fill      = PatternFill("solid", fgColor=BLUE_HDR)
                 tc.border    = brd_all
+                _brd_merge(row, 1, 6, brd_all)
                 ws.row_dimensions[row].height = 20
                 row += 1
 
@@ -2393,6 +2414,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                                          wrap_text=True)
                 lc.fill      = PatternFill("solid", fgColor=BLUE_CELL)
                 lc.border    = brd_all
+                _brd_merge(row, c1, c2, brd_all)
             ws.row_dimensions[row].height = 18
             row += 1
 
@@ -2405,6 +2427,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                         f"{get_column_letter(c1)}{row}:"
                         f"{get_column_letter(c2)}{row}")
                 ws.cell(row=row, column=c1).border = brd_all
+                _brd_merge(row, c1, c2, brd_all)
 
                 img_bio = _img_cache.get(key)
                 if img_bio is not None:
@@ -2413,7 +2436,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                         xl_img = XLImage(io.BytesIO(img_bio.read()))
                         # Dùng TwoCellAnchor để ảnh căng đúng khung ô
                         PAD = 9144   # ~1pt padding (đơn vị EMU)
-                        _anchor = TwoCellAnchor()
+                        _anchor = TwoCellAnchor(editAs="twoCell")
                         _anchor._from = AnchorMarker(
                             col=c1 - 1, colOff=PAD,
                             row=row - 1, rowOff=PAD)
