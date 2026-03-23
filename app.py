@@ -2660,21 +2660,6 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                 cap_nhat_nhieu_truong_task(task_id, _thay_doi)
             st.success("✅ Đã lưu!")
 
-    # ── Mô Tả (có thể chỉnh sửa / thêm mới) ─────────────────
-    _mo_ta_cur = hang.get("Mô Tả", "") or ""
-    _mo_ta_new = st.text_area(
-        "📝 Mô tả công việc",
-        value=_mo_ta_cur,
-        placeholder="Nhập mô tả công việc...",
-        key=f"edit_mo_ta_{task_id}",
-        height=100,
-    )
-    if _mo_ta_new != _mo_ta_cur:
-        if st.button("💾 Lưu mô tả", key=f"save_mo_ta_{task_id}", use_container_width=True):
-            with st.spinner("Đang lưu..."):
-                cap_nhat_nhieu_truong_task(task_id, {"Mô Tả": _mo_ta_new})
-            st.success("✅ Đã lưu!")
-
     st.divider()
 
     # ── Checklist ─────────────────────────────────────────────
@@ -3008,10 +2993,6 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         st.session_state[_do_key] = doc_anh_do_luong(str(hang.get("Ảnh Đo Lường", "") or ""))
 
     _fragment_upload_do_luong(task_id, _do_key)
-
-    # ── Ảnh Nghiệm Thu ───────────────────────────────────────
-    st.divider()
-    _fragment_upload_anh_nghiem_thu(task_id, _anh_key)
 
     # PDF
     tt_pdf = st.session_state.get(f"tt_select_{task_id}", trang_thai)
@@ -3751,6 +3732,20 @@ def _task_dialog(hang_dict, ds_tt):
     )
     if _cty_new != cty:
         cap_nhat_nhieu_truong_task(int(tid), {"Công Ty": _cty_new})
+    # ── Mô Tả (ngay bên dưới Công ty) ────────────────────────────
+    _mo_ta_cur = hang_dict.get("Mô Tả", "") or ""
+    _mo_ta_new = st.text_area(
+        "📝 Mô tả công việc",
+        value=_mo_ta_cur,
+        placeholder="Nhập mô tả công việc...",
+        key=f"dlg_mo_ta_{tid}",
+        height=100,
+    )
+    if _mo_ta_new != _mo_ta_cur:
+        if st.button("💾 Lưu mô tả", key=f"dlg_save_mo_ta_{tid}", use_container_width=True):
+            with st.spinner("Đang lưu..."):
+                cap_nhat_nhieu_truong_task(int(tid), {"Mô Tả": _mo_ta_new})
+            st.success("✅ Đã lưu!")
     st.divider()
     _fragment_chi_tiet_task(hang_dict, ds_tt)
 
