@@ -2145,11 +2145,29 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # ═══════════════════════════════════════════════════════════
 
     # ── Header công ty (A:E = text, F = logo) ──────────────────
-    _hdr_start = row  # dòng đầu của block header công ty
+    # Header: cột A = logo (span 4 hàng), B:F = nội dung công ty (canh giữa)
+    _hdr_start = row
+    _hdr_end   = row + 3   # 4 hàng cố định: 1 tên + 3 địa chỉ
 
-    ws.merge_cells(f"A{row}:E{row}")
-    _sc(row, 1, "CÔNG TY TNHH MỘT THÀNH VIÊN ĐIỆN CƠ NGỌC TRÂM",
-        bold=True, size=13, color=PURPLE, h_align="left")
+    # ── Ô logo bên TRÁI (A, span 4 hàng) ────────────────────────
+    ws.merge_cells(f"A{_hdr_start}:A{_hdr_end}")
+    _brd_merge(_hdr_start, 1, 1, brd_all, r_end=_hdr_end)
+    if _logo_bio is not None:
+        _logo_bio.seek(0)
+        _xl_logo = XLImage(io.BytesIO(_logo_bio.read()))
+        PAD_L = 18288   # ~2pt padding
+        _logo_anchor = TwoCellAnchor(editAs="twoCell")
+        _logo_anchor._from = AnchorMarker(col=0, colOff=PAD_L,
+                                          row=_hdr_start - 1, rowOff=PAD_L)
+        _logo_anchor.to   = AnchorMarker(col=1, colOff=-PAD_L,
+                                          row=_hdr_end, rowOff=-PAD_L)
+        _xl_logo.anchor = _logo_anchor
+        ws.add_image(_xl_logo)
+
+    # ── Tên công ty (B:F, canh giữa) ─────────────────────────────
+    ws.merge_cells(f"B{row}:F{row}")
+    _sc(row, 2, "CÔNG TY TNHH MỘT THÀNH VIÊN ĐIỆN CƠ NGỌC TRÂM",
+        bold=True, size=13, color=PURPLE, h_align="center")
     ws.row_dimensions[row].height = 20
     row += 1
 
@@ -2158,29 +2176,10 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         "Website: ngoctrammotor.com   Mail: ctyngoctram1811@gmail.com",
         "MST: 3603238978  ĐT: 0907 042 043 (Mr.Hiệp) – 0908 062 291 (Ms.Linh)",
     ]:
-        ws.merge_cells(f"A{row}:E{row}")
-        _sc(row, 1, txt, size=9, h_align="left")
+        ws.merge_cells(f"B{row}:F{row}")
+        _sc(row, 2, txt, size=9, h_align="center")
         ws.row_dimensions[row].height = 14
         row += 1
-
-    _hdr_end = row - 1  # dòng cuối của block header
-
-    # Cột F span toàn bộ 4 hàng header = ô logo
-    ws.merge_cells(f"F{_hdr_start}:F{_hdr_end}")
-    _logo_cell = ws.cell(row=_hdr_start, column=6)
-    _logo_cell.border = brd_all
-    _brd_merge(_hdr_start, 6, 6, brd_all, r_end=_hdr_end)
-    if _logo_bio is not None:
-        _logo_bio.seek(0)
-        _xl_logo = XLImage(io.BytesIO(_logo_bio.read()))
-        PAD_L = 9144
-        _logo_anchor = TwoCellAnchor(editAs="twoCell")
-        _logo_anchor._from = AnchorMarker(col=5, colOff=PAD_L,
-                                          row=_hdr_start - 1, rowOff=PAD_L)
-        _logo_anchor.to   = AnchorMarker(col=6, colOff=-PAD_L,
-                                          row=_hdr_end, rowOff=-PAD_L)
-        _xl_logo.anchor = _logo_anchor
-        ws.add_image(_xl_logo)
 
     row += 1  # khoảng trống
 
@@ -2207,12 +2206,14 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         ("Customer", "Khách hàng", khach_hang),
         ("Address",  "Địa chỉ",   ""),
     ]:
-        # A:B merged = label (31 chars), C:F merged = value (100 chars)
+        # A:B merged = label, C:F merged = value
         ws.merge_cells(f"A{row}:B{row}")
         _sc(row, 1, f"{en_lbl} / {vi_lbl}",
             bold=True, size=9, fill_color=BLUE_CELL, border=brd_all, h_align="left")
+        _brd_merge(row, 1, 2, brd_all)
         ws.merge_cells(f"C{row}:F{row}")
         _sc(row, 3, val, size=10, border=brd_all, h_align="left")
+        _brd_merge(row, 3, 6, brd_all)
         ws.row_dimensions[row].height = 18
         row += 1
 
@@ -2242,12 +2243,13 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         bold=True, size=10, h_align="left")
     row += 1
 
-    # Header bảng: A=STT(6) | B:D merged=Repair catalog | E=Date | F=Passed
+    # Header bảng: A=STT | B:D merged=Repair catalog | E=Date | F=Passed
     _sc(row, 1, "STT", bold=True, size=9, color=WHITE,
         fill_color=BLUE_HDR, border=brd_all)
     ws.merge_cells(f"B{row}:D{row}")
     _sc(row, 2, "Repair catalog / Hạng mục sửa chữa",
         bold=True, size=9, color=WHITE, fill_color=BLUE_HDR, border=brd_all)
+    _brd_merge(row, 2, 4, brd_all)
     _sc(row, 5, "Date / Ngày", bold=True, size=9, color=WHITE,
         fill_color=BLUE_HDR, border=brd_all)
     _sc(row, 6, "Passed / Thông qua", bold=True, size=9, color=WHITE,
@@ -2262,6 +2264,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         ws.merge_cells(f"B{row}:D{row}")
         _sc(row, 2, noi_dung, size=9, border=brd_all,
             h_align="left", fill_color=fill)
+        _brd_merge(row, 2, 4, brd_all)
         _sc(row, 5, "", size=9, border=brd_all, fill_color=fill)
         _sc(row, 6, "", size=9, border=brd_all, fill_color=fill)
         ws.row_dimensions[row].height = 16
@@ -2401,11 +2404,12 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         ws.row_dimensions[row + 1].height = 16
         row += 3   # 2 hàng header + 1 trống
 
-        img_row_h_pt = img_h_mm * 2.835
-
         for ten_en, ten_vi, display_labels, storage_keys in tables:
             n      = len(display_labels)
             ranges = _col_ranges(n)
+            # 2-col cells rộng hơn 3-col → tăng chiều cao tương ứng để hình cân đối
+            _h_scale = 1.4 if n == 2 else 1.0
+            img_row_h_pt = img_h_mm * 2.835 * _h_scale
 
             # -- Tiêu đề bảng (xanh đậm) --
             if ten_en:
