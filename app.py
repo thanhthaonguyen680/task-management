@@ -3017,37 +3017,20 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     tt_pdf = st.session_state.get(f"tt_select_{task_id}", trang_thai)
     if tt_pdf == "Đã Hoàn Thành - Giao Máy" or "Hoàn Thành" in tt_pdf:
         st.divider()
-        col_pdf, col_xl = st.columns(2)
-        with col_pdf:
-            if st.button("📄 Tạo Biên Bản PDF", key=f"pdf_{task_id}", use_container_width=True):
-                with st.spinner("Đang tạo PDF..."):
-                    df_moi = lay_danh_sach_cong_viec()
-                    rows = df_moi[df_moi["ID"].astype(str) == str(task_id)]
-                    if not rows.empty:
-                        du_lieu_pdf = tao_pdf_nghiem_thu(rows.iloc[0].to_dict())
-                        st.download_button(
-                            "💾 Tải Xuống PDF",
-                            data=du_lieu_pdf,
-                            file_name=f"BBNT_task_{task_id}.pdf",
-                            mime="application/pdf",
-                            key=f"dl_pdf_{task_id}",
-                            use_container_width=True,
-                        )
-        with col_xl:
-            if st.button("📊 Tạo Biên Bản Excel", key=f"xl_{task_id}", use_container_width=True):
-                with st.spinner("Đang tạo Excel..."):
-                    df_moi = lay_danh_sach_cong_viec()
-                    rows = df_moi[df_moi["ID"].astype(str) == str(task_id)]
-                    if not rows.empty:
-                        du_lieu_excel = tao_excel_nghiem_thu(rows.iloc[0].to_dict())
-                        st.download_button(
-                            "💾 Tải Xuống Excel",
-                            data=du_lieu_excel,
-                            file_name=f"BBNT_task_{task_id}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"dl_xl_{task_id}",
-                            use_container_width=True,
-                        )
+        if st.button("📊 Tạo Biên Bản Excel", key=f"xl_{task_id}", use_container_width=True):
+            with st.spinner("Đang tạo Excel..."):
+                df_moi = lay_danh_sach_cong_viec()
+                rows = df_moi[df_moi["ID"].astype(str) == str(task_id)]
+                if not rows.empty:
+                    du_lieu_excel = tao_excel_nghiem_thu(rows.iloc[0].to_dict())
+                    st.download_button(
+                        "💾 Tải Xuống Excel",
+                        data=du_lieu_excel,
+                        file_name=f"BBNT_task_{task_id}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_xl_{task_id}",
+                        use_container_width=True,
+                    )
 
 
 # ============================================================
@@ -3588,19 +3571,12 @@ def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
         label_visibility="collapsed",
         key=up_key,
     )
-    if st.button("📤 Upload ảnh", key=f"btn_up_nt_{task_id}", use_container_width=True):
-        files = st.session_state.get(up_key) or []
-        if files:
-            with st.spinner("Đang upload..."):
-                new_urls = []
-                for f in files:
-                    url = tai_anh_len_cloudinary(f)
-                    cap_nhat_url_anh(task_id, url)
-                    new_urls.append(url)
-            st.session_state[anh_key] = st.session_state.get(anh_key, []) + new_urls
-            st.rerun(scope="fragment")
-        else:
-            st.warning("Chưa chọn file!")
+    st.button(
+        "📤 Upload ảnh", key=f"btn_up_nt_{task_id}",
+        use_container_width=True,
+        on_click=_cb_upload_anh_nt,
+        args=(task_id, anh_key, up_key),
+    )
 
 
 _NHOM_DO = [
@@ -3705,19 +3681,12 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                     label_visibility="collapsed",
                     accept_multiple_files=False,
                 )
-                if st.button("📤 Upload", key=f"btn_do_{task_id}_{label}", use_container_width=True):
-                    f_do = st.session_state.get(up_key)
-                    if f_do:
-                        _fid = f"{f_do.name}_{f_do.size}"
-                        if not st.session_state.get(f"{done_key}_{_fid}"):
-                            with st.spinner("Đang upload..."):
-                                st.session_state[f"{done_key}_{_fid}"] = True
-                                url_new = tai_anh_len_cloudinary(f_do)
-                                st.session_state[do_key][label] = [url_new]
-                            cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
-                            st.rerun(scope="fragment")
-                    else:
-                        st.warning("Chưa chọn file!")
+                st.button(
+                    "📤 Upload", key=f"btn_do_{task_id}_{label}",
+                    use_container_width=True,
+                    on_click=_cb_upload_do,
+                    args=(task_id, do_key, label, up_key, done_key),
+                )
 
 
 # ─── helper: lưu công việc con về sheet ───────────────────────────────────────
