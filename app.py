@@ -2632,12 +2632,12 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _nl_start = row
     _nl_end   = row + 2   # sub-header + Voltage + Current = 3 rows
     _cat_label(_nl_start, _nl_end, "No-load test / Kiểm tra không tải")
-    # Sub-header: blank | L1 | L2 | L3 | blank — xanh đậm chữ trắng như mẫu
-    _sc(row, 2, "", size=9, border=brd_all, fill_color=BLUE_HDR)
+    # Sub-header: chỉ L1 | L2 | L3 tô xanh, cột 2 và cột 6 để trống border bình thường
+    _sc(row, 2, "", size=9, border=brd_all)
     for _c, _lbl in zip([3, 4, 5], ["L1", "L2", "L3"]):
         _sc(row, _c, _lbl, bold=True, size=9, color=WHITE,
             border=brd_all, fill_color=BLUE_HDR)
-    _sc(row, 6, "", size=9, border=brd_all, fill_color=BLUE_HDR)
+    _sc(row, 6, "", size=9, border=brd_all)
     ws.row_dimensions[row].height = 28
     row += 1
     for _lbl in ["Voltage (V)", "Current (A)"]:
