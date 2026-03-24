@@ -95,6 +95,12 @@ st.markdown(
         height: auto !important;
         min-height: 38px !important;
     }
+    /* Search input trong selectbox: luôn ltr để con trỏ ở cuối khi gõ */
+    [data-testid="stSelectbox"] [data-baseweb="select"] input,
+    [data-testid="stSelectbox"] input {
+        direction: ltr !important;
+        text-align: left !important;
+    }
     /* Selected value: div trực tiếp bên trong ValueContainer không phải input */
     /* Baseweb structure: select > div(control) > div(ValueContainer) > div(singleValue) + div(input) */
     [data-testid="stSelectbox"] [data-baseweb="select"] > div > div > div:not([data-testid]) {
@@ -2794,6 +2800,11 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         color: #d1d5db !important;
         box-shadow: none !important;
     }
+    /* Fix input bị cắt đáy trong column */
+    [data-testid="stColumn"] > [data-testid="stVerticalBlock"] {
+        overflow: visible !important;
+        padding-bottom: 4px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -2858,10 +2869,15 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     st.markdown("---")
     # Công ty, Công số, Năm, Hạn, Ngày tạo
     st.markdown(f"🏢 **Công ty:** `{hang.get('Công Ty', '')}`")
-    st.markdown(
-        f"📄 **Công số:** `{hang.get('Công Số', '')}` &nbsp;·&nbsp; "
-        f"📅 **Năm:** `{hang.get('Năm', '')}`"
-    )
+    _cong_so_hien = hang.get('Công Số', '')
+    _nam_hien     = hang.get('Năm', '')
+    _dong_cs = []
+    if _cong_so_hien:
+        _dong_cs.append(f"📄 **Công số:** `{_cong_so_hien}`")
+    if _nam_hien:
+        _dong_cs.append(f"📅 **Năm:** `{_nam_hien}`")
+    if _dong_cs:
+        st.markdown(" &nbsp;·&nbsp; ".join(_dong_cs))
     if hang.get("Người Phê Duyệt"):
         st.markdown(f"✅ **Người phê duyệt:** `{hang.get('Người Phê Duyệt', '')}`")
     # ── Hạn Hoàn Thành (nhân viên có thể chỉnh) ─────────────────────────────
@@ -3969,8 +3985,9 @@ def _cb_upload_do(task_id, do_key, label, up_key, done_key):
     cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
 
 
+@st.fragment
 def _fragment_upload_do_luong(task_id, do_key: str):
-    """Upload ảnh đo lường — dùng callback thay vì st.rerun() để dialog không đóng."""
+    """Upload ảnh đo lường — @st.fragment để rerun cục bộ, giữ nguyên scroll của outer fragment."""
     for nhom_title, labels in _NHOM_DO:
         st.markdown(
             f"<div style='background:#dbeafe;border-radius:8px 8px 0 0;padding:8px 14px;"
@@ -3984,43 +4001,39 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                 lbl_display, lbl_key = item
             else:
                 lbl_display = lbl_key = item
-            st.markdown(
-                f"<div style='background:#fef9c3;border:1px solid #e5e7eb;padding:6px 14px;"
-                f"font-weight:600;font-size:0.85rem;margin-top:4px;border-radius:4px;'>"
-                f"📷 {lbl_display}</div>",
-                unsafe_allow_html=True,
-            )
             urls_label = st.session_state[do_key].get(lbl_key, [])
-            if urls_label:
-                # Đã có ảnh — hiển thị + nút xoá
-                url_d = urls_label[0]
-                col_img, col_del = st.columns([3, 1], gap="small")
-                with col_img:
-                    _hien_thi_anh_drive(url_d, width=120)
-                with col_del:
-                    st.button(
-                        "🗑️ Xoá", key=f"xoa_do_{task_id}_{lbl_key}_0",
-                        use_container_width=True,
-                        on_click=_cb_xoa_do,
-                        args=(task_id, do_key, lbl_key, url_d),
+            _exp_lbl = f"📷 {lbl_display} ({len(urls_label)})" if urls_label else f"📷 {lbl_display}"
+            with st.expander(_exp_lbl, expanded=False):
+                if urls_label:
+                    # Đã có ảnh — hiển thị + nút xoá
+                    url_d = urls_label[0]
+                    col_img, col_del = st.columns([3, 1], gap="small")
+                    with col_img:
+                        _hien_thi_anh_drive(url_d, width=120)
+                    with col_del:
+                        st.button(
+                            "🗑️ Xoá", key=f"xoa_do_{task_id}_{lbl_key}_0",
+                            use_container_width=True,
+                            on_click=_cb_xoa_do,
+                            args=(task_id, do_key, lbl_key, url_d),
+                        )
+                else:
+                    # Chưa có ảnh — hiển thị uploader
+                    up_key   = f"up_do_{task_id}_{lbl_key}"
+                    done_key = f"up_do_done_{task_id}_{lbl_key}"
+                    st.file_uploader(
+                        f"Ảnh {lbl_display}",
+                        type=["jpg", "jpeg", "png"],
+                        key=up_key,
+                        label_visibility="collapsed",
+                        accept_multiple_files=False,
                     )
-            else:
-                # Chưa có ảnh — hiển thị uploader
-                up_key   = f"up_do_{task_id}_{lbl_key}"
-                done_key = f"up_do_done_{task_id}_{lbl_key}"
-                st.file_uploader(
-                    f"Ảnh {lbl_display}",
-                    type=["jpg", "jpeg", "png"],
-                    key=up_key,
-                    label_visibility="collapsed",
-                    accept_multiple_files=False,
-                )
-                st.button(
-                    "📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
-                    use_container_width=True,
-                    on_click=_cb_upload_do,
-                    args=(task_id, do_key, lbl_key, up_key, done_key),
-                )
+                    st.button(
+                        "📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
+                        use_container_width=True,
+                        on_click=_cb_upload_do,
+                        args=(task_id, do_key, lbl_key, up_key, done_key),
+                    )
 
 
 # ─── helper: lưu công việc con về sheet ───────────────────────────────────────
@@ -6270,6 +6283,11 @@ def inject_css():
             height: auto !important;
             min-height: 44px !important;
         }
+        [data-testid="stSelectbox"] [data-baseweb="select"] input,
+        [data-testid="stSelectbox"] input {
+            direction: ltr !important;
+            text-align: left !important;
+        }
         [data-testid="stSelectbox"] div[class*="singleValue"],
         [data-testid="stSelectbox"] div[class*="SingleValue"],
         [data-testid="stSelectbox"] div[class*="single-value"] {
@@ -6280,6 +6298,12 @@ def inject_css():
             max-width: calc(100% - 28px) !important;
             direction: rtl !important;
             text-align: left !important;
+        }
+
+        /* --- Fix input bị cắt đáy trong column --- */
+        [data-testid="stColumn"] > [data-testid="stVerticalBlock"] {
+            overflow: visible !important;
+            padding-bottom: 4px !important;
         }
 
         /* --- Expander: readable trên mobile --- */
