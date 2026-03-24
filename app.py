@@ -2046,6 +2046,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     from openpyxl.utils import get_column_letter
     from openpyxl.drawing.image import Image as XLImage
     from openpyxl.drawing.spreadsheet_drawing import TwoCellAnchor, AnchorMarker
+    from openpyxl.worksheet.pagebreak import Break
 
     # ── Logo công ty ────────────────────────────────────────────
     _LOGO_PATH = _os.path.join(_os.path.dirname(__file__), "image.png")
@@ -2180,22 +2181,26 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _sc(row, 2, txt, size=9, h_align="center")
         ws.row_dimensions[row].height = 14
         row += 1
+    # Outer border cho toàn bộ khối B:F header
+    _brd_merge(_hdr_start, 2, 6, brd_all, r_end=_hdr_end)
 
     row += 1  # khoảng trống
 
     # ── Tiêu đề BBNT ────────────────────────────────────────────
     ws.merge_cells(f"A{row}:F{row}")
-    _sc(row, 1, "REPAIR ACCEPTANCE CERTIFICATE", bold=True, size=12)
-    ws.row_dimensions[row].height = 18
+    _sc(row, 1, "REPAIR ACCEPTANCE CERTIFICATE",
+        bold=True, size=12, color="1F3864", h_align="center")
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 20
     row += 1
 
     ws.merge_cells(f"A{row}:F{row}")
     c = ws.cell(row=row, column=1, value="BIÊN BẢN NGHIỆM THU")
-    c.font      = _font(bold=True, size=15)
+    c.font      = _font(bold=True, size=15, color="1F3864")
     c.alignment = _align()
     c.fill      = _fill(BLUE_CELL)
-    c.border    = brd_thick
-    ws.row_dimensions[row].height = 22
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 24
     row += 1
 
     row += 1  # khoảng trống
@@ -2223,17 +2228,23 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1,
         "I. Time and place of the test / Thời gian và địa điểm kiểm tra",
-        bold=True, size=10, h_align="left")
+        bold=True, size=10, h_align="left", border=brd_all)
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 18
     row += 1
 
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1, f"At 7:30 AM on {ngay_en}, at Ngoc Tram Motor",
-        size=10, h_align="left")
+        size=10, h_align="left", border=brd_all)
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 16
     row += 1
 
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1, f"Lúc 7h30 - {ngay_vi}, tại Điện cơ Ngọc Trâm",
-        size=9, h_align="left")
+        size=9, h_align="left", border=brd_all)
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 16
     row += 1
     row += 1
 
@@ -2253,15 +2264,11 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         "này cũng có giá trị mà không cần chữ ký viết tay."
     )
     _cc.value     = f"{_en_text}\n{_vi_text}"
-    _cc.font      = Font(name="Times New Roman", size=10, italic=False)
-    _cc.alignment = Alignment(horizontal="left", vertical="center",
+    _cc.font      = Font(name="Times New Roman", size=10, italic=True)
+    _cc.alignment = Alignment(horizontal="center", vertical="center",
                               wrap_text=True)
+    _cc.fill = _fill("F2F2F2")   # nền xám nhạt
     _brd_merge(_confirm_start, 1, 6, brd_all, r_end=_confirm_end)
-    # Make Vietnamese line italic via rich text is not directly supported in
-    # openpyxl plain text; we set the whole cell italic=False and note the VI
-    # portion — best we can do without InlineFont is set italic on cell font.
-    # Instead, write two lines and apply italic to the cell (whole cell italic):
-    _cc.font = Font(name="Times New Roman", size=10)
     for _r in range(_confirm_start, _confirm_end + 1):
         ws.row_dimensions[_r].height = 18
     row = _confirm_end + 1
@@ -2468,7 +2475,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         step = NCOLS // n
         return [(i * step + 1, (i + 1) * step) for i in range(n)]
 
-    row += 1  # dòng trống ngăn cách BBNT và phần ảnh
+    ws.row_breaks.append(Break(id=row - 1))   # ── page break: page 1/9 → 2/9 (tại row 45)
+    row += 1  # blank row 46 = đầu trang 2
 
     # ═══════════════════════════════════════════════════════════
     # TRANG 2/8 — BẢNG SỐ LIỆU ĐO LƯỜNG (manual entry)
@@ -2536,7 +2544,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         c.font      = Font(bold=True, size=9, color=WHITE,
                            name="Times New Roman")
         c.alignment = Alignment(horizontal="center", vertical="center",
-                                wrap_text=True, text_rotation=90)
+                                wrap_text=True, text_rotation=0)
         c.fill   = _fill(BLUE_HDR)
         _brd_merge(r_start, 1, 1, brd_all, r_end=r_end)
 
@@ -2613,8 +2621,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     for _c_idx in range(1, 7):
         _sc(row, _c_idx, "", size=9, border=brd_all)
     ws.row_dimensions[row].height = 20
-    row += 1
-    row += 1  # separator
+    row += 1          # past vib values → row 69
+    row += 6          # blank rows 69–74 để lấp đầy trang 2
+    ws.row_breaks.append(Break(id=row - 1))   # ── page break: page 2/9 → 3/9 (tại row 74)
 
     for page_str, img_h_mm, tables in IMAGE_PAGES:
         # ── Header NT mini (2 hàng) ──────────────────────────────
@@ -2689,22 +2698,20 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             row += 1
             row += 1  # trống giữa các bảng
 
-        row += 1  # khoảng cách giữa các trang
+        ws.row_breaks.append(Break(id=row - 1))  # ── page break: mỗi trang ảnh
 
-    # ── Page setup: A4 landscape, fit 1 trang ngang ─────────────
+    # ── Page setup: A4 portrait, fit 1 trang ngang ──────────────
     from openpyxl.worksheet.page import PageMargins
     ws.page_setup.paperSize        = 9          # A4
-    ws.page_setup.orientation      = "landscape"
+    ws.page_setup.orientation      = "portrait"
     ws.page_setup.fitToPage        = True
     ws.page_setup.fitToWidth       = 1          # scale vừa 1 trang ngang
     ws.page_setup.fitToHeight      = 0          # chiều cao tự nhiên (nhiều trang)
-    ws.page_setup.horizontalDpi    = 300
-    ws.page_setup.verticalDpi      = 300
     ws.sheet_properties.pageSetUpPr.fitToPage = True
 
     ws.page_margins = PageMargins(
-        left=0.39, right=0.39,        # ~1 cm
-        top=0.59,  bottom=0.59,       # ~1.5 cm
+        left=0.39, right=0.39,
+        top=0.59,  bottom=0.59,
         header=0.2, footer=0.2,
     )
 
