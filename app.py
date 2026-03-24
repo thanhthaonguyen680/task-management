@@ -1220,33 +1220,42 @@ def cap_nhat_trang_thai(task_id: int, trang_thai_moi: str):
     """
     Cập nhật trạng thái (Status) của công việc theo ID.
     """
-    sheet = _lay_sheet_fresh()
-    o_tim = sheet.find(str(task_id), in_column=1)
-    if o_tim:
-        sheet.update_cell(o_tim.row, 8, trang_thai_moi)
-        lay_danh_sach_cong_viec.clear()
+    try:
+        sheet = _lay_sheet_fresh()
+        o_tim = sheet.find(str(task_id), in_column=1)
+        if o_tim:
+            sheet.update_cell(o_tim.row, 8, trang_thai_moi)
+            lay_danh_sach_cong_viec.clear()
+    except Exception:
+        pass
 
 
 def cap_nhat_ngay_ket_thuc(task_id: int, ngay_ket_thuc: str):
     """
     Cập nhật Ngày Kết Thúc (cột X, cột 24) của công việc theo ID.
     """
-    sheet = _lay_sheet_fresh()
-    o_tim = sheet.find(str(task_id), in_column=1)
-    if o_tim:
-        sheet.update_cell(o_tim.row, 24, ngay_ket_thuc)
-        lay_danh_sach_cong_viec.clear()
+    try:
+        sheet = _lay_sheet_fresh()
+        o_tim = sheet.find(str(task_id), in_column=1)
+        if o_tim:
+            sheet.update_cell(o_tim.row, 24, ngay_ket_thuc)
+            lay_danh_sach_cong_viec.clear()
+    except Exception:
+        pass
 
 
 def cap_nhat_han_hoan_thanh(task_id: int, han: str):
     """
     Cập nhật Hạn Hoàn Thành (cột J, cột 10) của công việc theo ID.
     """
-    sheet = _lay_sheet_fresh()
-    o_tim = sheet.find(str(task_id), in_column=1)
-    if o_tim:
-        sheet.update_cell(o_tim.row, 10, han)
-        lay_danh_sach_cong_viec.clear()
+    try:
+        sheet = _lay_sheet_fresh()
+        o_tim = sheet.find(str(task_id), in_column=1)
+        if o_tim:
+            sheet.update_cell(o_tim.row, 10, han)
+            lay_danh_sach_cong_viec.clear()
+    except Exception:
+        pass
 
 
 def doc_anh_do_luong(gia_tri: str) -> dict:
@@ -1261,11 +1270,14 @@ def doc_anh_do_luong(gia_tri: str) -> dict:
 
 def cap_nhat_anh_do_luong(task_id: int, anh_dict: dict):
     """Ghi toàn bộ dict ảnh đo lường (cột Y = col 25) lên Google Sheets."""
-    sheet = _lay_sheet_fresh()
-    o_tim = sheet.find(str(task_id), in_column=1)
-    if o_tim:
-        sheet.update_cell(o_tim.row, 25, json.dumps(anh_dict, ensure_ascii=False))
-        lay_danh_sach_cong_viec.clear()
+    try:
+        sheet = _lay_sheet_fresh()
+        o_tim = sheet.find(str(task_id), in_column=1)
+        if o_tim:
+            sheet.update_cell(o_tim.row, 25, json.dumps(anh_dict, ensure_ascii=False))
+            lay_danh_sach_cong_viec.clear()
+    except Exception:
+        pass
 
 
 def doc_danh_sach_anh(gia_tri: str) -> list:
@@ -1294,56 +1306,65 @@ def cap_nhat_url_anh(task_id: int, url_anh: str):
         task_id: ID công việc cần cập nhật
         url_anh: URL ảnh mới trên Cloudinary
     """
-    sheet = _lay_sheet_fresh()
-    o_tim = sheet.find(str(task_id), in_column=1)
-    if o_tim:
-        so_hang = o_tim.row
-        # Lấy danh sách ảnh hiện có
-        gia_tri_cu = sheet.cell(so_hang, 11).value or ""
-        ds_anh = doc_danh_sach_anh(gia_tri_cu)
-        if url_anh not in ds_anh:
-            ds_anh.append(url_anh)
-        # Lưu JSON array vào cột K (11)
-        sheet.update_cell(so_hang, 11, json.dumps(ds_anh, ensure_ascii=False))
-        # Cột L (12): =IMAGE() của ảnh đầu tiên để xem trong Google Sheets
-        sheet.update(
-            [[f'=IMAGE("{ds_anh[0]}")']],
-            f"L{so_hang}",
-            value_input_option="USER_ENTERED"
-        )
-        lay_danh_sach_cong_viec.clear()
+    try:
+        sheet = _lay_sheet_fresh()
+        o_tim = sheet.find(str(task_id), in_column=1)
+        if o_tim:
+            so_hang = o_tim.row
+            # Lấy danh sách ảnh hiện có
+            gia_tri_cu = sheet.cell(so_hang, 11).value or ""
+            ds_anh = doc_danh_sach_anh(gia_tri_cu)
+            if url_anh not in ds_anh:
+                ds_anh.append(url_anh)
+            # Lưu JSON array vào cột K (11)
+            sheet.update_cell(so_hang, 11, json.dumps(ds_anh, ensure_ascii=False))
+            # Cột L (12): =IMAGE() của ảnh đầu tiên để xem trong Google Sheets
+            sheet.update(
+                [[f'=IMAGE("{ds_anh[0]}")']],
+                f"L{so_hang}",
+                value_input_option="USER_ENTERED"
+            )
+            lay_danh_sach_cong_viec.clear()
+    except Exception:
+        pass
 
 
 def xoa_url_anh(task_id: int, url_xoa: str):
     """
     Xoá một URL ảnh khỏi danh sách ảnh của task.
     """
-    sheet = _lay_sheet_fresh()
-    o_tim = sheet.find(str(task_id), in_column=1)
-    if o_tim:
-        so_hang = o_tim.row
-        gia_tri_cu = sheet.cell(so_hang, 11).value or ""
-        ds_anh = doc_danh_sach_anh(gia_tri_cu)
-        ds_anh = [u for u in ds_anh if u != url_xoa]
-        sheet.update_cell(so_hang, 11, json.dumps(ds_anh, ensure_ascii=False) if ds_anh else "")
-        if ds_anh:
-            sheet.update(
-                [[f'=IMAGE("{ds_anh[0]}")']],
-                f"L{so_hang}",
-                value_input_option="USER_ENTERED"
-            )
-        else:
-            sheet.update_cell(so_hang, 12, "")
-        lay_danh_sach_cong_viec.clear()
+    try:
+        sheet = _lay_sheet_fresh()
+        o_tim = sheet.find(str(task_id), in_column=1)
+        if o_tim:
+            so_hang = o_tim.row
+            gia_tri_cu = sheet.cell(so_hang, 11).value or ""
+            ds_anh = doc_danh_sach_anh(gia_tri_cu)
+            ds_anh = [u for u in ds_anh if u != url_xoa]
+            sheet.update_cell(so_hang, 11, json.dumps(ds_anh, ensure_ascii=False) if ds_anh else "")
+            if ds_anh:
+                sheet.update(
+                    [[f'=IMAGE("{ds_anh[0]}")']],
+                    f"L{so_hang}",
+                    value_input_option="USER_ENTERED"
+                )
+            else:
+                sheet.update_cell(so_hang, 12, "")
+            lay_danh_sach_cong_viec.clear()
+    except Exception:
+        pass
 
 
 def cap_nhat_checklist(task_id: int, checklist: list):
     """Lưu danh sách checklist (JSON) vào cột M của task."""
-    sheet = _lay_sheet_fresh()
-    o_tim = sheet.find(str(task_id), in_column=1)
-    if o_tim:
-        sheet.update_cell(o_tim.row, 13, json.dumps(checklist, ensure_ascii=False))
-        lay_danh_sach_cong_viec.clear()
+    try:
+        sheet = _lay_sheet_fresh()
+        o_tim = sheet.find(str(task_id), in_column=1)
+        if o_tim:
+            sheet.update_cell(o_tim.row, 13, json.dumps(checklist, ensure_ascii=False))
+            lay_danh_sach_cong_viec.clear()
+    except Exception:
+        pass
 
 
 # Ánh xạ tên field → số cột trong sheet Tasks
@@ -1373,16 +1394,19 @@ def cap_nhat_nhieu_truong_task(task_id: int, gia_tri: dict):
     """Cập nhật nhiều trường của task trong 1 lần kết nối.
     gia_tri: {tên_cột: giá_trị_mới}
     """
-    sheet = _lay_sheet_fresh()
-    o_tim = sheet.find(str(task_id), in_column=1)
-    if not o_tim:
-        return
-    r = o_tim.row
-    for ten_col, val in gia_tri.items():
-        col_num = _COL_MAP_TASK.get(ten_col)
-        if col_num:
-            sheet.update_cell(r, col_num, str(val))
-    lay_danh_sach_cong_viec.clear()
+    try:
+        sheet = _lay_sheet_fresh()
+        o_tim = sheet.find(str(task_id), in_column=1)
+        if not o_tim:
+            return
+        r = o_tim.row
+        for ten_col, val in gia_tri.items():
+            col_num = _COL_MAP_TASK.get(ten_col)
+            if col_num:
+                sheet.update_cell(r, col_num, str(val))
+        lay_danh_sach_cong_viec.clear()
+    except Exception:
+        pass
 
 
 # ============================================================
