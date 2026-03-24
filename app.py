@@ -2587,9 +2587,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _brd_merge(r_start, 1, 2, brd_all, r_end=r_end)
 
     # ── Group 1: Terminal / Đầu cực đấu ─────────────────────────
-    # Col A+B: blank (category area), Col C-F: Terminal header
-    _sc(row, 1, "", size=9, border=brd_all)
-    _sc(row, 2, "", size=9, border=brd_all)
+    # Col A+B: blank xanh (cùng màu category), Col C-F: Terminal header
+    _sc(row, 1, "", size=9, border=brd_all, fill_color=BLUE_HDR)
+    _sc(row, 2, "", size=9, border=brd_all, fill_color=BLUE_HDR)
     ws.merge_cells(f"C{row}:F{row}")
     _tc = ws.cell(row=row, column=3,
                   value="Terminal / Đầu cực đấu")
