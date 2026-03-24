@@ -2185,6 +2185,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _brd_merge(_hdr_start, 2, 6, brd_all, r_end=_hdr_end)
 
     row += 1  # khoảng trống
+    ws.row_dimensions[row - 1].height = 20
 
     # ── Tiêu đề BBNT ────────────────────────────────────────────
     ws.merge_cells(f"A{row}:F{row}")
@@ -2204,6 +2205,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     row += 1
 
     row += 1  # khoảng trống
+    ws.row_dimensions[row - 1].height = 20
 
     # ── Bảng Engine / Customer / Address ────────────────────────
     for en_lbl, vi_lbl, val in [
@@ -2219,10 +2221,11 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         ws.merge_cells(f"C{row}:F{row}")
         _sc(row, 3, val, size=10, border=brd_all, h_align="left")
         _brd_merge(row, 3, 6, brd_all)
-        ws.row_dimensions[row].height = 18
+        ws.row_dimensions[row].height = 22
         row += 1
 
     row += 1
+    ws.row_dimensions[row - 1].height = 20
 
     # ── Section I ────────────────────────────────────────────────
     ws.merge_cells(f"A{row}:F{row}")
@@ -2230,23 +2233,24 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         "I. Time and place of the test / Thời gian và địa điểm kiểm tra",
         bold=True, size=10, h_align="left", border=brd_all)
     _brd_merge(row, 1, 6, brd_all)
-    ws.row_dimensions[row].height = 18
+    ws.row_dimensions[row].height = 22
     row += 1
 
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1, f"At 7:30 AM on {ngay_en}, at Ngoc Tram Motor",
         size=10, h_align="left", border=brd_all)
     _brd_merge(row, 1, 6, brd_all)
-    ws.row_dimensions[row].height = 16
+    ws.row_dimensions[row].height = 20
     row += 1
 
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1, f"Lúc 7h30 - {ngay_vi}, tại Điện cơ Ngọc Trâm",
         size=9, h_align="left", border=brd_all)
     _brd_merge(row, 1, 6, brd_all)
-    ws.row_dimensions[row].height = 16
+    ws.row_dimensions[row].height = 20
     row += 1
     row += 1
+    ws.row_dimensions[row - 1].height = 20
 
     # ── Confirmation paragraph (bordered merged A:F, ~5 rows) ────
     _confirm_start = row
@@ -2270,9 +2274,10 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _cc.fill = _fill("F2F2F2")   # nền xám nhạt
     _brd_merge(_confirm_start, 1, 6, brd_all, r_end=_confirm_end)
     for _r in range(_confirm_start, _confirm_end + 1):
-        ws.row_dimensions[_r].height = 18
+        ws.row_dimensions[_r].height = 24
     row = _confirm_end + 1
     row += 1
+    ws.row_dimensions[row - 1].height = 20
 
     # ── CLIENT / CONTRACTOR signature block ──────────────────────
     # Header row
@@ -2298,10 +2303,10 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _sc(row, 4, "Position / Chức vụ : Trưởng bộ phận Kỹ thuật",
         size=9, border=brd_all, h_align="left")
     _brd_merge(row, 4, 6, brd_all)
-    ws.row_dimensions[row].height = 18
+    ws.row_dimensions[row].height = 22
     row += 1
 
-    # 3 empty rows (signature space, height=30)
+    # 3 empty rows (signature space, height=85)
     for _ in range(3):
         ws.merge_cells(f"A{row}:C{row}")
         _sc(row, 1, "", size=9, border=brd_all)
@@ -2309,7 +2314,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         ws.merge_cells(f"D{row}:F{row}")
         _sc(row, 4, "", size=9, border=brd_all)
         _brd_merge(row, 4, 6, brd_all)
-        ws.row_dimensions[row].height = 30
+        ws.row_dimensions[row].height = 60
         row += 1
 
     # Full name row
@@ -2321,7 +2326,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _sc(row, 4, f"Full name / Họ và tên : {nhan_vien.upper()}",
         size=9, border=brd_all, h_align="left")
     _brd_merge(row, 4, 6, brd_all)
-    ws.row_dimensions[row].height = 18
+    ws.row_dimensions[row].height = 22
     row += 1
 
     # Date row
@@ -2333,14 +2338,16 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _sc(row, 4, "Date / Ngày :",
         size=9, border=brd_all, h_align="left")
     _brd_merge(row, 4, 6, brd_all)
-    ws.row_dimensions[row].height = 18
+    ws.row_dimensions[row].height = 22
     row += 1
     row += 1
+    ws.row_dimensions[row - 1].height = 20
 
     # ── Section II ───────────────────────────────────────────────
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1, "II. Hạng mục sửa chữa / Repair catalog",
         bold=True, size=10, h_align="left")
+    ws.row_dimensions[row].height = 22
     row += 1
 
     # Header bảng: A=STT | B:D merged=Repair catalog | E=Date | F=Passed
@@ -2367,10 +2374,11 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _brd_merge(row, 2, 4, brd_all)
         _sc(row, 5, "", size=9, border=brd_all, fill_color=fill)
         _sc(row, 6, "", size=9, border=brd_all, fill_color=fill)
-        ws.row_dimensions[row].height = 16
+        ws.row_dimensions[row].height = 26
         row += 1
 
     row += 1
+    ws.row_dimensions[row - 1].height = 20
 
     # ═══════════════════════════════════════════════════════════
     # PHẦN 2 — ẢNH ĐO LƯỜNG (IMAGE_PAGES 1/5 → 5/5)
@@ -2519,8 +2527,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             size=7, border=brd_all)
         _brd_merge(row + 1, 4, 5, brd_all)
         _sc(row + 1, 6, f"Page / Trang: {page_lbl}", size=8, border=brd_all)
-        ws.row_dimensions[row].height     = 16
-        ws.row_dimensions[row + 1].height = 16
+        ws.row_dimensions[row].height     = 22
+        ws.row_dimensions[row + 1].height = 22
+        ws.row_dimensions[row + 2].height = 14   # blank gap sau mini header
         row += 3
 
     # NT mini header for page 2/8
@@ -2568,10 +2577,10 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _res_end   = row + len(_res_rows) - 1
     _cat_label(_res_start, _res_end, "Resistance (mΩ) / Điện trở")
     for _lbl in _res_rows:
-        _sc(row, 2, _lbl, size=9, border=brd_all, h_align="left")
+        _sc(row, 2, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
         for _c in range(3, 7):
             _sc(row, _c, "", size=9, border=brd_all)
-        ws.row_dimensions[row].height = 16
+        ws.row_dimensions[row].height = 28
         row += 1
 
     # Category: Insulation Resistance (MΩ) / Cách điện — 7 rows
@@ -2583,47 +2592,50 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _ir_end   = row + len(_ir_rows) - 1
     _cat_label(_ir_start, _ir_end, "Insulation Resistance (MΩ) / Cách điện")
     for _lbl in _ir_rows:
-        _sc(row, 2, _lbl, size=9, border=brd_all, h_align="left")
+        _sc(row, 2, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
         for _c in range(3, 7):
             _sc(row, _c, "", size=9, border=brd_all)
-        ws.row_dimensions[row].height = 16
+        ws.row_dimensions[row].height = 28
         row += 1
 
     # Category: No-load test / Kiểm tra không tải — 3 rows (with L1/L2/L3 sub-header)
     _nl_start = row
     _nl_end   = row + 2   # sub-header + Voltage + Current = 3 rows
     _cat_label(_nl_start, _nl_end, "No-load test / Kiểm tra không tải")
-    # Sub-header: blank | L1 | L2 | L3 | blank
-    _sc(row, 2, "", size=9, border=brd_all, fill_color=LIGHT_BLUE)
+    # Sub-header: blank | L1 | L2 | L3 | blank — xanh đậm chữ trắng như mẫu
+    _sc(row, 2, "", size=9, border=brd_all, fill_color=BLUE_HDR)
     for _c, _lbl in zip([3, 4, 5], ["L1", "L2", "L3"]):
-        _sc(row, _c, _lbl, bold=True, size=9,
-            border=brd_all, fill_color=LIGHT_BLUE)
-    _sc(row, 6, "", size=9, border=brd_all, fill_color=LIGHT_BLUE)
-    ws.row_dimensions[row].height = 16
+        _sc(row, _c, _lbl, bold=True, size=9, color=WHITE,
+            border=brd_all, fill_color=BLUE_HDR)
+    _sc(row, 6, "", size=9, border=brd_all, fill_color=BLUE_HDR)
+    ws.row_dimensions[row].height = 28
     row += 1
     for _lbl in ["Voltage (V)", "Current (A)"]:
-        _sc(row, 2, _lbl, size=9, border=brd_all, h_align="left")
+        _sc(row, 2, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
         for _c in range(3, 7):
             _sc(row, _c, "", size=9, border=brd_all)
-        ws.row_dimensions[row].height = 16
+        ws.row_dimensions[row].height = 28
         row += 1
 
-    # Vibration row — header (light blue) across all 6 cols, then values row
+    # Vibration row — xanh đậm chữ trắng như mẫu
     _vib_labels = [
         "Radial ↔ DE/AS", "Radial ↑ DE/AS", "Axial (X) DE/AS",
         "Radial ↔ NDE/AS", "Radial ↑ NDE/AS", "Axial (X) NDE/AS",
     ]
     for _c_idx, _lbl in enumerate(_vib_labels, start=1):
-        _sc(row, _c_idx, _lbl, bold=True, size=8,
-            border=brd_all, fill_color=LIGHT_BLUE, h_align="center")
-    ws.row_dimensions[row].height = 20
+        _sc(row, _c_idx, _lbl, bold=True, size=8, color=WHITE,
+            border=brd_all, fill_color=BLUE_HDR, h_align="center")
+    ws.row_dimensions[row].height = 28
     row += 1
     for _c_idx in range(1, 7):
         _sc(row, _c_idx, "", size=9, border=brd_all)
-    ws.row_dimensions[row].height = 20
-    row += 1          # past vib values → row 69
-    row += 6          # blank rows 69–74 để lấp đầy trang 2
-    ws.row_breaks.append(Break(id=row - 1))   # ── page break: page 2/9 → 3/9 (tại row 74)
+    ws.row_dimensions[row].height = 30
+    row += 1          # past vib values
+    # blank filler rows để lấp đầy trang 2
+    for _fi in range(8):
+        ws.row_dimensions[row].height = 40
+        row += 1
+    ws.row_breaks.append(Break(id=row - 1))   # ── page break: page 2 → 3
 
     for page_str, img_h_mm, tables in IMAGE_PAGES:
         # ── Header NT mini (2 hàng) ──────────────────────────────
@@ -3859,23 +3871,20 @@ _NHOM_DO = [
     ("📐 Resistance / Điện trở",
      [("R (U1 – U2)", "R_U1U2"),
       ("R (V1 – V2)", "R_V1V2"),
-      ("R (W1 – W2)", "R_W1W2")]),
-    ("📐 Resistance / Điện trở (R PTC, PT100, HEATER)",
-     [("R (PTC)",    "R_PTC"),
-      ("R (PT100)",  "R_PT100"),
-      ("R (HEATER)", "R_HEATER")]),
+      ("R (W1 – W2)", "R_W1W2"),
+      ("R (PTC)",     "R_PTC"),
+      ("R (PT100)",   "R_PT100"),
+      ("R (HEATER)",  "R_HEATER")]),
 
     # Trang 4/8 — Insulation Resistance
     ("🔒 Insulation Resistance / Cách điện",
      [("IR (U – V)",       "IR_UV"),
       ("IR (U – W)",       "IR_UW"),
-      ("IR (V – W)",       "IR_VW")]),
-    ("🔒 Insulation Resistance (cont.)",
-     [("IR (PTC – E)",     "IR_PTC_E"),
+      ("IR (V – W)",       "IR_VW"),
+      ("IR (PTC – E)",     "IR_PTC_E"),
       ("IR (PT100 – E)",   "IR_PT100_E"),
-      ("IR (HEATER – E)",  "IR_HEATER_E")]),
-    ("🔒 Insulation Resistance (cont.)",
-     [("IR (U – E)",       "IR_U_E"),
+      ("IR (HEATER – E)",  "IR_HEATER_E"),
+      ("IR (U – E)",       "IR_U_E"),
       ("IR (V – E)",       "IR_V_E"),
       ("IR (W – E)",       "IR_W_E")]),
 
