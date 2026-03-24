@@ -2237,6 +2237,99 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     row += 1
     row += 1
 
+    # ── Confirmation paragraph (bordered merged A:F, ~5 rows) ────
+    _confirm_start = row
+    _confirm_end   = row + 4
+    ws.merge_cells(f"A{_confirm_start}:F{_confirm_end}")
+    _cc = ws.cell(row=_confirm_start, column=1)
+    _en_text = (
+        "We hereby confirm that all electrical tests on this machine have been "
+        "performed in accordance with the relevant standards. This electronically "
+        "generated report is also valid without a handwritten signature."
+    )
+    _vi_text = (
+        "Chúng tôi xác nhận rằng tất cả các thử nghiệm điện trên máy này đã được "
+        "thực hiện theo các tiêu chuẩn liên quan. Báo cáo được tạo bằng điện tử "
+        "này cũng có giá trị mà không cần chữ ký viết tay."
+    )
+    _cc.value     = f"{_en_text}\n{_vi_text}"
+    _cc.font      = Font(name="Times New Roman", size=10, italic=False)
+    _cc.alignment = Alignment(horizontal="left", vertical="center",
+                              wrap_text=True)
+    _brd_merge(_confirm_start, 1, 6, brd_all, r_end=_confirm_end)
+    # Make Vietnamese line italic via rich text is not directly supported in
+    # openpyxl plain text; we set the whole cell italic=False and note the VI
+    # portion — best we can do without InlineFont is set italic on cell font.
+    # Instead, write two lines and apply italic to the cell (whole cell italic):
+    _cc.font = Font(name="Times New Roman", size=10)
+    for _r in range(_confirm_start, _confirm_end + 1):
+        ws.row_dimensions[_r].height = 18
+    row = _confirm_end + 1
+    row += 1
+
+    # ── CLIENT / CONTRACTOR signature block ──────────────────────
+    # Header row
+    ws.merge_cells(f"A{row}:C{row}")
+    _sc(row, 1, "CLIENT / CHỦ ĐẦU TƯ",
+        bold=True, size=10, color=WHITE, fill_color=BLUE_HDR,
+        border=brd_all, h_align="center")
+    _brd_merge(row, 1, 3, brd_all)
+    ws.merge_cells(f"D{row}:F{row}")
+    _sc(row, 4, "CONTRACTOR / NHÀ THẦU",
+        bold=True, size=10, color=WHITE, fill_color=BLUE_HDR,
+        border=brd_all, h_align="center")
+    _brd_merge(row, 4, 6, brd_all)
+    ws.row_dimensions[row].height = 20
+    row += 1
+
+    # Position row
+    ws.merge_cells(f"A{row}:C{row}")
+    _sc(row, 1, "Position / Chức vụ :",
+        size=9, border=brd_all, h_align="left")
+    _brd_merge(row, 1, 3, brd_all)
+    ws.merge_cells(f"D{row}:F{row}")
+    _sc(row, 4, "Position / Chức vụ : Trưởng bộ phận Kỹ thuật",
+        size=9, border=brd_all, h_align="left")
+    _brd_merge(row, 4, 6, brd_all)
+    ws.row_dimensions[row].height = 18
+    row += 1
+
+    # 3 empty rows (signature space, height=30)
+    for _ in range(3):
+        ws.merge_cells(f"A{row}:C{row}")
+        _sc(row, 1, "", size=9, border=brd_all)
+        _brd_merge(row, 1, 3, brd_all)
+        ws.merge_cells(f"D{row}:F{row}")
+        _sc(row, 4, "", size=9, border=brd_all)
+        _brd_merge(row, 4, 6, brd_all)
+        ws.row_dimensions[row].height = 30
+        row += 1
+
+    # Full name row
+    ws.merge_cells(f"A{row}:C{row}")
+    _sc(row, 1, "Full name / Họ và tên :",
+        size=9, border=brd_all, h_align="left")
+    _brd_merge(row, 1, 3, brd_all)
+    ws.merge_cells(f"D{row}:F{row}")
+    _sc(row, 4, f"Full name / Họ và tên : {nhan_vien.upper()}",
+        size=9, border=brd_all, h_align="left")
+    _brd_merge(row, 4, 6, brd_all)
+    ws.row_dimensions[row].height = 18
+    row += 1
+
+    # Date row
+    ws.merge_cells(f"A{row}:C{row}")
+    _sc(row, 1, "Date / Ngày :",
+        size=9, border=brd_all, h_align="left")
+    _brd_merge(row, 1, 3, brd_all)
+    ws.merge_cells(f"D{row}:F{row}")
+    _sc(row, 4, "Date / Ngày :",
+        size=9, border=brd_all, h_align="left")
+    _brd_merge(row, 4, 6, brd_all)
+    ws.row_dimensions[row].height = 18
+    row += 1
+    row += 1
+
     # ── Section II ───────────────────────────────────────────────
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1, "II. Hạng mục sửa chữa / Repair catalog",
@@ -2278,53 +2371,68 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # ═══════════════════════════════════════════════════════════
 
     IMAGE_PAGES = [
-        ("1/5", 75, [
-            ("Stator 1 coil resistance",
-             "Điện trở cuộn dây Stator 1",
-             ["U1 – U2", "V1 – V2", "W1 – W2"],
-             ["U1–U2",   "V1–V2",   "W1–W2"]),
-            ("Resistance of the temperature sensor",
-             "Điện trở của cảm biến nhiệt độ",
-             ["PTC", "PT100", "HEATER"],
-             ["PTC", "PT100", "HEATER"]),
-        ]),
-        ("2/5", 68, [
-            ("No-load test", "Kiểm tra không tải",
-             ["Frequency / Tần số", "Voltage / Điện áp", "Current / Dòng điện"],
-             ["Tần số", "Voltage", "Dòng điện"]),
+        ("3/8", 75, [
+            ("Resistance / Điện trở", "",
+             ["R (U1 – U2)", "R (V1 – V2)", "R (W1 – W2)"],
+             ["R_U1U2", "R_V1V2", "R_W1W2"]),
             ("", "",
-             ["Radial ↔ DE / AS", "Radial ↕ DE / AS", "Axial (X) DE / AS"],
-             ["Radial ↔ DE / AS", "Radial ↑ DE / AS", "Axial (X) DE / AS"]),
+             ["R (PTC)", "R (PT100)", "R (HEATER)"],
+             ["R_PTC", "R_PT100", "R_HEATER"]),
+        ]),
+        ("4/8", 75, [
+            ("Insulation Resistance / Cách điện", "",
+             ["IR (U – V)", "IR (U – W)", "IR (V – W)"],
+             ["IR_UV", "IR_UW", "IR_VW"]),
             ("", "",
-             ["Radial ↔ NDE / AS", "Radial ↕ NDE / AS", "Axial (X) NDE / AS"],
-             ["Radial ↔ NDE / AS", "Radial ↑ NDE / AS", "Axial (X) NDE / AS"]),
-        ]),
-        ("3/5", 75, [
-            ("Engine overview", "Tổng quan động cơ",
-             ["Engine / Động cơ", "Nameplate / Bảng tên", "Quạt làm mát / Cooling fan"],
-             ["Engine / Động cơ", "Nameplate / Bảng tên", "Quạt làm mát / Cooling fan"]),
-            ("Nắp động cơ", "",
-             ["DE", "NDE"], ["Nắp DE", "Nắp NDE"]),
-        ]),
-        ("4/5", 58, [
-            ("Trục động cơ", "",
-             ["Bạc đạn DE", "Bạc đạn NDE"], ["Bạc đạn DE", "Bạc đạn NDE"]),
+             ["IR (PTC – E)", "IR (PT100 – E)", "IR (HEATER – E)"],
+             ["IR_PTC_E", "IR_PT100_E", "IR_HEATER_E"]),
             ("", "",
-             ["Phớt", "Đầu ren, chốt lavet", "Cánh quạt làm mát"],
-             ["Phớt", "Đầu ren, chốt lavet", "Cánh quạt làm mát"]),
-            ("Phớt chặn", "",
-             ["Phớt 1", "Phớt 2"], ["Phớt chặn 1", "Phớt chặn 2"]),
-            ("Bearing / Vòng bi", "",
-             ["DE", "NDE"], ["Vòng bi DE", "Vòng bi NDE"]),
+             ["IR (U – E)", "IR (V – E)", "IR (W – E)"],
+             ["IR_U_E", "IR_V_E", "IR_W_E"]),
         ]),
-        ("5/5", 68, [
-            ("Grease pump", "Bơm mỡ bôi trơn",
-             ["Bearing / Vòng bi", "Grease cap / Mặt gam"],
-             ["Vòng bi bơm mỡ", "Mặt gam"]),
-            ("Coil", "Cuộn dây",
-             ["Vào dây", "Đai đấu"], ["Vào dây", "Đai đầu"]),
-            ("Cân bằng động", "",
-             ["Gá lên máy", "Sau khi cân"], ["Gá lên máy", "Sau khi cân"]),
+        ("5/8", 85, [
+            ("Engine Overview / Tổng Quan Động Cơ", "",
+             ["Engine / Động cơ", "Nameplate / Bảng thông số"],
+             ["eng_overview", "eng_nameplate"]),
+            ("Terminal Box / Hộp Điện", "",
+             ["Before", "After"],
+             ["tb_before", "tb_after"]),
+            ("Terminal Block / Cầu Đấu Điện", "",
+             ["Before", "After"],
+             ["tbl_before", "tbl_after"]),
+        ]),
+        ("6/8", 85, [
+            ("Cover Fan / Chụp Bảo Vệ Cánh Quạt", "",
+             ["Before", "After"],
+             ["cf_before", "cf_after"]),
+            ("Rotor Fan / Cánh Quạt", "",
+             ["Before", "After"],
+             ["rf_before", "rf_after"]),
+            ("Coil / Cuộn dây", "",
+             ["Before", "After"],
+             ["coil_before", "coil_after"]),
+        ]),
+        ("7/8", 85, [
+            ("End Cover DE / Nắp Đầu Tải", "",
+             ["Before", "After"],
+             ["ec_de_before", "ec_de_after"]),
+            ("End Cover NDE / Nắp Đầu Không Tải", "",
+             ["Before", "After"],
+             ["ec_nde_before", "ec_nde_after"]),
+            ("Shaft at DE / Trục Đầu Tải", "",
+             ["Before", "After"],
+             ["shaft_de_before", "shaft_de_after"]),
+        ]),
+        ("8/8", 85, [
+            ("Shaft at NDE / Trục Đầu Không Tải", "",
+             ["Before", "After"],
+             ["shaft_nde_before", "shaft_nde_after"]),
+            ("DE Bearing / Vòng Bi Đầu Tải", "",
+             ["Before", "After"],
+             ["de_brg_before", "de_brg_after"]),
+            ("NDE Bearing / Vòng Bi Đầu Không Tải", "",
+             ["Before", "After"],
+             ["nde_brg_before", "nde_brg_after"]),
         ]),
     ]
 
@@ -2362,26 +2470,30 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
 
     row += 1  # dòng trống ngăn cách BBNT và phần ảnh
 
-    for page_str, img_h_mm, tables in IMAGE_PAGES:
-        # ── Header NT mini (2 hàng) ──────────────────────────────
+    # ═══════════════════════════════════════════════════════════
+    # TRANG 2/8 — BẢNG SỐ LIỆU ĐO LƯỜNG (manual entry)
+    # ═══════════════════════════════════════════════════════════
+
+    def _nt_mini_header(page_lbl):
+        """Render NT mini header (2 rows) at current row, advance row by 3."""
+        nonlocal row
         ws.merge_cells(f"A{row}:A{row+1}")
-        _nt_cell = ws.cell(row=row, column=1,
-                           value="" if _logo_bio is not None else "NT")
-        _nt_cell.font      = _font(bold=True, size=11)
-        _nt_cell.alignment = _align()
+        _nt2 = ws.cell(row=row, column=1,
+                       value="" if _logo_bio is not None else "NT")
+        _nt2.font      = _font(bold=True, size=11)
+        _nt2.alignment = _align()
         _brd_merge(row, 1, 1, brd_all, r_end=row + 1)
         if _logo_bio is not None:
             _logo_bio.seek(0)
-            _xl_nt = XLImage(io.BytesIO(_logo_bio.read()))
-            PAD_NT = 9144
-            _nt_anchor = TwoCellAnchor(editAs="twoCell")
-            _nt_anchor._from = AnchorMarker(col=0, colOff=PAD_NT,
-                                             row=row - 1, rowOff=PAD_NT)
-            _nt_anchor.to   = AnchorMarker(col=1, colOff=-PAD_NT,
-                                             row=row + 1, rowOff=-PAD_NT)
-            _xl_nt.anchor = _nt_anchor
-            ws.add_image(_xl_nt)
-
+            _xl_nt2 = XLImage(io.BytesIO(_logo_bio.read()))
+            PAD_NT2 = 9144
+            _nt2_anchor = TwoCellAnchor(editAs="twoCell")
+            _nt2_anchor._from = AnchorMarker(col=0, colOff=PAD_NT2,
+                                              row=row - 1, rowOff=PAD_NT2)
+            _nt2_anchor.to   = AnchorMarker(col=1, colOff=-PAD_NT2,
+                                              row=row + 1, rowOff=-PAD_NT2)
+            _xl_nt2.anchor = _nt2_anchor
+            ws.add_image(_xl_nt2)
         ws.merge_cells(f"B{row}:C{row}")
         _sc(row, 2, "Quotation / Báo giá:", size=8, border=brd_all)
         _brd_merge(row, 2, 3, brd_all)
@@ -2389,7 +2501,6 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _sc(row, 4, "Engine number / Số máy:", size=8, border=brd_all)
         _brd_merge(row, 4, 5, brd_all)
         _sc(row, 6, f"Order number / Số ĐH: {cong_so}", size=8, border=brd_all)
-
         ws.merge_cells(f"B{row+1}:C{row+1}")
         _sc(row + 1, 2,
             "Management document / Tài liệu quản lý: QT-NT-029-1A",
@@ -2399,10 +2510,115 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _sc(row + 1, 4, "Edition date / Ngày ban hành: 24/04/2025",
             size=7, border=brd_all)
         _brd_merge(row + 1, 4, 5, brd_all)
-        _sc(row + 1, 6, f"Page / Trang: {page_str}", size=8, border=brd_all)
+        _sc(row + 1, 6, f"Page / Trang: {page_lbl}", size=8, border=brd_all)
         ws.row_dimensions[row].height     = 16
         ws.row_dimensions[row + 1].height = 16
-        row += 3   # 2 hàng header + 1 trống
+        row += 3
+
+    # NT mini header for page 2/8
+    _nt_mini_header("2/8")
+
+    LIGHT_BLUE = "DAEEF3"
+
+    def _val_cell(r, c1, c2):
+        """Empty bordered value cell (merged if c1 != c2)."""
+        if c1 != c2:
+            ws.merge_cells(
+                f"{get_column_letter(c1)}{r}:{get_column_letter(c2)}{r}")
+        _sc(r, c1, "", size=9, border=brd_all)
+        _brd_merge(r, c1, c2, brd_all)
+
+    def _cat_label(r_start, r_end, label):
+        """Dark-blue category label merged vertically in col A, rotated."""
+        if r_end > r_start:
+            ws.merge_cells(f"A{r_start}:A{r_end}")
+        c = ws.cell(row=r_start, column=1, value=label)
+        c.font      = Font(bold=True, size=9, color=WHITE,
+                           name="Times New Roman")
+        c.alignment = Alignment(horizontal="center", vertical="center",
+                                wrap_text=True, text_rotation=90)
+        c.fill   = _fill(BLUE_HDR)
+        _brd_merge(r_start, 1, 1, brd_all, r_end=r_end)
+
+    # ── Group 1: Terminal / Đầu cực đấu ─────────────────────────
+    ws.merge_cells(f"A{row}:F{row}")
+    _tc = ws.cell(row=row, column=1,
+                  value="Terminal / Đầu cực đấu")
+    _tc.font      = Font(bold=True, size=10, color=WHITE, name="Times New Roman")
+    _tc.alignment = Alignment(horizontal="center", vertical="center")
+    _tc.fill      = _fill(BLUE_HDR)
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 20
+    row += 1
+
+    # Category: Resistance (mΩ) / Điện trở — 6 rows
+    _res_rows = [
+        "R(U1-U2)", "R(V1-V2)", "R(W1-W2)",
+        "R(PTC)", "R(PT100)", "R(HEATER)",
+    ]
+    _res_start = row
+    _res_end   = row + len(_res_rows) - 1
+    _cat_label(_res_start, _res_end, "Resistance (mΩ) / Điện trở")
+    for _lbl in _res_rows:
+        _sc(row, 2, _lbl, size=9, border=brd_all, h_align="left")
+        for _c in range(3, 7):
+            _sc(row, _c, "", size=9, border=brd_all)
+        ws.row_dimensions[row].height = 16
+        row += 1
+
+    # Category: Insulation Resistance (MΩ) / Cách điện — 7 rows
+    _ir_rows = [
+        "IR(U-V)", "IR(U-W)", "IR(V-W)",
+        "IR(U;V;W-E)", "IR(PTC-E)", "IR(PT100-E)", "IR(HEATER-E)",
+    ]
+    _ir_start = row
+    _ir_end   = row + len(_ir_rows) - 1
+    _cat_label(_ir_start, _ir_end, "Insulation Resistance (MΩ) / Cách điện")
+    for _lbl in _ir_rows:
+        _sc(row, 2, _lbl, size=9, border=brd_all, h_align="left")
+        for _c in range(3, 7):
+            _sc(row, _c, "", size=9, border=brd_all)
+        ws.row_dimensions[row].height = 16
+        row += 1
+
+    # Category: No-load test / Kiểm tra không tải — 3 rows (with L1/L2/L3 sub-header)
+    _nl_start = row
+    _nl_end   = row + 2   # sub-header + Voltage + Current = 3 rows
+    _cat_label(_nl_start, _nl_end, "No-load test / Kiểm tra không tải")
+    # Sub-header: blank | L1 | L2 | L3 | blank
+    _sc(row, 2, "", size=9, border=brd_all, fill_color=LIGHT_BLUE)
+    for _c, _lbl in zip([3, 4, 5], ["L1", "L2", "L3"]):
+        _sc(row, _c, _lbl, bold=True, size=9,
+            border=brd_all, fill_color=LIGHT_BLUE)
+    _sc(row, 6, "", size=9, border=brd_all, fill_color=LIGHT_BLUE)
+    ws.row_dimensions[row].height = 16
+    row += 1
+    for _lbl in ["Voltage (V)", "Current (A)"]:
+        _sc(row, 2, _lbl, size=9, border=brd_all, h_align="left")
+        for _c in range(3, 7):
+            _sc(row, _c, "", size=9, border=brd_all)
+        ws.row_dimensions[row].height = 16
+        row += 1
+
+    # Vibration row — header (light blue) across all 6 cols, then values row
+    _vib_labels = [
+        "Radial ↔ DE/AS", "Radial ↑ DE/AS", "Axial (X) DE/AS",
+        "Radial ↔ NDE/AS", "Radial ↑ NDE/AS", "Axial (X) NDE/AS",
+    ]
+    for _c_idx, _lbl in enumerate(_vib_labels, start=1):
+        _sc(row, _c_idx, _lbl, bold=True, size=8,
+            border=brd_all, fill_color=LIGHT_BLUE, h_align="center")
+    ws.row_dimensions[row].height = 20
+    row += 1
+    for _c_idx in range(1, 7):
+        _sc(row, _c_idx, "", size=9, border=brd_all)
+    ws.row_dimensions[row].height = 20
+    row += 1
+    row += 1  # separator
+
+    for page_str, img_h_mm, tables in IMAGE_PAGES:
+        # ── Header NT mini (2 hàng) ──────────────────────────────
+        _nt_mini_header(page_str)
 
         for ten_en, ten_vi, display_labels, storage_keys in tables:
             n      = len(display_labels)
@@ -2474,6 +2690,23 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             row += 1  # trống giữa các bảng
 
         row += 1  # khoảng cách giữa các trang
+
+    # ── Page setup: A4 landscape, fit 1 trang ngang ─────────────
+    from openpyxl.worksheet.page import PageMargins
+    ws.page_setup.paperSize        = 9          # A4
+    ws.page_setup.orientation      = "landscape"
+    ws.page_setup.fitToPage        = True
+    ws.page_setup.fitToWidth       = 1          # scale vừa 1 trang ngang
+    ws.page_setup.fitToHeight      = 0          # chiều cao tự nhiên (nhiều trang)
+    ws.page_setup.horizontalDpi    = 300
+    ws.page_setup.verticalDpi      = 300
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+
+    ws.page_margins = PageMargins(
+        left=0.39, right=0.39,        # ~1 cm
+        top=0.59,  bottom=0.59,       # ~1.5 cm
+        header=0.2, footer=0.2,
+    )
 
     # ── Xuất bytes ──────────────────────────────────────────────
     buf = io.BytesIO()
@@ -3613,41 +3846,75 @@ def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
     )
 
 
+# Cấu trúc: (tiêu đề nhóm, [(display_label, storage_key), ...])
 _NHOM_DO = [
-    # Hình 1
-    ("Stator 1 coil resistance / Điện trở cuộn dây Stator 1",
-     ["U1–U2", "V1–V2", "W1–W2"]),
+    # Trang 3/8 — Resistance
+    ("📐 Resistance / Điện trở",
+     [("R (U1 – U2)", "R_U1U2"),
+      ("R (V1 – V2)", "R_V1V2"),
+      ("R (W1 – W2)", "R_W1W2")]),
+    ("📐 Resistance / Điện trở (R PTC, PT100, HEATER)",
+     [("R (PTC)",    "R_PTC"),
+      ("R (PT100)",  "R_PT100"),
+      ("R (HEATER)", "R_HEATER")]),
 
-    # Hình 2
-    ("Resistance of the temperature sensor / Điện trở cảm biến nhiệt độ",
-     ["PTC", "PT100", "HEATER"]),
-    ("No-load test / Kiểm tra không tải",
-     ["Tần số", "Voltage", "Dòng điện",
-      "Radial ↔ DE / AS", "Radial ↑ DE / AS", "Axial (X) DE / AS",
-      "Radial ↔ NDE / AS", "Radial ↑ NDE / AS", "Axial (X) NDE / AS"]),
+    # Trang 4/8 — Insulation Resistance
+    ("🔒 Insulation Resistance / Cách điện",
+     [("IR (U – V)",       "IR_UV"),
+      ("IR (U – W)",       "IR_UW"),
+      ("IR (V – W)",       "IR_VW")]),
+    ("🔒 Insulation Resistance (cont.)",
+     [("IR (PTC – E)",     "IR_PTC_E"),
+      ("IR (PT100 – E)",   "IR_PT100_E"),
+      ("IR (HEATER – E)",  "IR_HEATER_E")]),
+    ("🔒 Insulation Resistance (cont.)",
+     [("IR (U – E)",       "IR_U_E"),
+      ("IR (V – E)",       "IR_V_E"),
+      ("IR (W – E)",       "IR_W_E")]),
 
-    # Hình 3
-    ("Engine overview / Tổng quan động cơ",
-     ["Engine / Động cơ", "Nameplate / Bảng tên", "Quạt làm mát / Cooling fan"]),
-    ("Nắp động cơ",
-     ["Nắp DE", "Nắp NDE"]),
+    # Trang 5/8 — Engine Overview, Terminal Box, Terminal Block
+    ("🔧 Engine Overview / Tổng Quan Động Cơ",
+     [("Engine / Động cơ",            "eng_overview"),
+      ("Nameplate / Bảng thông số",   "eng_nameplate")]),
+    ("🔌 Terminal Box / Hộp Điện",
+     [("Before / Trước", "tb_before"),
+      ("After / Sau",    "tb_after")]),
+    ("🔌 Terminal Block / Cầu Đấu Điện",
+     [("Before / Trước", "tbl_before"),
+      ("After / Sau",    "tbl_after")]),
 
-    # Hình 4
-    ("Trục động cơ",
-     ["Bạc đạn DE", "Bạc đạn NDE",
-      "Phớt", "Đầu ren, chốt lavet", "Cánh quạt làm mát"]),
-    ("Phớt chặn",
-     ["Phớt chặn 1", "Phớt chặn 2"]),
-    ("Bearing / Vòng bi",
-     ["Vòng bi DE", "Vòng bi NDE"]),
+    # Trang 6/8 — Cover Fan, Rotor Fan, Coil
+    ("💨 Cover Fan / Chụp Bảo Vệ Cánh Quạt",
+     [("Before / Trước", "cf_before"),
+      ("After / Sau",    "cf_after")]),
+    ("💨 Rotor Fan / Cánh Quạt",
+     [("Before / Trước", "rf_before"),
+      ("After / Sau",    "rf_after")]),
+    ("🌀 Coil / Cuộn dây",
+     [("Before / Trước", "coil_before"),
+      ("After / Sau",    "coil_after")]),
 
-    # Hình 5
-    ("Grease pump / Bơm mỡ bôi trơn",
-     ["Vòng bi bơm mỡ", "Mặt gam"]),
-    ("Coil / Cuộn dây",
-     ["Vào dây", "Đai đầu"]),
-    ("Cân bằng động",
-     ["Gá lên máy", "Sau khi cân"]),
+    # Trang 7/8 — End Covers, Shaft DE
+    ("🔩 End Cover DE / Nắp Đầu Tải",
+     [("Before / Trước", "ec_de_before"),
+      ("After / Sau",    "ec_de_after")]),
+    ("🔩 End Cover NDE / Nắp Đầu Không Tải",
+     [("Before / Trước", "ec_nde_before"),
+      ("After / Sau",    "ec_nde_after")]),
+    ("⚙️ Shaft at DE / Trục Đầu Tải",
+     [("Before / Trước", "shaft_de_before"),
+      ("After / Sau",    "shaft_de_after")]),
+
+    # Trang 8/8 — Shaft NDE, Bearings
+    ("⚙️ Shaft at NDE / Trục Đầu Không Tải",
+     [("Before / Trước", "shaft_nde_before"),
+      ("After / Sau",    "shaft_nde_after")]),
+    ("🔵 DE Bearing / Vòng Bi Đầu Tải",
+     [("Before / Trước", "de_brg_before"),
+      ("After / Sau",    "de_brg_after")]),
+    ("🔵 NDE Bearing / Vòng Bi Đầu Không Tải",
+     [("Before / Trước", "nde_brg_before"),
+      ("After / Sau",    "nde_brg_after")]),
 ]
 
 
@@ -3683,43 +3950,48 @@ def _fragment_upload_do_luong(task_id, do_key: str):
             f"{nhom_title}</div>",
             unsafe_allow_html=True,
         )
-        for label in labels:
+        for item in labels:
+            # item là (display_label, storage_key) hoặc chuỗi cũ
+            if isinstance(item, tuple):
+                lbl_display, lbl_key = item
+            else:
+                lbl_display = lbl_key = item
             st.markdown(
                 f"<div style='background:#fef9c3;border:1px solid #e5e7eb;padding:6px 14px;"
                 f"font-weight:600;font-size:0.85rem;margin-top:4px;border-radius:4px;'>"
-                f"📏 {label}</div>",
+                f"📷 {lbl_display}</div>",
                 unsafe_allow_html=True,
             )
-            urls_label = st.session_state[do_key].get(label, [])
+            urls_label = st.session_state[do_key].get(lbl_key, [])
             if urls_label:
-                # Đã có ảnh — hiển thị + nút xoá, ẩn uploader
+                # Đã có ảnh — hiển thị + nút xoá
                 url_d = urls_label[0]
                 col_img, col_del = st.columns([3, 1], gap="small")
                 with col_img:
                     _hien_thi_anh_drive(url_d, width=120)
                 with col_del:
                     st.button(
-                        "🗑️ Xoá", key=f"xoa_do_{task_id}_{label}_0",
+                        "🗑️ Xoá", key=f"xoa_do_{task_id}_{lbl_key}_0",
                         use_container_width=True,
                         on_click=_cb_xoa_do,
-                        args=(task_id, do_key, label, url_d),
+                        args=(task_id, do_key, lbl_key, url_d),
                     )
             else:
-                # Chưa có ảnh — hiển thị uploader (1 file duy nhất)
-                up_key   = f"up_do_{task_id}_{label}"
-                done_key = f"up_do_done_{task_id}_{label}"
+                # Chưa có ảnh — hiển thị uploader
+                up_key   = f"up_do_{task_id}_{lbl_key}"
+                done_key = f"up_do_done_{task_id}_{lbl_key}"
                 st.file_uploader(
-                    f"Ảnh {label}",
+                    f"Ảnh {lbl_display}",
                     type=["jpg", "jpeg", "png"],
                     key=up_key,
                     label_visibility="collapsed",
                     accept_multiple_files=False,
                 )
                 st.button(
-                    "📤 Upload", key=f"btn_do_{task_id}_{label}",
+                    "📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
                     use_container_width=True,
                     on_click=_cb_upload_do,
-                    args=(task_id, do_key, label, up_key, done_key),
+                    args=(task_id, do_key, lbl_key, up_key, done_key),
                 )
 
 
