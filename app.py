@@ -2576,25 +2576,27 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _brd_merge(r, c1, c2, brd_all)
 
     def _cat_label(r_start, r_end, label):
-        """Dark-blue category label merged vertically in col A, rotated."""
-        if r_end > r_start:
-            ws.merge_cells(f"A{r_start}:A{r_end}")
+        """Dark-blue category label merged vertically in col A+B (2 columns)."""
+        ws.merge_cells(f"A{r_start}:B{r_end}")
         c = ws.cell(row=r_start, column=1, value=label)
         c.font      = Font(bold=True, size=9, color=WHITE,
                            name="Times New Roman")
         c.alignment = Alignment(horizontal="center", vertical="center",
                                 wrap_text=True, text_rotation=0)
         c.fill   = _fill(BLUE_HDR)
-        _brd_merge(r_start, 1, 1, brd_all, r_end=r_end)
+        _brd_merge(r_start, 1, 2, brd_all, r_end=r_end)
 
     # ── Group 1: Terminal / Đầu cực đấu ─────────────────────────
-    ws.merge_cells(f"A{row}:F{row}")
-    _tc = ws.cell(row=row, column=1,
+    # Col A+B: blank (category area), Col C-F: Terminal header
+    _sc(row, 1, "", size=9, border=brd_all)
+    _sc(row, 2, "", size=9, border=brd_all)
+    ws.merge_cells(f"C{row}:F{row}")
+    _tc = ws.cell(row=row, column=3,
                   value="Terminal / Đầu cực đấu")
     _tc.font      = Font(bold=True, size=10, color=WHITE, name="Times New Roman")
     _tc.alignment = Alignment(horizontal="center", vertical="center")
     _tc.fill      = _fill(BLUE_HDR)
-    _brd_merge(row, 1, 6, brd_all)
+    _brd_merge(row, 3, 6, brd_all)
     ws.row_dimensions[row].height = 20
     row += 1
 
@@ -2607,8 +2609,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _res_end   = row + len(_res_rows) - 1
     _cat_label(_res_start, _res_end, "Resistance (mΩ) / Điện trở")
     for _lbl in _res_rows:
-        _sc(row, 2, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
-        for _c in range(3, 7):
+        _sc(row, 3, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
+        for _c in range(4, 7):
             _sc(row, _c, "", size=9, border=brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
@@ -2622,8 +2624,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _ir_end   = row + len(_ir_rows) - 1
     _cat_label(_ir_start, _ir_end, "Insulation Resistance (MΩ) / Cách điện")
     for _lbl in _ir_rows:
-        _sc(row, 2, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
-        for _c in range(3, 7):
+        _sc(row, 3, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
+        for _c in range(4, 7):
             _sc(row, _c, "", size=9, border=brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
@@ -2632,17 +2634,16 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _nl_start = row
     _nl_end   = row + 2   # sub-header + Voltage + Current = 3 rows
     _cat_label(_nl_start, _nl_end, "No-load test / Kiểm tra không tải")
-    # Sub-header: chỉ L1 | L2 | L3 tô xanh, cột 2 và cột 6 để trống border bình thường
-    _sc(row, 2, "", size=9, border=brd_all)
-    for _c, _lbl in zip([3, 4, 5], ["L1", "L2", "L3"]):
+    # Sub-header: col3=blank/blue, col4=L1, col5=L2, col6=L3
+    _sc(row, 3, "", size=9, border=brd_all, fill_color=BLUE_HDR)
+    for _c, _lbl in zip([4, 5, 6], ["L1", "L2", "L3"]):
         _sc(row, _c, _lbl, bold=True, size=9, color=WHITE,
             border=brd_all, fill_color=BLUE_HDR)
-    _sc(row, 6, "", size=9, border=brd_all)
     ws.row_dimensions[row].height = 28
     row += 1
     for _lbl in ["Voltage (V)", "Current (A)"]:
-        _sc(row, 2, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
-        for _c in range(3, 7):
+        _sc(row, 3, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
+        for _c in range(4, 7):
             _sc(row, _c, "", size=9, border=brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
