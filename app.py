@@ -2967,6 +2967,18 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
 
     st.divider()
 
+    # ── Người Phê Duyệt (có thể chỉnh) ───────────────────────
+    _pd_cur = hang.get("Người Phê Duyệt", "") or ""
+    _ds_pd  = ["-- Không chọn --"] + lay_danh_sach_nhan_vien()
+    _pd_idx = _ds_pd.index(_pd_cur) if _pd_cur in _ds_pd else 0
+    _pd_new = st.selectbox("✅ Người Phê Duyệt", _ds_pd, index=_pd_idx, key=f"edit_pd_{task_id}")
+    _pd_luu = _pd_new if _pd_new != "-- Không chọn --" else ""
+    if _pd_luu != _pd_cur:
+        with st.spinner("Đang lưu..."):
+            cap_nhat_nhieu_truong_task(task_id, {"Người Phê Duyệt": _pd_luu})
+
+    st.divider()
+
     # ── Checklist ─────────────────────────────────────────────
     raw_cl = hang.get("Checklist", "") or "[]"
     try:
