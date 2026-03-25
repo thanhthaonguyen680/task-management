@@ -2336,24 +2336,26 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     ws.row_dimensions[row].height = 28
     row += 1
 
-    # 3 empty rows (signature space, height=85)
-    for _ in range(3):
-        ws.merge_cells(f"A{row}:C{row}")
-        _sc(row, 1, "", size=9, border=brd_all)
-        _brd_merge(row, 1, 3, brd_all)
-        ws.merge_cells(f"D{row}:F{row}")
-        _sc(row, 4, "", size=9, border=brd_all)
-        _brd_merge(row, 4, 6, brd_all)
-        ws.row_dimensions[row].height = 60
-        row += 1
+    # Merge 3 rows thành 1 ô ký tên mỗi bên (khoảng trắng để ký tay)
+    _sig_start = row
+    _sig_end   = row + 2
+    ws.merge_cells(f"A{_sig_start}:C{_sig_end}")
+    _sc(_sig_start, 1, "", size=13, border=brd_all)
+    _brd_merge(_sig_start, 1, 3, brd_all, r_end=_sig_end)
+    ws.merge_cells(f"D{_sig_start}:F{_sig_end}")
+    _sc(_sig_start, 4, "", size=13, border=brd_all)
+    _brd_merge(_sig_start, 4, 6, brd_all, r_end=_sig_end)
+    for _r in range(_sig_start, _sig_end + 1):
+        ws.row_dimensions[_r].height = 60
+    row = _sig_end + 1
 
-    # Full name row
+    # Full name row — bỏ tên nhân viên, để trống để điền tay
     ws.merge_cells(f"A{row}:C{row}")
     _sc(row, 1, "Full name / Họ và tên :",
         size=13, border=brd_all, h_align="left")
     _brd_merge(row, 1, 3, brd_all)
     ws.merge_cells(f"D{row}:F{row}")
-    _sc(row, 4, f"Full name / Họ và tên : {nhan_vien.upper()}",
+    _sc(row, 4, "Full name / Họ và tên :",
         size=13, border=brd_all, h_align="left")
     _brd_merge(row, 4, 6, brd_all)
     ws.row_dimensions[row].height = 28
@@ -2541,24 +2543,24 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             _xl_nt2.anchor = _nt2_anchor
             ws.add_image(_xl_nt2)
         ws.merge_cells(f"B{row}:C{row}")
-        _sc(row, 2, "Quotation / Báo giá:", size=8, border=brd_all)
+        _sc(row, 2, "Quotation / Báo giá:", size=12, border=brd_all)
         _brd_merge(row, 2, 3, brd_all)
         ws.merge_cells(f"D{row}:E{row}")
-        _sc(row, 4, "Engine number / Số máy:", size=8, border=brd_all)
+        _sc(row, 4, "Engine number / Số máy:", size=12, border=brd_all)
         _brd_merge(row, 4, 5, brd_all)
-        _sc(row, 6, f"Order number / Số ĐH: {cong_so}", size=8, border=brd_all)
+        _sc(row, 6, f"Order number / Số ĐH: {cong_so}", size=12, border=brd_all)
         ws.merge_cells(f"B{row+1}:C{row+1}")
         _sc(row + 1, 2,
             "Management document / Tài liệu quản lý: QT-NT-029-1A",
-            size=7, border=brd_all)
+            size=10, border=brd_all)
         _brd_merge(row + 1, 2, 3, brd_all)
         ws.merge_cells(f"D{row+1}:E{row+1}")
         _sc(row + 1, 4, "Edition date / Ngày ban hành: 24/04/2025",
-            size=7, border=brd_all)
+            size=10, border=brd_all)
         _brd_merge(row + 1, 4, 5, brd_all)
-        _sc(row + 1, 6, f"Page / Trang: {page_lbl}", size=8, border=brd_all)
-        ws.row_dimensions[row].height     = 22
-        ws.row_dimensions[row + 1].height = 22
+        _sc(row + 1, 6, f"Page / Trang: {page_lbl}", size=12, border=brd_all)
+        ws.row_dimensions[row].height     = 26
+        ws.row_dimensions[row + 1].height = 24
         ws.row_dimensions[row + 2].height = 14   # blank gap sau mini header
         row += 3
 
