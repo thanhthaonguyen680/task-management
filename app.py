@@ -2208,8 +2208,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         "MST: 3603238978  ĐT: 0907 042 043 (Mr.Hiệp) – 0908 062 291 (Ms.Linh)",
     ]:
         ws.merge_cells(f"B{row}:F{row}")
-        _sc(row, 2, txt, size=10, h_align="center")
-        ws.row_dimensions[row].height = 16
+        _sc(row, 2, txt, size=13, h_align="center")
+        ws.row_dimensions[row].height = 20
         row += 1
     # Outer border cho toàn bộ khối B:F header
     _brd_merge(_hdr_start, 2, 6, brd_all, r_end=_hdr_end)
@@ -2261,9 +2261,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1,
         "I. Time and place of the test / Thời gian và địa điểm kiểm tra",
-        bold=True, size=12, h_align="left", border=brd_all)
+        bold=True, size=13, h_align="left", border=brd_all)
     _brd_merge(row, 1, 6, brd_all)
-    ws.row_dimensions[row].height = 24
+    ws.row_dimensions[row].height = 26
     row += 1
 
     ws.merge_cells(f"A{row}:F{row}")
@@ -2378,8 +2378,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # ── Section II ───────────────────────────────────────────────
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1, "II. Hạng mục sửa chữa / Repair catalog",
-        bold=True, size=12, h_align="left")
-    ws.row_dimensions[row].height = 24
+        bold=True, size=13, h_align="left")
+    ws.row_dimensions[row].height = 26
     row += 1
 
     # Header bảng — nền xanh nhạt, chữ đen đậm (dễ in đen trắng)
