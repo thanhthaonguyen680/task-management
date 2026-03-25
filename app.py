@@ -2111,7 +2111,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     brd_all   = Border(left=thin, right=thin, top=thin, bottom=thin)
     brd_thick = Border(left=thick, right=thick, top=thick, bottom=thick)
 
-    BLUE_HDR  = "4472C4"
+    BLUE_HDR  = "5B84CC"
     BLUE_CELL = "BDD7EE"
     PURPLE    = "70309F"
     WHITE     = "FFFFFF"
@@ -2346,7 +2346,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _sc(_sig_start, 4, "", size=13, border=brd_all)
     _brd_merge(_sig_start, 4, 6, brd_all, r_end=_sig_end)
     for _r in range(_sig_start, _sig_end + 1):
-        ws.row_dimensions[_r].height = 60
+        ws.row_dimensions[_r].height = 40
     row = _sig_end + 1
 
     # Full name row — bỏ tên nhân viên, để trống để điền tay
@@ -2406,11 +2406,11 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _brd_merge(row, 2, 4, brd_all)
         _sc(row, 5, "", size=13, border=brd_all, fill_color=fill)
         _sc(row, 6, "", size=13, border=brd_all, fill_color=fill)
-        ws.row_dimensions[row].height = 34
+        ws.row_dimensions[row].height = 26
         row += 1
 
     row += 1
-    ws.row_dimensions[row - 1].height = 20
+    ws.row_dimensions[row - 1].height = 14
 
     # ═══════════════════════════════════════════════════════════
     # PHẦN 2 — ẢNH ĐO LƯỜNG (IMAGE_PAGES 1/5 → 5/5)
@@ -2437,7 +2437,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
              ["IR (U – E)", "IR (V – E)", "IR (W – E)"],
              ["IR_U_E", "IR_V_E", "IR_W_E"]),
         ]),
-        ("5/8", 85, [
+        ("5/8", 46, [
             ("Engine Overview / Tổng Quan Động Cơ", "",
              ["Engine / Động cơ", "Nameplate / Bảng thông số"],
              ["eng_overview", "eng_nameplate"]),
@@ -2448,7 +2448,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
              ["Before", "After"],
              ["tbl_before", "tbl_after"]),
         ]),
-        ("6/8", 85, [
+        ("6/8", 46, [
             ("Cover Fan / Chụp Bảo Vệ Cánh Quạt", "",
              ["Before", "After"],
              ["cf_before", "cf_after"]),
@@ -2459,7 +2459,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
              ["Before", "After"],
              ["coil_before", "coil_after"]),
         ]),
-        ("7/8", 85, [
+        ("7/8", 46, [
             ("End Cover DE / Nắp Đầu Tải", "",
              ["Before", "After"],
              ["ec_de_before", "ec_de_after"]),
@@ -2470,7 +2470,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
              ["Before", "After"],
              ["shaft_de_before", "shaft_de_after"]),
         ]),
-        ("8/8", 85, [
+        ("8/8", 46, [
             ("Shaft at NDE / Trục Đầu Không Tải", "",
              ["Before", "After"],
              ["shaft_nde_before", "shaft_nde_after"]),
@@ -2581,7 +2581,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         """Dark-blue category label merged vertically in col A+B (2 columns)."""
         ws.merge_cells(f"A{r_start}:B{r_end}")
         c = ws.cell(row=r_start, column=1, value=label)
-        c.font      = Font(bold=True, size=9, color=WHITE,
+        c.font      = Font(bold=True, size=13, color=WHITE,
                            name="Times New Roman")
         c.alignment = Alignment(horizontal="center", vertical="center",
                                 wrap_text=True, text_rotation=0)
@@ -2590,16 +2590,16 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
 
     # ── Group 1: Terminal / Đầu cực đấu ─────────────────────────
     # Col A+B: blank xanh (cùng màu category), Col C-F: Terminal header
-    _sc(row, 1, "", size=9, border=brd_all, fill_color=BLUE_HDR)
-    _sc(row, 2, "", size=9, border=brd_all, fill_color=BLUE_HDR)
+    _sc(row, 1, "", size=13, border=brd_all, fill_color=BLUE_HDR)
+    _sc(row, 2, "", size=13, border=brd_all, fill_color=BLUE_HDR)
     ws.merge_cells(f"C{row}:F{row}")
     _tc = ws.cell(row=row, column=3,
                   value="Terminal / Đầu cực đấu")
-    _tc.font      = Font(bold=True, size=10, color=WHITE, name="Times New Roman")
+    _tc.font      = Font(bold=True, size=13, color=WHITE, name="Times New Roman")
     _tc.alignment = Alignment(horizontal="center", vertical="center")
     _tc.fill      = _fill(BLUE_HDR)
     _brd_merge(row, 3, 6, brd_all)
-    ws.row_dimensions[row].height = 20
+    ws.row_dimensions[row].height = 26
     row += 1
 
     # Category: Resistance (mΩ) / Điện trở — 6 rows
@@ -2611,9 +2611,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _res_end   = row + len(_res_rows) - 1
     _cat_label(_res_start, _res_end, "Resistance (mΩ) / Điện trở")
     for _lbl in _res_rows:
-        _sc(row, 3, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
+        _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
         for _c in range(4, 7):
-            _sc(row, _c, "", size=9, border=brd_all)
+            _sc(row, _c, "", size=13, border=brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
 
@@ -2626,9 +2626,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _ir_end   = row + len(_ir_rows) - 1
     _cat_label(_ir_start, _ir_end, "Insulation Resistance (MΩ) / Cách điện")
     for _lbl in _ir_rows:
-        _sc(row, 3, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
+        _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
         for _c in range(4, 7):
-            _sc(row, _c, "", size=9, border=brd_all)
+            _sc(row, _c, "", size=13, border=brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
 
@@ -2637,16 +2637,16 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _nl_end   = row + 2   # sub-header + Voltage + Current = 3 rows
     _cat_label(_nl_start, _nl_end, "No-load test / Kiểm tra không tải")
     # Sub-header: col3=blank/blue, col4=L1, col5=L2, col6=L3
-    _sc(row, 3, "", size=9, border=brd_all, fill_color=BLUE_HDR)
+    _sc(row, 3, "", size=13, border=brd_all, fill_color=BLUE_HDR)
     for _c, _lbl in zip([4, 5, 6], ["L1", "L2", "L3"]):
-        _sc(row, _c, _lbl, bold=True, size=9, color=WHITE,
+        _sc(row, _c, _lbl, bold=True, size=13, color=WHITE,
             border=brd_all, fill_color=BLUE_HDR)
     ws.row_dimensions[row].height = 28
     row += 1
     for _lbl in ["Voltage (V)", "Current (A)"]:
-        _sc(row, 3, _lbl, bold=True, size=9, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
+        _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
         for _c in range(4, 7):
-            _sc(row, _c, "", size=9, border=brd_all)
+            _sc(row, _c, "", size=13, border=brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
 
@@ -2656,12 +2656,12 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         "Radial ↔ NDE/AS", "Radial ↑ NDE/AS", "Axial (X) NDE/AS",
     ]
     for _c_idx, _lbl in enumerate(_vib_labels, start=1):
-        _sc(row, _c_idx, _lbl, bold=True, size=8, color=WHITE,
+        _sc(row, _c_idx, _lbl, bold=True, size=13, color=WHITE,
             border=brd_all, fill_color=BLUE_HDR, h_align="center")
     ws.row_dimensions[row].height = 28
     row += 1
     for _c_idx in range(1, 7):
-        _sc(row, _c_idx, "", size=9, border=brd_all)
+        _sc(row, _c_idx, "", size=13, border=brd_all)
     ws.row_dimensions[row].height = 30
     row += 1          # past vib values
     # blank filler rows để lấp đầy trang 2
@@ -2686,13 +2686,13 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                 ws.merge_cells(f"A{row}:F{row}")
                 title_txt = f"{ten_en} / {ten_vi}" if ten_vi else ten_en
                 tc = ws.cell(row=row, column=1, value=title_txt)
-                tc.font      = Font(bold=True, size=10, color="FFFFFF",
+                tc.font      = Font(bold=True, size=12, color="FFFFFF",
                                     name="Times New Roman")
                 tc.alignment = Alignment(horizontal="center", vertical="center")
                 tc.fill      = PatternFill("solid", fgColor=BLUE_HDR)
                 tc.border    = brd_all
                 _brd_merge(row, 1, 6, brd_all)
-                ws.row_dimensions[row].height = 20
+                ws.row_dimensions[row].height = 22
                 row += 1
 
             # -- Nhãn cột (xanh nhạt) --
@@ -2702,13 +2702,13 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                         f"{get_column_letter(c1)}{row}:"
                         f"{get_column_letter(c2)}{row}")
                 lc = ws.cell(row=row, column=c1, value=lbl)
-                lc.font      = Font(bold=True, size=9, name="Times New Roman")
+                lc.font      = Font(bold=True, size=12, name="Times New Roman")
                 lc.alignment = Alignment(horizontal="center", vertical="center",
                                          wrap_text=True)
                 lc.fill      = PatternFill("solid", fgColor=BLUE_CELL)
                 lc.border    = brd_all
                 _brd_merge(row, c1, c2, brd_all)
-            ws.row_dimensions[row].height = 18
+            ws.row_dimensions[row].height = 15
             row += 1
 
             # -- Hàng ảnh --
@@ -2741,6 +2741,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                     except Exception:
                         pass
             row += 1
+            ws.row_dimensions[row].height = 5   # khoảng trắng nhỏ giữa các bảng
             row += 1  # trống giữa các bảng
 
         ws.row_breaks.append(Break(id=row - 1))  # ── page break: mỗi trang ảnh
