@@ -1781,7 +1781,7 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
 
     # ── 12 dòng hạng mục ─────────────────────────────────────
     pdf.set_font("DejaVu", "", 8.5)
-    for i in range(1, 13):
+    for i in range(1, 11):
         noi_dung = hang_muc[i - 1] if (i - 1) < len(hang_muc) else ""
         y_r = y_hdr + HDR_H + (i - 1) * ROW_H2
 
@@ -1799,7 +1799,7 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
         pdf.cell(W_HM, ROW_H2 - 1, noi_dung, border=0, align="L")
 
     # Đặt cursor xuống dưới bảng
-    pdf.set_xy(M_LEFT, y_hdr + HDR_H + 12 * ROW_H2)
+    pdf.set_xy(M_LEFT, y_hdr + HDR_H + 10 * ROW_H2)
 
     # Định nghĩa W1/W2/W3 dùng chung cho _draw_img_hdr
     BOX_H1 = 8
@@ -2396,7 +2396,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     ws.row_dimensions[row].height = 28
     row += 1
 
-    for i in range(1, 13):
+    for i in range(1, 11):
         noi_dung = hang_muc[i - 1] if (i - 1) < len(hang_muc) else ""
         fill = YELLOW if i % 2 == 0 else WHITE
         _sc(row, 1, f"{i}", size=13, border=brd_all, fill_color=fill)
