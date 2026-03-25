@@ -2198,8 +2198,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # ── Tên công ty (B:F, canh giữa) ─────────────────────────────
     ws.merge_cells(f"B{row}:F{row}")
     _sc(row, 2, "CÔNG TY TNHH MỘT THÀNH VIÊN ĐIỆN CƠ NGỌC TRÂM",
-        bold=True, size=13, color=PURPLE, h_align="center")
-    ws.row_dimensions[row].height = 20
+        bold=True, size=14, color=PURPLE, h_align="center")
+    ws.row_dimensions[row].height = 22
     row += 1
 
     for txt in [
@@ -2208,8 +2208,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         "MST: 3603238978  ĐT: 0907 042 043 (Mr.Hiệp) – 0908 062 291 (Ms.Linh)",
     ]:
         ws.merge_cells(f"B{row}:F{row}")
-        _sc(row, 2, txt, size=9, h_align="center")
-        ws.row_dimensions[row].height = 14
+        _sc(row, 2, txt, size=10, h_align="center")
+        ws.row_dimensions[row].height = 16
         row += 1
     # Outer border cho toàn bộ khối B:F header
     _brd_merge(_hdr_start, 2, 6, brd_all, r_end=_hdr_end)
@@ -2220,18 +2220,18 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # ── Tiêu đề BBNT ────────────────────────────────────────────
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1, "REPAIR ACCEPTANCE CERTIFICATE",
-        bold=True, size=12, color="1F3864", h_align="center")
+        bold=True, size=13, color="1F3864", h_align="center")
     _brd_merge(row, 1, 6, brd_all)
-    ws.row_dimensions[row].height = 20
+    ws.row_dimensions[row].height = 22
     row += 1
 
     ws.merge_cells(f"A{row}:F{row}")
     c = ws.cell(row=row, column=1, value="BIÊN BẢN NGHIỆM THU")
-    c.font      = _font(bold=True, size=15, color="1F3864")
+    c.font      = _font(bold=True, size=16, color="1F3864")
     c.alignment = _align()
     c.fill      = _fill(BLUE_CELL)
     _brd_merge(row, 1, 6, brd_all)
-    ws.row_dimensions[row].height = 24
+    ws.row_dimensions[row].height = 28
     row += 1
 
     row += 1  # khoảng trống
@@ -2246,12 +2246,12 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         # A:B merged = label, C:F merged = value
         ws.merge_cells(f"A{row}:B{row}")
         _sc(row, 1, f"{en_lbl} / {vi_lbl}",
-            bold=True, size=9, fill_color=BLUE_CELL, border=brd_all, h_align="left")
+            bold=True, size=11, fill_color=BLUE_CELL, border=brd_all, h_align="left")
         _brd_merge(row, 1, 2, brd_all)
         ws.merge_cells(f"C{row}:F{row}")
-        _sc(row, 3, val, size=10, border=brd_all, h_align="left")
+        _sc(row, 3, val, size=11, border=brd_all, h_align="left")
         _brd_merge(row, 3, 6, brd_all)
-        ws.row_dimensions[row].height = 22
+        ws.row_dimensions[row].height = 26
         row += 1
 
     row += 1
@@ -2261,23 +2261,23 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1,
         "I. Time and place of the test / Thời gian và địa điểm kiểm tra",
-        bold=True, size=10, h_align="left", border=brd_all)
+        bold=True, size=12, h_align="left", border=brd_all)
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 24
+    row += 1
+
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1, f"At 7:30 AM on {ngay_en}, at Ngoc Tram Motor",
+        size=11, h_align="left", border=brd_all)
     _brd_merge(row, 1, 6, brd_all)
     ws.row_dimensions[row].height = 22
     row += 1
 
     ws.merge_cells(f"A{row}:F{row}")
-    _sc(row, 1, f"At 7:30 AM on {ngay_en}, at Ngoc Tram Motor",
-        size=10, h_align="left", border=brd_all)
-    _brd_merge(row, 1, 6, brd_all)
-    ws.row_dimensions[row].height = 20
-    row += 1
-
-    ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1, f"Lúc 7h30 - {ngay_vi}, tại Điện cơ Ngọc Trâm",
-        size=9, h_align="left", border=brd_all)
+        size=11, h_align="left", border=brd_all)
     _brd_merge(row, 1, 6, brd_all)
-    ws.row_dimensions[row].height = 20
+    ws.row_dimensions[row].height = 22
     row += 1
     row += 1
     ws.row_dimensions[row - 1].height = 20
@@ -2298,7 +2298,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         "này cũng có giá trị mà không cần chữ ký viết tay."
     )
     _cc.value     = f"{_en_text}\n{_vi_text}"
-    _cc.font      = Font(name="Times New Roman", size=10, italic=True)
+    _cc.font      = Font(name="Times New Roman", size=11, italic=True)
     _cc.alignment = Alignment(horizontal="center", vertical="center",
                               wrap_text=True)
     _cc.fill = _fill("F2F2F2")   # nền xám nhạt
@@ -2310,30 +2310,30 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     ws.row_dimensions[row - 1].height = 20
 
     # ── CLIENT / CONTRACTOR signature block ──────────────────────
-    # Header row
+    # Header row — nền xanh nhạt, chữ đen đậm (dễ đọc khi in đen trắng)
     ws.merge_cells(f"A{row}:C{row}")
     _sc(row, 1, "CLIENT / CHỦ ĐẦU TƯ",
-        bold=True, size=10, color=WHITE, fill_color=BLUE_HDR,
+        bold=True, size=12, color="000000", fill_color=BLUE_CELL,
         border=brd_all, h_align="center")
     _brd_merge(row, 1, 3, brd_all)
     ws.merge_cells(f"D{row}:F{row}")
     _sc(row, 4, "CONTRACTOR / NHÀ THẦU",
-        bold=True, size=10, color=WHITE, fill_color=BLUE_HDR,
+        bold=True, size=12, color="000000", fill_color=BLUE_CELL,
         border=brd_all, h_align="center")
     _brd_merge(row, 4, 6, brd_all)
-    ws.row_dimensions[row].height = 20
+    ws.row_dimensions[row].height = 24
     row += 1
 
     # Position row
     ws.merge_cells(f"A{row}:C{row}")
     _sc(row, 1, "Position / Chức vụ :",
-        size=9, border=brd_all, h_align="left")
+        size=11, border=brd_all, h_align="left")
     _brd_merge(row, 1, 3, brd_all)
     ws.merge_cells(f"D{row}:F{row}")
     _sc(row, 4, "Position / Chức vụ : Trưởng bộ phận Kỹ thuật",
-        size=9, border=brd_all, h_align="left")
+        size=11, border=brd_all, h_align="left")
     _brd_merge(row, 4, 6, brd_all)
-    ws.row_dimensions[row].height = 22
+    ws.row_dimensions[row].height = 24
     row += 1
 
     # 3 empty rows (signature space, height=85)
@@ -2350,25 +2350,25 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # Full name row
     ws.merge_cells(f"A{row}:C{row}")
     _sc(row, 1, "Full name / Họ và tên :",
-        size=9, border=brd_all, h_align="left")
+        size=11, border=brd_all, h_align="left")
     _brd_merge(row, 1, 3, brd_all)
     ws.merge_cells(f"D{row}:F{row}")
     _sc(row, 4, f"Full name / Họ và tên : {nhan_vien.upper()}",
-        size=9, border=brd_all, h_align="left")
+        size=11, border=brd_all, h_align="left")
     _brd_merge(row, 4, 6, brd_all)
-    ws.row_dimensions[row].height = 22
+    ws.row_dimensions[row].height = 24
     row += 1
 
     # Date row
     ws.merge_cells(f"A{row}:C{row}")
     _sc(row, 1, "Date / Ngày :",
-        size=9, border=brd_all, h_align="left")
+        size=11, border=brd_all, h_align="left")
     _brd_merge(row, 1, 3, brd_all)
     ws.merge_cells(f"D{row}:F{row}")
     _sc(row, 4, "Date / Ngày :",
-        size=9, border=brd_all, h_align="left")
+        size=11, border=brd_all, h_align="left")
     _brd_merge(row, 4, 6, brd_all)
-    ws.row_dimensions[row].height = 22
+    ws.row_dimensions[row].height = 24
     row += 1
     row += 1
     ws.row_dimensions[row - 1].height = 20
@@ -2376,35 +2376,35 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # ── Section II ───────────────────────────────────────────────
     ws.merge_cells(f"A{row}:F{row}")
     _sc(row, 1, "II. Hạng mục sửa chữa / Repair catalog",
-        bold=True, size=10, h_align="left")
-    ws.row_dimensions[row].height = 22
+        bold=True, size=12, h_align="left")
+    ws.row_dimensions[row].height = 24
     row += 1
 
-    # Header bảng: A=STT | B:D merged=Repair catalog | E=Date | F=Passed
-    _sc(row, 1, "STT", bold=True, size=9, color=WHITE,
-        fill_color=BLUE_HDR, border=brd_all)
+    # Header bảng — nền xanh nhạt, chữ đen đậm (dễ in đen trắng)
+    _sc(row, 1, "STT", bold=True, size=11, color="000000",
+        fill_color=BLUE_CELL, border=brd_all)
     ws.merge_cells(f"B{row}:D{row}")
     _sc(row, 2, "Repair catalog / Hạng mục sửa chữa",
-        bold=True, size=9, color=WHITE, fill_color=BLUE_HDR, border=brd_all)
+        bold=True, size=11, color="000000", fill_color=BLUE_CELL, border=brd_all)
     _brd_merge(row, 2, 4, brd_all)
-    _sc(row, 5, "Date / Ngày", bold=True, size=9, color=WHITE,
-        fill_color=BLUE_HDR, border=brd_all)
-    _sc(row, 6, "Passed / Thông qua", bold=True, size=9, color=WHITE,
-        fill_color=BLUE_HDR, border=brd_all)
-    ws.row_dimensions[row].height = 20
+    _sc(row, 5, "Date / Ngày", bold=True, size=11, color="000000",
+        fill_color=BLUE_CELL, border=brd_all)
+    _sc(row, 6, "Passed / Thông qua", bold=True, size=11, color="000000",
+        fill_color=BLUE_CELL, border=brd_all)
+    ws.row_dimensions[row].height = 24
     row += 1
 
     for i in range(1, 13):
         noi_dung = hang_muc[i - 1] if (i - 1) < len(hang_muc) else ""
         fill = YELLOW if i % 2 == 0 else WHITE
-        _sc(row, 1, f"{i}", size=9, border=brd_all, fill_color=fill)
+        _sc(row, 1, f"{i}", size=11, border=brd_all, fill_color=fill)
         ws.merge_cells(f"B{row}:D{row}")
-        _sc(row, 2, noi_dung, size=9, border=brd_all,
+        _sc(row, 2, noi_dung, size=11, border=brd_all,
             h_align="left", fill_color=fill)
         _brd_merge(row, 2, 4, brd_all)
-        _sc(row, 5, "", size=9, border=brd_all, fill_color=fill)
-        _sc(row, 6, "", size=9, border=brd_all, fill_color=fill)
-        ws.row_dimensions[row].height = 26
+        _sc(row, 5, "", size=11, border=brd_all, fill_color=fill)
+        _sc(row, 6, "", size=11, border=brd_all, fill_color=fill)
+        ws.row_dimensions[row].height = 30
         row += 1
 
     row += 1
