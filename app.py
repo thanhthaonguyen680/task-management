@@ -2437,7 +2437,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
              ["IR (U – E)", "IR (V – E)", "IR (W – E)"],
              ["IR_U_E", "IR_V_E", "IR_W_E"]),
         ]),
-        ("5/8", 46, [
+        ("5/8", 72, [
             ("Engine Overview / Tổng Quan Động Cơ", "",
              ["Engine / Động cơ", "Nameplate / Bảng thông số"],
              ["eng_overview", "eng_nameplate"]),
@@ -2448,7 +2448,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
              ["Before", "After"],
              ["tbl_before", "tbl_after"]),
         ]),
-        ("6/8", 46, [
+        ("6/8", 72, [
             ("Cover Fan / Chụp Bảo Vệ Cánh Quạt", "",
              ["Before", "After"],
              ["cf_before", "cf_after"]),
@@ -2459,7 +2459,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
              ["Before", "After"],
              ["coil_before", "coil_after"]),
         ]),
-        ("7/8", 46, [
+        ("7/8", 72, [
             ("End Cover DE / Nắp Đầu Tải", "",
              ["Before", "After"],
              ["ec_de_before", "ec_de_after"]),
@@ -2470,7 +2470,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
              ["Before", "After"],
              ["shaft_de_before", "shaft_de_after"]),
         ]),
-        ("8/8", 46, [
+        ("8/8", 72, [
             ("Shaft at NDE / Trục Đầu Không Tải", "",
              ["Before", "After"],
              ["shaft_nde_before", "shaft_nde_after"]),
