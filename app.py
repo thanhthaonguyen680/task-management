@@ -1662,7 +1662,7 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
     pdf.set_font("DejaVu", "", 8.5)
     pdf.cell(W, 5, "Địa chỉ : 8/5,hẻm 04, tổ 9, khu Kim Sơn, Xã Long Thành, Tỉnh Đồng Nai, Việt Nam",
              align="C", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(W, 5, "Website: ngoctrammotor.com   Mail: ctyngoctram1811@gmail.com",
+    pdf.cell(W, 5, "Website: ngoctrammotor.com   Mail: kd@ngoctrammotor.com",
              align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.cell(W, 5, "MST: 3603238978  DT: 0907 042 043 (Mr.Hiệp) – 0908 062 291 ( Ms.Linh)",
              align="C", new_x="LMARGIN", new_y="NEXT")
@@ -1964,12 +1964,12 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
             ("",   # không vẽ lại header
              "",
              ["Radial ↔ DE / AS", "Radial ↕ DE / AS", "Axial (X) DE / AS"],
-             ["Radial ↔ DE / AS", "Radial ↑ DE / AS", "Axial (X) DE / AS"]),
+             ["Radial ↔ DE / AS", "Radial ↕ DE / AS", "Axial (X) DE / AS"]),
 
             ("",
              "",
              ["Radial ↔ NDE / AS", "Radial ↕ NDE / AS", "Axial (X) NDE / AS"],
-             ["Radial ↔ NDE / AS", "Radial ↑ NDE / AS", "Axial (X) NDE / AS"]),
+             ["Radial ↔ NDE / AS", "Radial ↕ NDE / AS", "Axial (X) NDE / AS"]),
         ]),
 
         # Trang 3/5 — Engine overview + Nắp
@@ -2089,6 +2089,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     ten_dong_co  = str(thong_tin_task.get("Tên Công Việc", ""))
     khach_hang   = str(thong_tin_task.get("Công Ty", ""))
     cong_so      = str(thong_tin_task.get("Công Số", ""))
+    ma_so        = str(thong_tin_task.get("Mã Số", ""))
+    so_po_kh     = str(thong_tin_task.get("Số PO KH/HĐ", ""))
+    so_bao_gia   = str(thong_tin_task.get("Số Báo Giá", ""))
     mo_ta        = str(thong_tin_task.get("Mô Tả", ""))
     nhan_vien    = str(thong_tin_task.get("Nhân Viên", ""))
     ngay_tao_str = str(thong_tin_task.get("Ngày Tạo", ""))
@@ -2103,7 +2106,18 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         ngay_en = ngay_tao_str
         ngay_vi = ngay_tao_str
 
-    hang_muc = [h.strip() for h in mo_ta.split("\n") if h.strip()]
+    # Lấy các mục checklist đã tick (done=True) làm hạng mục sửa chữa
+    _raw_cl = str(thong_tin_task.get("Checklist", "") or "[]")
+    try:
+        _cl_items = json.loads(_raw_cl)
+    except Exception:
+        _cl_items = []
+    hang_muc = [
+        it["text"].strip() for it in _cl_items
+        if isinstance(it, dict) and it.get("done") and it.get("text", "").strip()
+    ]
+    if not hang_muc:  # fallback: dùng Mô Tả nếu chưa có checklist
+        hang_muc = [h.strip() for h in mo_ta.split("\n") if h.strip()]
 
     # ── Styles ──────────────────────────────────────────────────
     thin  = Side(style="thin",   color="000000")
@@ -2205,7 +2219,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
 
     for txt in [
         "Địa chỉ : 8/5, hẻm 04, tổ 9, khu Kim Sơn, Xã Long Thành, Tỉnh Đồng Nai, Việt Nam",
-        "Website: ngoctrammotor.com   Mail: ctyngoctram1811@gmail.com",
+        "Website: ngoctrammotor.com   Mail: kd@ngoctrammotor.com",
         "MST: 3603238978  ĐT: 0907 042 043 (Mr.Hiệp) – 0908 062 291 (Ms.Linh)",
     ]:
         ws.merge_cells(f"B{row}:F{row}")
@@ -2558,12 +2572,12 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             _xl_nt2.anchor = _nt2_anchor
             ws.add_image(_xl_nt2)
         ws.merge_cells(f"B{row}:C{row}")
-        _sc(row, 2, "Quotation / Báo giá:", size=12, border=brd_all)
+        _sc(row, 2, f"Quotation / Báo giá: {so_bao_gia}", size=12, border=brd_all)
         _brd_merge(row, 2, 3, brd_all)
         ws.merge_cells(f"D{row}:E{row}")
-        _sc(row, 4, "Engine number / Số máy:", size=12, border=brd_all)
+        _sc(row, 4, f"Engine number / Số máy: {ma_so}", size=12, border=brd_all)
         _brd_merge(row, 4, 5, brd_all)
-        _sc(row, 6, f"Order number / Số ĐH: {cong_so}", size=12, border=brd_all)
+        _sc(row, 6, f"Order number / Số ĐH: {so_po_kh}", size=12, border=brd_all)
         ws.merge_cells(f"B{row+1}:C{row+1}")
         _sc(row + 1, 2,
             "Management document / Tài liệu quản lý: QT-NT-029-1A",
@@ -2669,8 +2683,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
 
     # Vibration row — xanh đậm chữ trắng như mẫu
     _vib_labels = [
-        "Radial ↔ DE/AS", "Radial ↑ DE/AS", "Axial (X) DE/AS",
-        "Radial ↔ NDE/AS", "Radial ↑ NDE/AS", "Axial (X) NDE/AS",
+        "Radial ↔ DE/AS", "Radial ↕ DE/AS", "Axial (X) DE/AS",
+        "Radial ↔ NDE/AS", "Radial ↕ NDE/AS", "Axial (X) NDE/AS",
     ]
     for _c_idx, _lbl in enumerate(_vib_labels, start=1):
         _sc(row, _c_idx, _lbl, bold=True, size=13, color=WHITE,
