@@ -2111,8 +2111,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     brd_all   = Border(left=thin, right=thin, top=thin, bottom=thin)
     brd_thick = Border(left=thick, right=thick, top=thick, bottom=thick)
 
-    BLUE_HDR  = "5B84CC"
-    BLUE_CELL = "BDD7EE"
+    BLUE_HDR   = "5B84CC"
+    BLUE_CELL  = "BDD7EE"
+    BLUE_LABEL = "E2EFF8"   # nhạt hơn BLUE_CELL, dùng cho label row khung ảnh
     PURPLE    = "70309F"
     WHITE     = "FFFFFF"
     YELLOW    = "FFF2CC"
@@ -2522,6 +2523,20 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     # TRANG 2/8 — BẢNG SỐ LIỆU ĐO LƯỜNG (manual entry)
     # ═══════════════════════════════════════════════════════════
 
+    def _apply_outer_thick(r_start, r_end):
+        """Bọc khung thick (dày) bên ngoài block rows r_start:r_end, cols A-F."""
+        tk = Side(style="thick", color="000000")
+        for r in range(r_start, r_end + 1):
+            for c in range(1, 7):
+                cell = ws.cell(row=r, column=c)
+                b = cell.border
+                cell.border = Border(
+                    top    = tk if r == r_start else b.top,
+                    bottom = tk if r == r_end   else b.bottom,
+                    left   = tk if c == 1       else b.left,
+                    right  = tk if c == 6       else b.right,
+                )
+
     def _nt_mini_header(page_lbl):
         """Render NT mini header (2 rows) at current row, advance row by 3."""
         nonlocal row
@@ -2562,6 +2577,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         ws.row_dimensions[row].height     = 26
         ws.row_dimensions[row + 1].height = 24
         ws.row_dimensions[row + 2].height = 14   # blank gap sau mini header
+        _apply_outer_thick(row, row + 1)          # viền ngoài dày cho mini header
         row += 3
 
     # NT mini header for page 2/8
@@ -2589,6 +2605,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _brd_merge(r_start, 1, 2, brd_all, r_end=r_end)
 
     # ── Group 1: Terminal / Đầu cực đấu ─────────────────────────
+    _terminal_tbl_start = row   # để bọc viền ngoài toàn bảng Terminal
     # Col A+B: blank xanh (cùng màu category), Col C-F: Terminal header
     _sc(row, 1, "", size=13, border=brd_all, fill_color=BLUE_HDR)
     _sc(row, 2, "", size=13, border=brd_all, fill_color=BLUE_HDR)
@@ -2664,6 +2681,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _sc(row, _c_idx, "", size=13, border=brd_all)
     ws.row_dimensions[row].height = 30
     row += 1          # past vib values
+    _apply_outer_thick(_terminal_tbl_start, row - 1)  # viền ngoài dày toàn bảng Terminal
     # blank filler rows để lấp đầy trang 2
     for _fi in range(8):
         ws.row_dimensions[row].height = 40
@@ -2675,6 +2693,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _nt_mini_header(page_str)
 
         for ten_en, ten_vi, display_labels, storage_keys in tables:
+            _tbl_start = row          # theo dõi dòng đầu của bảng này
             n      = len(display_labels)
             ranges = _col_ranges(n)
             # 2-col cells rộng hơn 3-col → tăng chiều cao tương ứng để hình cân đối
@@ -2686,13 +2705,13 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                 ws.merge_cells(f"A{row}:F{row}")
                 title_txt = f"{ten_en} / {ten_vi}" if ten_vi else ten_en
                 tc = ws.cell(row=row, column=1, value=title_txt)
-                tc.font      = Font(bold=True, size=12, color="FFFFFF",
+                tc.font      = Font(bold=True, size=16, color="000000",
                                     name="Times New Roman")
                 tc.alignment = Alignment(horizontal="center", vertical="center")
-                tc.fill      = PatternFill("solid", fgColor=BLUE_HDR)
-                tc.border    = brd_all
-                _brd_merge(row, 1, 6, brd_all)
-                ws.row_dimensions[row].height = 22
+                tc.fill      = PatternFill("solid", fgColor=BLUE_CELL)
+                tc.border    = brd_thick
+                _brd_merge(row, 1, 6, brd_thick)
+                ws.row_dimensions[row].height = 26
                 row += 1
 
             # -- Nhãn cột (xanh nhạt) --
@@ -2702,13 +2721,13 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                         f"{get_column_letter(c1)}{row}:"
                         f"{get_column_letter(c2)}{row}")
                 lc = ws.cell(row=row, column=c1, value=lbl)
-                lc.font      = Font(bold=True, size=12, name="Times New Roman")
+                lc.font      = Font(bold=True, size=14, name="Times New Roman")
                 lc.alignment = Alignment(horizontal="center", vertical="center",
                                          wrap_text=True)
-                lc.fill      = PatternFill("solid", fgColor=BLUE_CELL)
-                lc.border    = brd_all
-                _brd_merge(row, c1, c2, brd_all)
-            ws.row_dimensions[row].height = 15
+                lc.fill      = PatternFill("solid", fgColor=BLUE_LABEL)
+                lc.border    = brd_thick
+                _brd_merge(row, c1, c2, brd_thick)
+            ws.row_dimensions[row].height = 20
             row += 1
 
             # -- Hàng ảnh --
@@ -2719,8 +2738,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                     ws.merge_cells(
                         f"{get_column_letter(c1)}{row}:"
                         f"{get_column_letter(c2)}{row}")
-                ws.cell(row=row, column=c1).border = brd_all
-                _brd_merge(row, c1, c2, brd_all)
+                ws.cell(row=row, column=c1).border = brd_thick
+                _brd_merge(row, c1, c2, brd_thick)
 
                 img_bio = _img_cache.get(key)
                 if img_bio is not None:
@@ -2740,6 +2759,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                         ws.add_image(xl_img)
                     except Exception:
                         pass
+            _apply_outer_thick(_tbl_start, row)   # khung đậm bên ngoài toàn bảng
             row += 1
             ws.row_dimensions[row].height = 5   # khoảng trắng nhỏ giữa các bảng
             row += 1  # trống giữa các bảng
