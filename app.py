@@ -3451,6 +3451,13 @@ div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
     min-width: 0 !important;
     flex: 1 1 0 !important;
     width: 50% !important;
+    overflow: visible !important;
+}
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] {
+    overflow: visible !important;
+}
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
+    overflow: visible !important;
 }
 .cl-btn-row { margin: 0 0 10px 0; gap: 6px; display: flex; }
 /* Nút icon nhỏ trong checklist (row có checkbox) */
@@ -5903,7 +5910,8 @@ def giao_dien_dang_nhap():
     # ─────────────────────────── ĐĂNG NHẬP ───────────────────────────
     with tab_dn:
         with st.form("form_dang_nhap", clear_on_submit=False):
-            username_dn = st.text_input("Username", placeholder="Nhập username của bạn")
+            _prefill_un = st.session_state.get("_saved_username", "")
+            username_dn = st.text_input("Username", value=_prefill_un, placeholder="Nhập username của bạn")
             matkhau_dn  = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu")
             btn_dn      = st.form_submit_button("Đăng Nhập", use_container_width=True,
                                                  type="primary")
@@ -6731,10 +6739,12 @@ def main():
             token = st.session_state.get("session_token")
             if token:
                 _session_store().pop(token, None)
+            _saved_un = st.session_state.get("username", "")
             for k in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro", "session_token"]:
                 st.session_state.pop(k, None)
             st.query_params.clear()
             st.session_state["manual_logout"] = True
+            st.session_state["_saved_username"] = _saved_un
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
