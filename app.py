@@ -4265,9 +4265,10 @@ def _render_kanban_board(df, ds_tt, board_key="kb"):
         st.markdown(f"<div class='{mk}' style='display:none'></div>",
                     unsafe_allow_html=True)
         btn_label = f"{chevron}  {tt}  ({so})"
-        if st.button(btn_label, key=f"{board_key}_tog_{tt}", use_container_width=True):
-            st.session_state[_sk] = not is_open
-            st.rerun()
+        def _toggle_group(_sk=_sk):
+            st.session_state[_sk] = not st.session_state[_sk]
+        st.button(btn_label, key=f"{board_key}_tog_{tt}",
+                  use_container_width=True, on_click=_toggle_group)
 
         if not is_open:
             continue
