@@ -3610,6 +3610,22 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
         if val:
             st.session_state[cl_key][i]["text"] = val
 
+    def _cb_ck_done(i):
+        st.session_state[cl_key][i]["done"] = st.session_state.get(f"{key_prefix}_ck_{i}", False)
+
+    def _cb_cl_del(i):
+        if i < len(st.session_state[cl_key]):
+            st.session_state[cl_key].pop(i)
+        for k in list(st.session_state.keys()):
+            if k.startswith(f"{key_prefix}_cl_txt_"):
+                del st.session_state[k]
+
+    def _cb_cl_add():
+        val = st.session_state.get(f"{key_prefix}_cl_inp_{st.session_state[cl_inp_v]}", "").strip()
+        if val:
+            st.session_state[cl_key].append({"text": val, "done": False})
+            st.session_state[cl_inp_v] += 1
+
     for i, item in enumerate(items):
         txt      = item.get("text", "") or f"Mục {i+1}"
         done_val = bool(item.get("done", False))
@@ -3618,14 +3634,12 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
         with col_ck:
             # Marker ở đây để CSS :has() tìm đúng HorizontalBlock này
             st.markdown(f"<span class='{mk}' style='display:none'></span>", unsafe_allow_html=True)
-            new_done = st.checkbox(
+            st.checkbox(
                 "", value=done_val,
                 key=f"{key_prefix}_ck_{i}",
                 label_visibility="collapsed",
+                on_change=_cb_ck_done, args=(i,),
             )
-            if new_done != done_val:
-                st.session_state[cl_key][i]["done"] = new_done
-                st.rerun()
         with col_txt:
             st.text_input(
                 "", value=txt,
@@ -3634,33 +3648,21 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
                 on_change=_save_cl, args=(i,),
             )
         with col_del:
-            if st.button("🗑️", key=f"{key_prefix}_cl_del_{i}", use_container_width=True):
-                _xoa = i
-
-    if _xoa is not None:
-        st.session_state[cl_key].pop(_xoa)
-        for k in list(st.session_state.keys()):
-            if k.startswith(f"{key_prefix}_cl_txt_"):
-                del st.session_state[k]
-        st.rerun()
+            st.button("🗑️", key=f"{key_prefix}_cl_del_{i}", use_container_width=True,
+                      on_click=_cb_cl_del, args=(i,))
 
     st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
     col_i, col_b = st.columns([5, 2])
     with col_i:
-        moi = st.text_input(
+        st.text_input(
             "", placeholder="Nhập tên checklist...",
             key=f"{key_prefix}_cl_inp_{st.session_state[cl_inp_v]}",
             label_visibility="collapsed",
         )
     with col_b:
-        if st.button("＋ Thêm", key=f"{key_prefix}_cl_add",
-                     use_container_width=True):
-            val = st.session_state.get(
-                f"{key_prefix}_cl_inp_{st.session_state[cl_inp_v]}", "").strip()
-            if val:
-                st.session_state[cl_key].append({"text": val, "done": False})
-                st.session_state[cl_inp_v] += 1
-                st.rerun()
+        st.button("＋ Thêm", key=f"{key_prefix}_cl_add",
+                  use_container_width=True,
+                  on_click=_cb_cl_add)
 
 
 
@@ -3763,7 +3765,6 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
     .cv-nv-frag-{key_prefix} label {{ font-size: 0.78rem !important; color: #6b7280 !important; }}
     </style>""", unsafe_allow_html=True)
 
-    _xoa = None
     items_cv = st.session_state[cv_key]
 
     def _save_cv_ten(i):
@@ -3807,8 +3808,8 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 on_change=_save_cv_ten, args=(i,),
             )
         with col_del:
-            if st.button("🗑️", key=f"{key_prefix}_cv_del_{i}", use_container_width=True):
-                _xoa = i
+            st.button("🗑️", key=f"{key_prefix}_cv_del_{i}", use_container_width=True,
+                      on_click=_cb_cv_del, args=(i,))
         # Hàng 2: selectbox nhân viên full width
         st.markdown(f"<div class='cv-nv-frag-{key_prefix}'>", unsafe_allow_html=True)
         st.selectbox(
@@ -3857,12 +3858,12 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 else:
                     st.warning("Chưa chọn file!")
 
-    if _xoa is not None:
-        st.session_state[cv_key].pop(_xoa)
+    def _cb_cv_del(i):
+        if i < len(st.session_state[cv_key]):
+            st.session_state[cv_key].pop(i)
         for k in list(st.session_state.keys()):
             if k.startswith(f"{key_prefix}_cv_txt_") or k.startswith(f"{key_prefix}_cv_nv_sel_"):
                 del st.session_state[k]
-        st.rerun()
 
     # Thêm thủ công một mục mới
     st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
@@ -3877,8 +3878,8 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         key=f"{key_prefix}_cv_nv_{st.session_state[cv_inp_v]}",
     )
     st.markdown("</div>", unsafe_allow_html=True)
-    if st.button("＋ Thêm công việc con", key=f"{key_prefix}_cv_add",
-                 use_container_width=True):
+
+    def _cb_cv_add():
         ten_val = st.session_state.get(
             f"{key_prefix}_cv_ten_{st.session_state[cv_inp_v]}", "").strip()
         cv_nv   = st.session_state.get(
@@ -3890,7 +3891,9 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 "done":      False,
             })
             st.session_state[cv_inp_v] += 1
-            st.rerun()
+
+    st.button("＋ Thêm công việc con", key=f"{key_prefix}_cv_add",
+              use_container_width=True, on_click=_cb_cv_add)
 
 
 
@@ -5587,6 +5590,10 @@ def giao_dien_nhan_vien():
         lay_danh_sach_cong_viec.clear()
         st.session_state["_last_nv_load"] = ten_nhan_vien
 
+    # ---- Dialog thành công (phải đặt TRƯỚC tabs để luôn hiển thị) ----
+    if st.session_state.get("_nv_task_success"):
+        _dialog_tao_task_thanh_cong(st.session_state.pop("_nv_task_success"), "_nv_goto_board")
+
     # ---- Tabs ----
     tab_cong_viec, tab_tao_task, tab_phe_duyet = st.tabs([
         "🗂️ Bảng Quản Lý Công Việc",
@@ -5727,8 +5734,6 @@ def giao_dien_nhan_vien():
     # ========================================================
     with tab_tao_task:
         st.subheader("➕ Tạo Công Việc Mới")
-        if st.session_state.get("_nv_task_success"):
-            _dialog_tao_task_thanh_cong(st.session_state.pop("_nv_task_success"), "_nv_goto_board")
         st.info(f"Công việc sẽ được giao cho: **{ten_nhan_vien}** *(tự động)*")
 
         ds_cong_ty_nv = lay_ten_cac_cong_ty()
@@ -5838,9 +5843,17 @@ def giao_dien_nhan_vien():
                         st.session_state.pop(_cl_key, None)
                         st.session_state.pop(_cv_key, None)
                         st.session_state.pop(f"{_nv_prefix}_cv_seeded", None)
-                        # Xoá form fields
-                        for _k in [f"{_nv_prefix}_ten", f"{_nv_prefix}_mo_ta"]:
-                            st.session_state.pop(_k, None)
+                        # Xoá toàn bộ form fields
+                        _fields_to_clear = [
+                            "_ct", "_pd", "_tt", "_nam", "_dl",
+                            "_loai_may", "_tinh_trang", "_cong_suat", "_so_cuc",
+                            "_ma_so", "_so_po_noi_bo", "_so_po_kh", "_so_bao_gia",
+                            "_ten", "_mo_ta",
+                        ]
+                        for _suffix in _fields_to_clear:
+                            st.session_state.pop(f"{_nv_prefix}{_suffix}", None)
+                        # Xoá luôn các key cl_inp versioning
+                        st.session_state.pop(f"{_nv_prefix}_cl_inp_v", None)
                         st.session_state["_nv_task_success"] = (
                             f"🎉 Đã tạo task **{nv_ten_task}** thành công! "
                             f"Chuyển sang tab **Công Việc Của Tôi** để xem."
