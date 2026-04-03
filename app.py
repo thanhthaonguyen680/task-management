@@ -4120,6 +4120,18 @@ def _save_cv_to_sheet(task_id, cv_key):
 
 
 # ============================================================
+# DIALOG: TẠO TASK THÀNH CÔNG
+# ============================================================
+@st.dialog("✅ Tạo Task Thành Công!")
+def _dialog_tao_task_thanh_cong(message: str, goto_key: str):
+    st.success(message)
+    st.balloons()
+    if st.button("📋 OK — Xem Bảng Quản Lý", use_container_width=True, type="primary"):
+        st.session_state[goto_key] = True
+        st.rerun()
+
+
+# ============================================================
 # KANBAN BOARD HELPER
 # ============================================================
 @st.dialog("📋 Chi tiết & Chỉnh sửa công việc", width="large")
@@ -4311,6 +4323,20 @@ def giao_dien_admin():
     tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_board, tab_cvc, tab_tdtdm = st.tabs(
         ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "🗂️  Bảng Quản Lý", "📋  Công Việc Con", "🔩  Theo Dõi Tiến Độ Máy"]
     )
+
+    if st.session_state.pop("_adm_goto_board", False):
+        components.html("""
+        <script>
+        setTimeout(function() {
+            var tabs = window.parent.document.querySelectorAll('button[role="tab"]');
+            for (var i = 0; i < tabs.length; i++) {
+                if (tabs[i].innerText.indexOf('B\u1ea3ng Qu\u1ea3n L\u00fd') !== -1) {
+                    tabs[i].click(); break;
+                }
+            }
+        }, 400);
+        </script>
+        """, height=0)
 
     # CSS chung cho cả bảng CVC và TDM (AgGrid)
     _aggrid_css = {
@@ -4774,10 +4800,8 @@ def giao_dien_admin():
     # TAB 3 — TẠO TASK MỚI
     # ══════════════════════════════════════════════
     with tab_tao_task:
-        # Hiển thị success message từ lần tạo task trước
         if st.session_state.get("_adm_task_success"):
-            st.success(st.session_state.pop("_adm_task_success"))
-            st.balloons()
+            _dialog_tao_task_thanh_cong(st.session_state.pop("_adm_task_success"), "_adm_goto_board")
 
         @st.fragment
         def _fragment_tao_task_admin():
@@ -5570,6 +5594,20 @@ def giao_dien_nhan_vien():
         "✅ Việc Cần Phê Duyệt"
     ])
 
+    if st.session_state.pop("_nv_goto_board", False):
+        components.html("""
+        <script>
+        setTimeout(function() {
+            var tabs = window.parent.document.querySelectorAll('button[role="tab"]');
+            for (var i = 0; i < tabs.length; i++) {
+                if (tabs[i].innerText.indexOf('B\u1ea3ng Qu\u1ea3n L\u00fd C\u00f4ng Vi\u1ec7c') !== -1) {
+                    tabs[i].click(); break;
+                }
+            }
+        }, 400);
+        </script>
+        """, height=0)
+
     # ========================================================
     # Tab 1: Công việc của tôi
     # ========================================================
@@ -5689,10 +5727,8 @@ def giao_dien_nhan_vien():
     # ========================================================
     with tab_tao_task:
         st.subheader("➕ Tạo Công Việc Mới")
-        # Hiển thị success message từ lần tạo task trước
         if st.session_state.get("_nv_task_success"):
-            st.success(st.session_state.pop("_nv_task_success"))
-            st.balloons()
+            _dialog_tao_task_thanh_cong(st.session_state.pop("_nv_task_success"), "_nv_goto_board")
         st.info(f"Công việc sẽ được giao cho: **{ten_nhan_vien}** *(tự động)*")
 
         ds_cong_ty_nv = lay_ten_cac_cong_ty()
