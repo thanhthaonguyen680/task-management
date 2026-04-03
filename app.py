@@ -65,6 +65,7 @@ st.markdown(
     /* ẩn status widget / avatar badge */
     [data-testid="stStatusWidget"] { display: none !important; visibility: hidden !important; }
     [data-testid="stBottom"]       { display: none !important; visibility: hidden !important; }
+    [data-testid="stBottomBlockContainer"] { display: none !important; visibility: hidden !important; }
     /* ẩn theo class name (phòng trường hợp testid thay đổi) */
     [class*="viewerBadge"]         { display: none !important; visibility: hidden !important; }
     [class*="ViewerBadge"]         { display: none !important; visibility: hidden !important; }
@@ -81,7 +82,8 @@ st.markdown(
     /* ẩn fixed bottom-right badge/avatar */
     iframe[style*="position: fixed"] { display: none !important; }
     iframe[style*="position:fixed"]  { display: none !important; }
-    div[style*="position: fixed"][style*="bottom"] img { display: none !important; }
+    div[style*="position: fixed"][style*="bottom"] { display: none !important; }
+    div[style*="position:fixed"][style*="bottom"]  { display: none !important; }
     [class*="badge"], [class*="Badge"], [class*="avatar"], [class*="Avatar"] {
         display: none !important; visibility: hidden !important;
     }
@@ -189,6 +191,7 @@ components.html(
     var HIDE = [
         '[data-testid="stStatusWidget"]',
         '[data-testid="stBottom"]',
+        '[data-testid="stBottomBlockContainer"]',
         '[data-testid="stDeployButton"]',
         '[data-testid="manage-app-button"]',
         '[data-testid="stToolbar"]',
