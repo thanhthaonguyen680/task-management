@@ -3625,7 +3625,7 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
             )
             if new_done != done_val:
                 st.session_state[cl_key][i]["done"] = new_done
-                st.rerun(scope="fragment")
+                st.rerun()
         with col_txt:
             st.text_input(
                 "", value=txt,
@@ -3642,7 +3642,7 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
         for k in list(st.session_state.keys()):
             if k.startswith(f"{key_prefix}_cl_txt_"):
                 del st.session_state[k]
-        st.rerun(scope="fragment")
+        st.rerun()
 
     st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
     col_i, col_b = st.columns([5, 2])
@@ -3660,7 +3660,7 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
             if val:
                 st.session_state[cl_key].append({"text": val, "done": False})
                 st.session_state[cl_inp_v] += 1
-                st.rerun(scope="fragment")
+                st.rerun()
 
 
 
