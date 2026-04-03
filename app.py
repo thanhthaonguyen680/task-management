@@ -3442,6 +3442,14 @@ _FRAGMENT_CSS = """
     color: #16a34a; background: #dcfce7;
     padding: 2px 8px; border-radius: 20px;
 }
+/* Fix input bị cắt đáy — cascade overflow visible qua mọi wrapper */
+[data-testid="stTextInput"],
+[data-testid="stTextInput"] > div,
+[data-testid="stTextArea"],
+[data-testid="stTextArea"] > div,
+.element-container {
+    overflow: visible !important;
+}
 /* Ép 2 nút nằm cùng hàng trên mọi màn hình */
 div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]) {
     flex-wrap: nowrap !important;
@@ -3452,11 +3460,12 @@ div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
     flex: 1 1 0 !important;
     width: 50% !important;
     overflow: visible !important;
+    padding-bottom: 4px !important;
 }
-div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] {
-    overflow: visible !important;
-}
-div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div,
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div > div,
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div > div > div,
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div > div > div > div {
     overflow: visible !important;
 }
 .cl-btn-row { margin: 0 0 10px 0; gap: 6px; display: flex; }
@@ -5896,6 +5905,19 @@ def giao_dien_dang_nhap():
         color: #7b8aa0;
         font-size: 0.9rem;
         margin-bottom: 1.5rem;
+    }
+    /* Fix input bị cắt đáy trên mobile */
+    [data-testid="stForm"],
+    [data-testid="stForm"] > div,
+    [data-testid="stVerticalBlock"],
+    [data-testid="stVerticalBlock"] > div,
+    .element-container,
+    [data-testid="stTextInput"],
+    [data-testid="stTextInput"] > div {
+        overflow: visible !important;
+    }
+    [data-testid="stTextInput"] input {
+        padding-bottom: 10px !important;
     }
     </style>
     """, unsafe_allow_html=True)
