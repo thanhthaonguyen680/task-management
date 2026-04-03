@@ -3784,6 +3784,13 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         else:
             st.session_state[cv_key][i].pop("ngay_hoan_thanh", None)
 
+    def _cb_cv_del(i):
+        if i < len(st.session_state[cv_key]):
+            st.session_state[cv_key].pop(i)
+        for k in list(st.session_state.keys()):
+            if k.startswith(f"{key_prefix}_cv_txt_") or k.startswith(f"{key_prefix}_cv_nv_sel_"):
+                del st.session_state[k]
+
     for i, cv in enumerate(items_cv):
         done_val = bool(cv.get("done", False))
         ten   = cv.get("ten", "") or f"Việc {i+1}"
@@ -3854,16 +3861,9 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                         for _fm in _files:
                             _new_url = _tai_media_len_drive(_fm)
                             st.session_state[cv_key][i].setdefault("anh", []).append(_new_url)
-                    st.rerun(scope="fragment")
+                    st.rerun()
                 else:
                     st.warning("Chưa chọn file!")
-
-    def _cb_cv_del(i):
-        if i < len(st.session_state[cv_key]):
-            st.session_state[cv_key].pop(i)
-        for k in list(st.session_state.keys()):
-            if k.startswith(f"{key_prefix}_cv_txt_") or k.startswith(f"{key_prefix}_cv_nv_sel_"):
-                del st.session_state[k]
 
     # Thêm thủ công một mục mới
     st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
