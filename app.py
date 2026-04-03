@@ -3625,7 +3625,7 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
             )
             if new_done != done_val:
                 st.session_state[cl_key][i]["done"] = new_done
-                st.rerun()
+                st.rerun(scope="fragment")
         with col_txt:
             st.text_input(
                 "", value=txt,
@@ -3642,7 +3642,7 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
         for k in list(st.session_state.keys()):
             if k.startswith(f"{key_prefix}_cl_txt_"):
                 del st.session_state[k]
-        st.rerun()
+        st.rerun(scope="fragment")
 
     st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
     col_i, col_b = st.columns([5, 2])
@@ -3660,7 +3660,7 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
             if val:
                 st.session_state[cl_key].append({"text": val, "done": False})
                 st.session_state[cl_inp_v] += 1
-                st.rerun()
+                st.rerun(scope="fragment")
 
 
 
@@ -5699,116 +5699,120 @@ def giao_dien_nhan_vien():
         if not ds_cong_ty_nv:
             st.warning("⚠️ Chưa có công ty nào trong hệ thống. Vui lòng liên hệ Admin để thêm công ty trước.")
         else:
-            # Prefix cho session state (mỗi nhân viên dùng key riêng)
-            _nv_prefix = f"nv_{ten_nhan_vien.replace(' ', '_')}"
-            _cl_key    = f"{_nv_prefix}_checklist"
-            _cv_key    = f"{_nv_prefix}_cong_viec_con"
+            @st.fragment
+            def _fragment_tao_task_nv():
+                # Prefix cho session state (mỗi nhân viên dùng key riêng)
+                _nv_prefix = f"nv_{ten_nhan_vien.replace(' ', '_')}"
+                _cl_key    = f"{_nv_prefix}_checklist"
+                _cv_key    = f"{_nv_prefix}_cong_viec_con"
 
-            ds_nv_nv       = lay_danh_sach_nhan_vien()
-            ds_trang_thai_nv = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
+                ds_nv_nv       = lay_danh_sach_nhan_vien()
+                ds_trang_thai_nv = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
-            # ── Hàng đầu: Công Ty ──
-            nv_cong_ty = st.selectbox("🏢 Công Ty *", options=ds_cong_ty_nv, key=f"{_nv_prefix}_ct")
-            # ── Hàng tiếp theo: Người Phê Duyệt ──
-            nv_phe_duyet = st.selectbox(
-                "✅ Người Phê Duyệt",
-                options=["-- Không chọn --"] + ds_nv_nv,
-                key=f"{_nv_prefix}_pd"
-            )
-
-            col_tt2, col_nam2 = st.columns(2)
-            with col_tt2:
-                nv_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai_nv, key=f"{_nv_prefix}_tt")
-            with col_nam2:
-                nv_nam = st.text_input("📅 Năm", value=str(datetime.now().year), key=f"{_nv_prefix}_nam")
-
-            nv_deadline = st.date_input("📅 Hạn Hoàn Thành", key=f"{_nv_prefix}_dl")
-
-            col_lm_nv, col_tt_nv = st.columns(2)
-            with col_lm_nv:
-                ds_loai_may_nv = lay_ten_cac_loai_may()
-                nv_loai_may = st.selectbox(
-                    "🔧 Loại Máy",
-                    options=["-- Không chọn --"] + ds_loai_may_nv,
-                    key=f"{_nv_prefix}_loai_may",
-                )
-            with col_tt_nv:
-                ds_tinh_trang_nv = lay_ten_cac_tinh_trang()
-                nv_tinh_trang = st.selectbox(
-                    "🛠️ Tình Trạng",
-                    options=["-- Không chọn --"] + ds_tinh_trang_nv,
-                    key=f"{_nv_prefix}_tinh_trang",
+                # ── Hàng đầu: Công Ty ──
+                nv_cong_ty = st.selectbox("🏢 Công Ty *", options=ds_cong_ty_nv, key=f"{_nv_prefix}_ct")
+                # ── Hàng tiếp theo: Người Phê Duyệt ──
+                nv_phe_duyet = st.selectbox(
+                    "✅ Người Phê Duyệt",
+                    options=["-- Không chọn --"] + ds_nv_nv,
+                    key=f"{_nv_prefix}_pd"
                 )
 
-            col_cs_nv, col_sc_nv = st.columns(2)
-            with col_cs_nv:
-                nv_cong_suat = st.text_input("⚡ Công Suất", placeholder="VD: 5.5kW", key=f"{_nv_prefix}_cong_suat")
-            with col_sc_nv:
-                nv_so_cuc = st.text_input("🔩 Số Cực", placeholder="VD: 4P", key=f"{_nv_prefix}_so_cuc")
+                col_tt2, col_nam2 = st.columns(2)
+                with col_tt2:
+                    nv_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai_nv, key=f"{_nv_prefix}_tt")
+                with col_nam2:
+                    nv_nam = st.text_input("📅 Năm", value=str(datetime.now().year), key=f"{_nv_prefix}_nam")
 
-            col_ms_nv, col_po_nv = st.columns(2)
-            with col_ms_nv:
-                nv_ma_so = st.text_input("🏷️ Mã Số", placeholder="VD: ABC-001", key=f"{_nv_prefix}_ma_so")
-            with col_po_nv:
-                nv_so_po_noi_bo = st.text_input("📄 Số PO Nội Bộ", placeholder="VD: PO-2024-001", key=f"{_nv_prefix}_so_po_noi_bo")
+                nv_deadline = st.date_input("📅 Hạn Hoàn Thành", key=f"{_nv_prefix}_dl")
 
-            col_kh_nv, col_bg_nv = st.columns(2)
-            with col_kh_nv:
-                nv_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key=f"{_nv_prefix}_so_po_kh")
-            with col_bg_nv:
-                nv_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key=f"{_nv_prefix}_so_bao_gia")
-
-            nv_ten_task = st.text_input("📌 Tên Công Việc *", placeholder="Mô tả ngắn công việc cần làm", key=f"{_nv_prefix}_ten")
-            nv_mo_ta    = st.text_area("📝 Mô Tả Chi Tiết", placeholder="Mô tả chi tiết về công việc...", key=f"{_nv_prefix}_mo_ta")
-
-            st.divider()
-            _fragment_checklist(_nv_prefix, show_done=False, default_items=_MAC_DINH_CHECKLIST)
-
-            st.divider()
-            _fragment_cong_viec_con(_nv_prefix, ds_nv_nv, show_done=False)
-
-            st.divider()
-
-            if st.button("✅ Tạo Task", use_container_width=True, type="primary", key=f"{_nv_prefix}_submit"):
-                if not nv_ten_task.strip():
-                    st.error("❌ Vui lòng nhập Tên Công Việc!")
-                else:
-                    phe_duyet_nv = nv_phe_duyet if nv_phe_duyet != "-- Không chọn --" else ""
-                    with st.spinner("Đang lưu task mới..."):
-                        them_cong_viec(
-                            ten_task        = nv_ten_task.strip(),
-                            mo_ta           = nv_mo_ta.strip(),
-                            nguoi_duoc_giao = ten_nhan_vien,
-                            deadline        = str(nv_deadline),
-                            cong_ty         = nv_cong_ty,
-                            cong_so         = "",
-                            nam             = nv_nam.strip(),
-                            trang_thai      = nv_trang_thai,
-                            nguoi_phe_duyet = phe_duyet_nv,
-                            checklist       = list(st.session_state[_cl_key]),
-                            cong_viec_con   = list(st.session_state[_cv_key]),
-                            cong_doan       = "",
-                            loai_may        = nv_loai_may if nv_loai_may != "-- Không chọn --" else "",
-                            tinh_trang      = nv_tinh_trang if nv_tinh_trang != "-- Không chọn --" else "",
-                            cong_suat       = nv_cong_suat.strip(),
-                            so_cuc          = nv_so_cuc.strip(),
-                            ma_so           = nv_ma_so.strip(),
-                            so_po_noi_bo    = nv_so_po_noi_bo.strip(),
-                            so_po_kh        = nv_so_po_kh.strip(),
-                            so_bao_gia      = nv_so_bao_gia.strip(),
-                        )
-                    st.session_state.pop(_cl_key, None)
-                    st.session_state.pop(_cv_key, None)
-                    st.session_state.pop(f"{_nv_prefix}_cv_seeded", None)
-                    # Xoá form fields
-                    for _k in [f"{_nv_prefix}_ten", f"{_nv_prefix}_mo_ta"]:
-                        st.session_state.pop(_k, None)
-                    st.session_state["_nv_task_success"] = (
-                        f"🎉 Đã tạo task **{nv_ten_task}** thành công! "
-                        f"Chuyển sang tab **Công Việc Của Tôi** để xem."
+                col_lm_nv, col_tt_nv = st.columns(2)
+                with col_lm_nv:
+                    ds_loai_may_nv = lay_ten_cac_loai_may()
+                    nv_loai_may = st.selectbox(
+                        "🔧 Loại Máy",
+                        options=["-- Không chọn --"] + ds_loai_may_nv,
+                        key=f"{_nv_prefix}_loai_may",
                     )
-                    st.session_state.pop("_last_nv_load", None)
-                    st.rerun()
+                with col_tt_nv:
+                    ds_tinh_trang_nv = lay_ten_cac_tinh_trang()
+                    nv_tinh_trang = st.selectbox(
+                        "🛠️ Tình Trạng",
+                        options=["-- Không chọn --"] + ds_tinh_trang_nv,
+                        key=f"{_nv_prefix}_tinh_trang",
+                    )
+
+                col_cs_nv, col_sc_nv = st.columns(2)
+                with col_cs_nv:
+                    nv_cong_suat = st.text_input("⚡ Công Suất", placeholder="VD: 5.5kW", key=f"{_nv_prefix}_cong_suat")
+                with col_sc_nv:
+                    nv_so_cuc = st.text_input("🔩 Số Cực", placeholder="VD: 4P", key=f"{_nv_prefix}_so_cuc")
+
+                col_ms_nv, col_po_nv = st.columns(2)
+                with col_ms_nv:
+                    nv_ma_so = st.text_input("🏷️ Mã Số", placeholder="VD: ABC-001", key=f"{_nv_prefix}_ma_so")
+                with col_po_nv:
+                    nv_so_po_noi_bo = st.text_input("📄 Số PO Nội Bộ", placeholder="VD: PO-2024-001", key=f"{_nv_prefix}_so_po_noi_bo")
+
+                col_kh_nv, col_bg_nv = st.columns(2)
+                with col_kh_nv:
+                    nv_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key=f"{_nv_prefix}_so_po_kh")
+                with col_bg_nv:
+                    nv_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key=f"{_nv_prefix}_so_bao_gia")
+
+                nv_ten_task = st.text_input("📌 Tên Công Việc *", placeholder="Mô tả ngắn công việc cần làm", key=f"{_nv_prefix}_ten")
+                nv_mo_ta    = st.text_area("📝 Mô Tả Chi Tiết", placeholder="Mô tả chi tiết về công việc...", key=f"{_nv_prefix}_mo_ta")
+
+                st.divider()
+                _fragment_checklist(_nv_prefix, show_done=False, default_items=_MAC_DINH_CHECKLIST)
+
+                st.divider()
+                _fragment_cong_viec_con(_nv_prefix, ds_nv_nv, show_done=False)
+
+                st.divider()
+
+                if st.button("✅ Tạo Task", use_container_width=True, type="primary", key=f"{_nv_prefix}_submit"):
+                    if not nv_ten_task.strip():
+                        st.error("❌ Vui lòng nhập Tên Công Việc!")
+                    else:
+                        phe_duyet_nv = nv_phe_duyet if nv_phe_duyet != "-- Không chọn --" else ""
+                        with st.spinner("Đang lưu task mới..."):
+                            them_cong_viec(
+                                ten_task        = nv_ten_task.strip(),
+                                mo_ta           = nv_mo_ta.strip(),
+                                nguoi_duoc_giao = ten_nhan_vien,
+                                deadline        = str(nv_deadline),
+                                cong_ty         = nv_cong_ty,
+                                cong_so         = "",
+                                nam             = nv_nam.strip(),
+                                trang_thai      = nv_trang_thai,
+                                nguoi_phe_duyet = phe_duyet_nv,
+                                checklist       = list(st.session_state[_cl_key]),
+                                cong_viec_con   = list(st.session_state[_cv_key]),
+                                cong_doan       = "",
+                                loai_may        = nv_loai_may if nv_loai_may != "-- Không chọn --" else "",
+                                tinh_trang      = nv_tinh_trang if nv_tinh_trang != "-- Không chọn --" else "",
+                                cong_suat       = nv_cong_suat.strip(),
+                                so_cuc          = nv_so_cuc.strip(),
+                                ma_so           = nv_ma_so.strip(),
+                                so_po_noi_bo    = nv_so_po_noi_bo.strip(),
+                                so_po_kh        = nv_so_po_kh.strip(),
+                                so_bao_gia      = nv_so_bao_gia.strip(),
+                            )
+                        st.session_state.pop(_cl_key, None)
+                        st.session_state.pop(_cv_key, None)
+                        st.session_state.pop(f"{_nv_prefix}_cv_seeded", None)
+                        # Xoá form fields
+                        for _k in [f"{_nv_prefix}_ten", f"{_nv_prefix}_mo_ta"]:
+                            st.session_state.pop(_k, None)
+                        st.session_state["_nv_task_success"] = (
+                            f"🎉 Đã tạo task **{nv_ten_task}** thành công! "
+                            f"Chuyển sang tab **Công Việc Của Tôi** để xem."
+                        )
+                        st.session_state.pop("_last_nv_load", None)
+                        st.rerun(scope="app")
+
+            _fragment_tao_task_nv()
 
 
 # ============================================================
