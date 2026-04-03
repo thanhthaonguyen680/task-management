@@ -5744,8 +5744,6 @@ def giao_dien_nhan_vien():
             def _fragment_tao_task_nv():
                 # Prefix cho session state (mỗi nhân viên dùng key riêng)
                 _nv_prefix = f"nv_{ten_nhan_vien.replace(' ', '_')}"
-                _cl_key    = f"{_nv_prefix}_checklist"
-                _cv_key    = f"{_nv_prefix}_cong_viec_con"
 
                 # Form version counter: thay đổi key → Streamlit tạo widget mới hoàn toàn
                 _ver_key = f"{_nv_prefix}_form_ver"
@@ -5810,11 +5808,16 @@ def giao_dien_nhan_vien():
                 nv_ten_task = st.text_input("📌 Tên Công Việc *", placeholder="Mô tả ngắn công việc cần làm", key=f"{_nv_prefix}_ten_{_v}")
                 nv_mo_ta    = st.text_area("📝 Mô Tả Chi Tiết", placeholder="Mô tả chi tiết về công việc...", key=f"{_nv_prefix}_mo_ta_{_v}")
 
-                st.divider()
-                _fragment_checklist(_nv_prefix, show_done=False, default_items=_MAC_DINH_CHECKLIST)
+                # Prefix có version cho checklist & công việc con → đổi key khi reset form
+                _vp = f"{_nv_prefix}_v{_v}"
+                _cl_key = f"{_vp}_checklist"
+                _cv_key = f"{_vp}_cong_viec_con"
 
                 st.divider()
-                _fragment_cong_viec_con(_nv_prefix, ds_nv_nv, show_done=False)
+                _fragment_checklist(_vp, show_done=False, default_items=_MAC_DINH_CHECKLIST)
+
+                st.divider()
+                _fragment_cong_viec_con(_vp, ds_nv_nv, show_done=False)
 
                 st.divider()
 
@@ -5834,8 +5837,8 @@ def giao_dien_nhan_vien():
                                 nam             = nv_nam.strip(),
                                 trang_thai      = nv_trang_thai,
                                 nguoi_phe_duyet = phe_duyet_nv,
-                                checklist       = list(st.session_state[_cl_key]),
-                                cong_viec_con   = list(st.session_state[_cv_key]),
+                                checklist       = list(st.session_state.get(_cl_key, [])),
+                                cong_viec_con   = list(st.session_state.get(_cv_key, [])),
                                 cong_doan       = "",
                                 loai_may        = nv_loai_may if nv_loai_may != "-- Không chọn --" else "",
                                 tinh_trang      = nv_tinh_trang if nv_tinh_trang != "-- Không chọn --" else "",
@@ -5846,12 +5849,8 @@ def giao_dien_nhan_vien():
                                 so_po_kh        = nv_so_po_kh.strip(),
                                 so_bao_gia      = nv_so_bao_gia.strip(),
                             )
-                        # Reset form: tăng version → tất cả widget keys thay đổi → Streamlit tạo widget trống
+                        # Tăng version → toàn bộ widget keys (kể cả checklist/cong_viec_con) đổi → reset sạch
                         st.session_state[_ver_key] = _v + 1
-                        st.session_state.pop(_cl_key, None)
-                        st.session_state.pop(_cv_key, None)
-                        st.session_state.pop(f"{_nv_prefix}_cv_seeded", None)
-                        st.session_state.pop(f"{_nv_prefix}_cl_inp_v", None)
                         st.session_state["_nv_task_success"] = (
                             f"🎉 Đã tạo task **{nv_ten_task}** thành công! "
                             f"Chuyển sang tab **Công Việc Của Tôi** để xem."
