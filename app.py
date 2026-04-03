@@ -3854,16 +3854,13 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 key=_up_key_frag,
                 label_visibility="collapsed",
             )
-            if st.button("📤 Upload", key=f"{key_prefix}_btn_up_cv_{i}", use_container_width=True):
-                _files = st.session_state.get(_up_key_frag) or []
-                if _files:
-                    with st.spinner("Đang upload..."):
-                        for _fm in _files:
-                            _new_url = _tai_media_len_drive(_fm)
-                            st.session_state[cv_key][i].setdefault("anh", []).append(_new_url)
-                    st.rerun()
-                else:
-                    st.warning("Chưa chọn file!")
+            def _cb_upload_cv(idx=i, up_k=_up_key_frag):
+                _files = st.session_state.get(up_k) or []
+                for _fm in _files:
+                    _new_url = _tai_media_len_drive(_fm)
+                    st.session_state[cv_key][idx].setdefault("anh", []).append(_new_url)
+            st.button("📤 Upload", key=f"{key_prefix}_btn_up_cv_{i}",
+                      use_container_width=True, on_click=_cb_upload_cv)
 
     # Thêm thủ công một mục mới
     st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
