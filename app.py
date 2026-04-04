@@ -4154,7 +4154,7 @@ def _dialog_tao_task_thanh_cong(message: str, goto_key: str):
 def _dialog_nv_tao_task_xong(message: str):
     st.success(message)
     st.balloons()
-    if st.button("✅ OK — Tạo Tiếp", use_container_width=True, type="primary"):
+    if st.button("✅ OK", use_container_width=True, type="primary"):
         st.rerun()
 
 
