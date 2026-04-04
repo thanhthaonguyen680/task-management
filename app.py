@@ -17,6 +17,8 @@ import tempfile
 import os
 import json
 import hashlib
+import hmac as _hmac_mod
+import base64 as _b64_mod
 
 # ============================================================
 # TẢI FONT UNICODE HỖ TRỢ TIẾNG VIỆT
@@ -451,45 +453,38 @@ components.html(
 )
 
 
-_SESSION_FILE = os.path.join(os.path.dirname(__file__), ".sessions.json")
+# Token secret — dùng để ký HMAC cho session token
+_TOKEN_SECRET = st.secrets.get("TOKEN_SECRET", "tm_default_secret_xk9p_2026")
+
+
+def _create_session_token(data: dict) -> str:
+    """Mã hoá user data vào token (base64 JSON + HMAC). Không cần server storage."""
+    payload = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+    b64 = _b64_mod.urlsafe_b64encode(payload.encode()).decode()
+    sig = _hmac_mod.new(_TOKEN_SECRET.encode(), b64.encode(), "sha256").hexdigest()[:24]
+    return f"{b64}.{sig}"
+
+
+def _verify_session_token(token: str) -> dict | None:
+    """Xác minh và giải mã token. Trả về user data hoặc None nếu không hợp lệ."""
+    try:
+        b64, sig = token.rsplit(".", 1)
+        expected = _hmac_mod.new(_TOKEN_SECRET.encode(), b64.encode(), "sha256").hexdigest()[:24]
+        if not _hmac_mod.compare_digest(sig, expected):
+            return None
+        return json.loads(_b64_mod.urlsafe_b64decode(b64 + "==").decode())
+    except Exception:
+        return None
+
 
 def _session_store():
-    """Lưu session token → thông tin user vào file JSON để tồn tại qua app restart."""
-    return _SessionStore()
+    """Backward compat wrapper — không còn dùng server storage."""
+    class _Noop:
+        def get(self, k, d=None): return d
+        def pop(self, k, *a): return a[0] if a else None
+        def __setitem__(self, k, v): pass
+    return _Noop()
 
-class _SessionStore:
-    def _load(self):
-        try:
-            if os.path.exists(_SESSION_FILE):
-                with open(_SESSION_FILE, "r", encoding="utf-8") as f:
-                    return json.load(f)
-        except Exception:
-            pass
-        return {}
-
-    def _save(self, data):
-        try:
-            with open(_SESSION_FILE, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False)
-        except Exception:
-            pass
-
-    def get(self, key, default=None):
-        return self._load().get(key, default)
-
-    def __getitem__(self, key):
-        return self._load()[key]
-
-    def __setitem__(self, key, value):
-        data = self._load()
-        data[key] = value
-        self._save(data)
-
-    def pop(self, key, *args):
-        data = self._load()
-        result = data.pop(key, *args)
-        self._save(data)
-        return result
 
 
 # ============================================================
@@ -5983,13 +5978,12 @@ def giao_dien_dang_nhap():
                     st.session_state["ho_ten"]         = user["ho_ten"]
                     st.session_state["vai_tro"]        = user["vai_tro"]
                     st.session_state.pop("manual_logout", None)
-                    token = str(uuid.uuid4())
-                    _session_store()[token] = {
+                    token = _create_session_token({
                         "user_id":  str(user["id"]),
                         "username": user["username"],
                         "ho_ten":   user["ho_ten"],
                         "vai_tro":  user["vai_tro"],
-                    }
+                    })
                     st.session_state["session_token"] = token
                     st.query_params["s"] = token
                     st.success(f"Chào mừng, **{user['ho_ten']}**! 🎉")
@@ -6708,7 +6702,7 @@ def main():
             return
 
         token = st.query_params.get("s")
-        sess  = _session_store().get(token) if token else None
+        sess  = _verify_session_token(token) if token else None
 
         if sess:
             uid            = sess["user_id"]
