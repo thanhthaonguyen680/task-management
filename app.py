@@ -5650,9 +5650,21 @@ def giao_dien_nhan_vien():
     if st.session_state.get("_nv_task_success"):
         _dialog_nv_tao_task_xong(st.session_state.pop("_nv_task_success"))
 
-    # ---- Scroll lên đầu sau khi đóng dialog ----
+    # ---- Scroll lên đầu + giữ tab Tạo Công Việc Mới sau khi đóng dialog ----
     if st.session_state.pop("_nv_scroll_top", False):
-        components.html("<script>window.parent.scrollTo({top:0,behavior:'smooth'});</script>", height=0)
+        components.html("""
+        <script>
+        window.parent.scrollTo({top: 0, behavior: 'smooth'});
+        setTimeout(function() {
+            var tabs = window.parent.document.querySelectorAll('button[role="tab"]');
+            for (var i = 0; i < tabs.length; i++) {
+                if (tabs[i].innerText.indexOf('T\u1ea1o C\u00f4ng Vi\u1ec7c M\u1edbi') !== -1) {
+                    tabs[i].click(); break;
+                }
+            }
+        }, 200);
+        </script>
+        """, height=0)
 
     # ---- Tabs ----
     tab_cong_viec, tab_tao_task, tab_phe_duyet = st.tabs([
