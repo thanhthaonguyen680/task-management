@@ -4185,6 +4185,7 @@ def _dialog_nv_tao_task_xong(message: str):
     st.success(message)
     st.balloons()
     if st.button("✅ OK", use_container_width=True, type="primary"):
+        st.session_state["_nv_scroll_top"] = True
         st.rerun()
 
 
@@ -5648,6 +5649,10 @@ def giao_dien_nhan_vien():
     # ---- Dialog thành công (phải đặt TRƯỚC tabs để luôn hiển thị) ----
     if st.session_state.get("_nv_task_success"):
         _dialog_nv_tao_task_xong(st.session_state.pop("_nv_task_success"))
+
+    # ---- Scroll lên đầu sau khi đóng dialog ----
+    if st.session_state.pop("_nv_scroll_top", False):
+        components.html("<script>window.parent.scrollTo({top:0,behavior:'smooth'});</script>", height=0)
 
     # ---- Tabs ----
     tab_cong_viec, tab_tao_task, tab_phe_duyet = st.tabs([
