@@ -1,6 +1,9 @@
 # Secrets - KHÔNG commit lên Git
 .streamlit/secrets.toml
 
+# Session store (persistent login)
+.sessions.json
+
 # Python
 __pycache__/
 *.py[cod]

@@ -451,10 +451,45 @@ components.html(
 )
 
 
-@st.cache_resource
+_SESSION_FILE = os.path.join(os.path.dirname(__file__), ".sessions.json")
+
 def _session_store():
-    """Lưu session token → thông tin user. Dùng cache_resource để chia sẻ giữa các session."""
-    return {}
+    """Lưu session token → thông tin user vào file JSON để tồn tại qua app restart."""
+    return _SessionStore()
+
+class _SessionStore:
+    def _load(self):
+        try:
+            if os.path.exists(_SESSION_FILE):
+                with open(_SESSION_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
+        return {}
+
+    def _save(self, data):
+        try:
+            with open(_SESSION_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+        except Exception:
+            pass
+
+    def get(self, key, default=None):
+        return self._load().get(key, default)
+
+    def __getitem__(self, key):
+        return self._load()[key]
+
+    def __setitem__(self, key, value):
+        data = self._load()
+        data[key] = value
+        self._save(data)
+
+    def pop(self, key, *args):
+        data = self._load()
+        result = data.pop(key, *args)
+        self._save(data)
+        return result
 
 
 # ============================================================
