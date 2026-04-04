@@ -3106,80 +3106,91 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     _checklist = st.session_state[_cl_key]
 
     so_xong = sum(1 for it in _checklist if isinstance(it, dict) and it.get("done"))
-    st.markdown(
-        f"**☑️ Checklist** &nbsp;<span style='color:#6b7280;font-size:0.82rem;'>{so_xong}/{len(_checklist)} mục</span>",
-        unsafe_allow_html=True,
+
+    _cl_open_key = f"cl_open_{task_id}"
+    if _cl_open_key not in st.session_state:
+        st.session_state[_cl_open_key] = False  # mặc định đóng
+
+    _cl_chevron = "▼" if st.session_state[_cl_open_key] else "▶"
+    def _toggle_cl():
+        st.session_state[_cl_open_key] = not st.session_state[_cl_open_key]
+    st.button(
+        f"{_cl_chevron}  ☑️ Checklist  {so_xong}/{len(_checklist)} mục",
+        key=f"dlg_cl_tog_{task_id}",
+        use_container_width=True,
+        on_click=_toggle_cl,
     )
 
-    _mk_cl = f"dlgcl{task_id}"
-    st.markdown(f"""<style>
-    [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) {{
-        flex-wrap: nowrap !important; align-items: center !important; gap: 6px !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) > [data-testid="stColumn"]:first-child {{
-        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) > [data-testid="stColumn"]:last-child {{
-        flex: 1 1 0% !important; min-width: 0 !important;
-    }}
-    [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) [data-testid="stCheckbox"] {{ margin:0 !important; }}
-    [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) p {{
-        margin: 0 !important; font-size: 0.93rem !important; color: #1e1b4b;
-        padding: 4px 2px;
-    }}
-    </style>""", unsafe_allow_html=True)
+    if st.session_state[_cl_open_key]:
+        _mk_cl = f"dlgcl{task_id}"
+        st.markdown(f"""<style>
+        [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) {{
+            flex-wrap: nowrap !important; align-items: center !important; gap: 6px !important;
+        }}
+        [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) > [data-testid="stColumn"]:first-child {{
+            flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
+        }}
+        [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) > [data-testid="stColumn"]:last-child {{
+            flex: 1 1 0% !important; min-width: 0 !important;
+        }}
+        [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) [data-testid="stCheckbox"] {{ margin:0 !important; }}
+        [data-testid="stHorizontalBlock"]:has(.{_mk_cl}) p {{
+            margin: 0 !important; font-size: 0.93rem !important; color: #1e1b4b;
+            padding: 4px 2px;
+        }}
+        </style>""", unsafe_allow_html=True)
 
-    def _cb_cl_done(idx):
-        val = st.session_state.get(f"dlg_ck_{task_id}_{idx}", False)
-        st.session_state[_cl_key][idx]["done"] = val
-        cap_nhat_checklist(task_id, st.session_state[_cl_key])
+        def _cb_cl_done(idx):
+            val = st.session_state.get(f"dlg_ck_{task_id}_{idx}", False)
+            st.session_state[_cl_key][idx]["done"] = val
+            cap_nhat_checklist(task_id, st.session_state[_cl_key])
 
-    def _cb_cl_text(idx):
-        val = st.session_state.get(f"dlg_cl_txt_{task_id}_{idx}", "")
-        st.session_state[_cl_key][idx]["text"] = val
-        cap_nhat_checklist(task_id, st.session_state[_cl_key])
+        def _cb_cl_text(idx):
+            val = st.session_state.get(f"dlg_cl_txt_{task_id}_{idx}", "")
+            st.session_state[_cl_key][idx]["text"] = val
+            cap_nhat_checklist(task_id, st.session_state[_cl_key])
 
-    for _ci, _cit in enumerate(_checklist):
-        if isinstance(_cit, str):
-            _cit = {"text": _cit, "done": False}
-            _checklist[_ci] = _cit
-        _done_v = bool(_cit.get("done", False))
-        _txt0   = _cit.get("text", "") or f"Mục {_ci+1}"
-        col_ck, col_txt = st.columns([0.5, 9], gap="small")
-        with col_ck:
-            st.markdown(f"<span class='{_mk_cl}' style='display:none'></span>", unsafe_allow_html=True)
-            st.checkbox("", value=_done_v, key=f"dlg_ck_{task_id}_{_ci}",
-                        label_visibility="collapsed",
-                        on_change=_cb_cl_done, args=(_ci,))
-        with col_txt:
+        for _ci, _cit in enumerate(_checklist):
+            if isinstance(_cit, str):
+                _cit = {"text": _cit, "done": False}
+                _checklist[_ci] = _cit
+            _done_v = bool(_cit.get("done", False))
+            _txt0   = _cit.get("text", "") or f"Mục {_ci+1}"
+            col_ck, col_txt = st.columns([0.5, 9], gap="small")
+            with col_ck:
+                st.markdown(f"<span class='{_mk_cl}' style='display:none'></span>", unsafe_allow_html=True)
+                st.checkbox("", value=_done_v, key=f"dlg_ck_{task_id}_{_ci}",
+                            label_visibility="collapsed",
+                            on_change=_cb_cl_done, args=(_ci,))
+            with col_txt:
+                st.text_input(
+                    "", value=_txt0,
+                    key=f"dlg_cl_txt_{task_id}_{_ci}",
+                    label_visibility="collapsed",
+                    on_change=_cb_cl_text, args=(_ci,),
+                )
+
+        # ── Thêm mục checklist mới ────────────────────────────────
+        _cl_new_key = f"dlg_cl_new_{task_id}"
+        _cl_new_v   = f"dlg_cl_new_v_{task_id}"
+        if _cl_new_v not in st.session_state:
+            st.session_state[_cl_new_v] = 0
+
+        col_inp, col_add = st.columns([8, 1], gap="small")
+        with col_inp:
             st.text_input(
-                "", value=_txt0,
-                key=f"dlg_cl_txt_{task_id}_{_ci}",
+                "", placeholder="➕ Thêm mục checklist...",
+                key=f"{_cl_new_key}_{st.session_state[_cl_new_v]}",
                 label_visibility="collapsed",
-                on_change=_cb_cl_text, args=(_ci,),
             )
-
-    # ── Thêm mục checklist mới ────────────────────────────────
-    _cl_new_key = f"dlg_cl_new_{task_id}"
-    _cl_new_v   = f"dlg_cl_new_v_{task_id}"
-    if _cl_new_v not in st.session_state:
-        st.session_state[_cl_new_v] = 0
-
-    col_inp, col_add = st.columns([8, 1], gap="small")
-    with col_inp:
-        st.text_input(
-            "", placeholder="➕ Thêm mục checklist...",
-            key=f"{_cl_new_key}_{st.session_state[_cl_new_v]}",
-            label_visibility="collapsed",
-        )
-    with col_add:
-        def _cb_cl_add():
-            _txt = st.session_state.get(f"{_cl_new_key}_{st.session_state[_cl_new_v]}", "").strip()
-            if _txt:
-                st.session_state[_cl_key].append({"text": _txt, "done": False})
-                cap_nhat_checklist(task_id, st.session_state[_cl_key])
-                st.session_state[_cl_new_v] += 1  # reset input
-        st.button("➕", key=f"dlg_cl_add_btn_{task_id}", on_click=_cb_cl_add, use_container_width=True)
+        with col_add:
+            def _cb_cl_add():
+                _txt = st.session_state.get(f"{_cl_new_key}_{st.session_state[_cl_new_v]}", "").strip()
+                if _txt:
+                    st.session_state[_cl_key].append({"text": _txt, "done": False})
+                    cap_nhat_checklist(task_id, st.session_state[_cl_key])
+                    st.session_state[_cl_new_v] += 1  # reset input
+            st.button("➕", key=f"dlg_cl_add_btn_{task_id}", on_click=_cb_cl_add, use_container_width=True)
 
     st.divider()
 
@@ -4293,7 +4304,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb"):
         # ── Toggle state ──────────────────────────────────────
         _sk = f"{board_key}_open_{tt}"
         if _sk not in st.session_state:
-            st.session_state[_sk] = True   # mặc định mở
+            st.session_state[_sk] = False   # mặc định đóng
 
         is_open = st.session_state[_sk]
         chevron = "▼" if is_open else "▶"
