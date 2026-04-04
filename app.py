@@ -4150,6 +4150,14 @@ def _dialog_tao_task_thanh_cong(message: str, goto_key: str):
         st.rerun()
 
 
+@st.dialog("✅ Tạo Task Thành Công!")
+def _dialog_nv_tao_task_xong(message: str):
+    st.success(message)
+    st.balloons()
+    if st.button("✅ OK — Tạo Tiếp", use_container_width=True, type="primary"):
+        st.rerun()
+
+
 # ============================================================
 # KANBAN BOARD HELPER
 # ============================================================
@@ -5609,7 +5617,7 @@ def giao_dien_nhan_vien():
 
     # ---- Dialog thành công (phải đặt TRƯỚC tabs để luôn hiển thị) ----
     if st.session_state.get("_nv_task_success"):
-        _dialog_tao_task_thanh_cong(st.session_state.pop("_nv_task_success"), "_nv_goto_board")
+        _dialog_nv_tao_task_xong(st.session_state.pop("_nv_task_success"))
 
     # ---- Tabs ----
     tab_cong_viec, tab_tao_task, tab_phe_duyet = st.tabs([
@@ -5617,20 +5625,6 @@ def giao_dien_nhan_vien():
         "➕ Tạo Công Việc Mới",
         "✅ Việc Cần Phê Duyệt"
     ])
-
-    if st.session_state.pop("_nv_goto_board", False):
-        components.html("""
-        <script>
-        setTimeout(function() {
-            var tabs = window.parent.document.querySelectorAll('button[role="tab"]');
-            for (var i = 0; i < tabs.length; i++) {
-                if (tabs[i].innerText.indexOf('B\u1ea3ng Qu\u1ea3n L\u00fd C\u00f4ng Vi\u1ec7c') !== -1) {
-                    tabs[i].click(); break;
-                }
-            }
-        }, 400);
-        </script>
-        """, height=0)
 
     # ========================================================
     # Tab 1: Công việc của tôi
