@@ -4329,6 +4329,24 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                         args=(task_id, do_key, lbl_key, up_key, done_key),
                     )
 
+    st.components.v1.html(
+        """<script>
+        (function() {
+            function applyInputMode() {
+                window.parent.document.querySelectorAll(
+                    'input[placeholder="Nhập số (VD: 5.8)..."]'
+                ).forEach(function(el) {
+                    el.setAttribute('inputmode', 'decimal');
+                    el.setAttribute('type', 'text');
+                });
+            }
+            applyInputMode();
+            setTimeout(applyInputMode, 300);
+        })();
+        </script>""",
+        height=0,
+    )
+
 
 @st.fragment
 def _fragment_upload_do_luong(task_id, do_key: str):
