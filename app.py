@@ -1873,17 +1873,17 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
         pdf.set_xy(xA, y1 + RH - 3)
         pdf.cell(W1, 6, "NT", border=0, align="C")
 
-        # ── Hàng 1 — text canh giữa ô ──
+        # ── Hàng 1 — text canh trái ô ──
         pdf.set_font("DejaVu", "", 7)
         # Quotation
         pdf.set_xy(xB, y1)
-        pdf.cell(W2, RH, "Quotation / Báo giá :", border=0, align="C")
+        pdf.cell(W2, RH, "Quotation / Báo giá :", border=0, align="L")
         # Engine number
         pdf.set_xy(xC, y1)
-        pdf.cell(W2, RH, "Engine number / Số máy :", border=0, align="C")
+        pdf.cell(W2, RH, "Engine number / Số máy :", border=0, align="L")
         # Order number (có giá trị)
         pdf.set_xy(xD, y1)
-        pdf.cell(W3, RH, f"Order number / Số ĐH: {cong_so}", border=0, align="C")
+        pdf.cell(W3, RH, f"Order number / Số ĐH: {cong_so}", border=0, align="L")
 
         # ── Hàng 2 — mỗi ô chia 2 dòng nhỏ bằng multi_cell ──
         sub_h = RH / 2  # 4mm mỗi sub-row
@@ -1891,21 +1891,21 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
         # Management doc
         pdf.set_font("DejaVu", "", 6.5)
         pdf.set_xy(xB, y2)
-        pdf.cell(W2, sub_h, "Management document / Tài liệu quản lý:", border=0, align="C")
+        pdf.cell(W2, sub_h, "Management document / Tài liệu quản lý:", border=0, align="L")
         pdf.set_xy(xB, y2 + sub_h)
-        pdf.cell(W2, sub_h, "QT-NT-029-1A", border=0, align="C")
+        pdf.cell(W2, sub_h, "QT-NT-029-1A", border=0, align="L")
 
         # Edition date
         pdf.set_xy(xC, y2)
-        pdf.cell(W2, sub_h, "Edition date / Ngày ban hành:", border=0, align="C")
+        pdf.cell(W2, sub_h, "Edition date / Ngày ban hành:", border=0, align="L")
         pdf.set_xy(xC, y2 + sub_h)
-        pdf.cell(W2, sub_h, "24/04/2025", border=0, align="C")
+        pdf.cell(W2, sub_h, "24/04/2025", border=0, align="L")
 
         # Page
         pdf.set_xy(xD, y2)
-        pdf.cell(W3, sub_h, "Page / Trang:", border=0, align="C")
+        pdf.cell(W3, sub_h, "Page / Trang:", border=0, align="L")
         pdf.set_xy(xD, y2 + sub_h)
-        pdf.cell(W3, sub_h, page_str, border=0, align="C")
+        pdf.cell(W3, sub_h, page_str, border=0, align="L")
 
         # Đặt cursor sau header
         pdf.set_xy(M_LEFT, M_TOP + RH * 2 + 4)
@@ -2605,22 +2605,22 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             _xl_nt2.anchor = _nt2_anchor
             ws.add_image(_xl_nt2)
         ws.merge_cells(f"B{row}:C{row}")
-        _sc(row, 2, f"Quotation / Báo giá: {so_bao_gia}", size=12, border=brd_all)
+        _sc(row, 2, f"Quotation / Báo giá: {so_bao_gia}", size=12, border=brd_all, h_align="left")
         _brd_merge(row, 2, 3, brd_all)
         ws.merge_cells(f"D{row}:E{row}")
-        _sc(row, 4, f"Engine number / Số máy: {ma_so}", size=12, border=brd_all)
+        _sc(row, 4, f"Engine number / Số máy: {ma_so}", size=12, border=brd_all, h_align="left")
         _brd_merge(row, 4, 5, brd_all)
-        _sc(row, 6, f"Order number / Số ĐH: {so_po_kh}", size=12, border=brd_all)
+        _sc(row, 6, f"Order number / Số ĐH: {so_po_kh}", size=12, border=brd_all, h_align="left")
         ws.merge_cells(f"B{row+1}:C{row+1}")
         _sc(row + 1, 2,
             "Management document / Tài liệu quản lý: QT-NT-029-1A",
-            size=10, border=brd_all)
+            size=10, border=brd_all, h_align="left")
         _brd_merge(row + 1, 2, 3, brd_all)
         ws.merge_cells(f"D{row+1}:E{row+1}")
         _sc(row + 1, 4, "Edition date / Ngày ban hành: 24/04/2025",
-            size=10, border=brd_all)
+            size=10, border=brd_all, h_align="left")
         _brd_merge(row + 1, 4, 5, brd_all)
-        _sc(row + 1, 6, f"Page / Trang: {page_lbl}", size=12, border=brd_all)
+        _sc(row + 1, 6, f"Page / Trang: {page_lbl}", size=12, border=brd_all, h_align="left")
         ws.row_dimensions[row].height     = 26
         ws.row_dimensions[row + 1].height = 24
         ws.row_dimensions[row + 2].height = 14   # blank gap sau mini header
