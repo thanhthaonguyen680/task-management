@@ -4338,6 +4338,19 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                 ).forEach(function(el) {
                     el.setAttribute('inputmode', 'decimal');
                     el.setAttribute('type', 'text');
+                    if (!el._commaFixed) {
+                        el._commaFixed = true;
+                        el.addEventListener('input', function() {
+                            var pos = el.selectionStart;
+                            var newVal = el.value.replace(/,/g, '.');
+                            if (newVal !== el.value) {
+                                el.value = newVal;
+                                el.selectionStart = pos;
+                                el.selectionEnd = pos;
+                                el.dispatchEvent(new Event('input', {bubbles: true}));
+                            }
+                        });
+                    }
                 });
             }
             applyInputMode();
