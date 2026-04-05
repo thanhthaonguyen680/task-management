@@ -4332,9 +4332,9 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
     st.components.v1.html(
         """<script>
         (function() {
-            var NUM_PH = 'Nhập số (VD: 5.8)...';
+            var NUM_PHS = ['Nhập số (VD: 5.8)...', 'Nhập giá trị đo...'];
             function fixEl(el) {
-                if (el.placeholder === NUM_PH) {
+                if (NUM_PHS.indexOf(el.placeholder) !== -1) {
                     el.setAttribute('inputmode', 'decimal');
                     if (!el._commaFixed) {
                         el._commaFixed = true;
