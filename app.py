@@ -4129,6 +4129,15 @@ _NHOM_DO = [
       ("After / Sau",    "nde_brg_after")]),
 ]
 
+# Keys có field nhập giá trị đo (chỉ Resistance + Insulation Resistance)
+_DO_LUONG_VALUE_KEYS = {
+    "R_U1U2", "R_V1V2", "R_W1W2", "R_PTC",
+    "R_PT100", "R_HEATER",
+    "IR_UV", "IR_UW", "IR_VW",
+    "IR_PTC_E", "IR_PT100_E", "IR_HEATER_E",
+    "IR_U_E", "IR_V_E", "IR_W_E",
+}
+
 # Mapping: TÊN CÔNG ĐOẠn (uppercase) → nhóm ảnh đo lường thuộc công đoạn đó
 _STAGE_DO_LUONG = {
     "ĐAI ĐẦU": [
@@ -4242,18 +4251,19 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
             unsafe_allow_html=True,
         )
         for lbl_display, lbl_key in labels:
-            # ── Giá trị thông số đo ──────────────────────────────
-            _val_key = f"{lbl_key}_val"
-            _cur_val = st.session_state.get(do_key, {}).get(_val_key, "")
-            _inp_key = f"inp_val_{task_id}_{lbl_key}"
-            st.text_input(
-                lbl_display,
-                value=_cur_val,
-                key=_inp_key,
-                placeholder="Nhập giá trị đo (VD: 1.23 mΩ)...",
-                on_change=_cb_save_val,
-                args=(task_id, do_key, _val_key, _inp_key),
-            )
+            # ── Giá trị thông số đo (chỉ Resistance + IR) ──
+            if lbl_key in _DO_LUONG_VALUE_KEYS:
+                _val_key = f"{lbl_key}_val"
+                _cur_val = st.session_state.get(do_key, {}).get(_val_key, "")
+                _inp_key = f"inp_val_{task_id}_{lbl_key}"
+                st.text_input(
+                    lbl_display,
+                    value=_cur_val,
+                    key=_inp_key,
+                    placeholder="Nhập giá trị đo (VD: 1.23 mΩ)...",
+                    on_change=_cb_save_val,
+                    args=(task_id, do_key, _val_key, _inp_key),
+                )
             # ── Ảnh minh chứng ───────────────────────────────────
             urls_label = st.session_state.get(do_key, {}).get(lbl_key, [])
             exp_lbl = f"📷 Ảnh {lbl_display}  ✅" if urls_label else f"📷 Ảnh {lbl_display}"
@@ -4304,18 +4314,19 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                 lbl_display, lbl_key = item
             else:
                 lbl_display = lbl_key = item
-            # ── Giá trị thông số đo ──────────────────────────────
-            _val_key = f"{lbl_key}_val"
-            _cur_val = st.session_state[do_key].get(_val_key, "")
-            _inp_key = f"inp_val_{task_id}_{lbl_key}"
-            st.text_input(
-                lbl_display,
-                value=_cur_val,
-                key=_inp_key,
-                placeholder="Nhập giá trị đo (VD: 1.23 mΩ)...",
-                on_change=_cb_save_val,
-                args=(task_id, do_key, _val_key, _inp_key),
-            )
+            # ── Giá trị thông số đo (chỉ Resistance + IR) ──
+            if lbl_key in _DO_LUONG_VALUE_KEYS:
+                _val_key = f"{lbl_key}_val"
+                _cur_val = st.session_state[do_key].get(_val_key, "")
+                _inp_key = f"inp_val_{task_id}_{lbl_key}"
+                st.text_input(
+                    lbl_display,
+                    value=_cur_val,
+                    key=_inp_key,
+                    placeholder="Nhập giá trị đo (VD: 1.23 mΩ)...",
+                    on_change=_cb_save_val,
+                    args=(task_id, do_key, _val_key, _inp_key),
+                )
             # ── Ảnh minh chứng ───────────────────────────────────
             urls_label = st.session_state[do_key].get(lbl_key, [])
             _exp_lbl = f"📷 Ảnh {lbl_display} ✅" if urls_label else f"📷 Ảnh {lbl_display}"
