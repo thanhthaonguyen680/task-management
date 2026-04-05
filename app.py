@@ -4546,7 +4546,7 @@ def _task_dialog(hang_dict, ds_tt):
     _fragment_chi_tiet_task(hang_dict, ds_tt)
 
 
-def _render_kanban_board(df, ds_tt, board_key="kb"):
+def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
     """Kanban board: header màu + toggle thu/mở, cards 4 cột/hàng.
     Bấm 📂 → @st.dialog chỉnh sửa.
     """
@@ -4592,6 +4592,8 @@ def _render_kanban_board(df, ds_tt, board_key="kb"):
         _sk = f"{board_key}_open_{tt}"
         if _sk not in st.session_state:
             st.session_state[_sk] = False   # mặc định đóng
+        if force_open and not nhom.empty:
+            st.session_state[_sk] = True
 
         is_open = st.session_state[_sk]
         chevron = "▼" if is_open else "▶"
@@ -5324,7 +5326,8 @@ def giao_dien_admin():
         ds_tt_board = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
         # ── KANBAN BOARD ──────────────────────────────────────────
-        _render_kanban_board(df_board, ds_tt_board, board_key="adm_kb")
+        _render_kanban_board(df_board, ds_tt_board, board_key="adm_kb",
+                             force_open=bool(adm_q.strip()))
 
     # ========================================================
     # Tab 6: Quản Lý Công Việc Con
@@ -6026,7 +6029,8 @@ def giao_dien_nhan_vien():
             st.info("Chưa có công việc nào trong hệ thống.")
         else:
             # ── KANBAN BOARD ────────────────────────────────────
-            _render_kanban_board(df_cua_toi, ds_tt, board_key="nv_kb")
+            _render_kanban_board(df_cua_toi, ds_tt, board_key="nv_kb",
+                                 force_open=bool(q_search.strip()))
 
     # ========================================================
     # Tab 2: Việc Cần Phê Duyệt
