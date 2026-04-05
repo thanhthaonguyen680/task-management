@@ -2444,8 +2444,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     ws.row_dimensions[row].height = 28
     row += 1
 
-    for i in range(1, 11):
-        noi_dung = hang_muc[i - 1] if (i - 1) < len(hang_muc) else ""
+    _hm_rows = hang_muc if hang_muc else [""]
+    for i, noi_dung in enumerate(_hm_rows, start=1):
         fill = YELLOW if i % 2 == 0 else WHITE
         _sc(row, 1, f"{i}", size=13, border=brd_all, fill_color=fill)
         ws.merge_cells(f"B{row}:D{row}")
