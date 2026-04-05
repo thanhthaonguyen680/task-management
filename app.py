@@ -2668,32 +2668,48 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
 
     # Category: Resistance (mΩ) / Điện trở — 6 rows
     _res_rows = [
-        "R(U1-U2)", "R(V1-V2)", "R(W1-W2)",
-        "R(PTC)", "R(PT100)", "R(HEATER)",
+        ("R(U1-U2)", "R_U1U2"),
+        ("R(V1-V2)", "R_V1V2"),
+        ("R(W1-W2)", "R_W1W2"),
+        ("R(PTC)",   "R_PTC"),
+        ("R(PT100)", "R_PT100"),
+        ("R(HEATER)","R_HEATER"),
     ]
     _res_start = row
     _res_end   = row + len(_res_rows) - 1
     _cat_label(_res_start, _res_end, "Resistance (mΩ) / Điện trở")
-    for _lbl in _res_rows:
+    for _lbl, _vkey in _res_rows:
+        _val = str(anh_do_luong.get(f"{_vkey}_val", "") or "")
         _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
         ws.merge_cells(f"D{row}:F{row}")
-        _sc(row, 4, "", size=13, border=brd_all)
+        _sc(row, 4, _val, size=13, border=brd_all)
         _brd_merge(row, 4, 6, brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
 
     # Category: Insulation Resistance (MΩ) / Cách điện — 7 rows
+    # IR(U;V;W-E) gộp giá trị từ 3 key riêng: IR_U_E, IR_V_E, IR_W_E
     _ir_rows = [
-        "IR(U-V)", "IR(U-W)", "IR(V-W)",
-        "IR(U;V;W-E)", "IR(PTC-E)", "IR(PT100-E)", "IR(HEATER-E)",
+        ("IR(U-V)",     "IR_UV"),
+        ("IR(U-W)",     "IR_UW"),
+        ("IR(V-W)",     "IR_VW"),
+        ("IR(U;V;W-E)", ["IR_U_E", "IR_V_E", "IR_W_E"]),
+        ("IR(PTC-E)",   "IR_PTC_E"),
+        ("IR(PT100-E)", "IR_PT100_E"),
+        ("IR(HEATER-E)","IR_HEATER_E"),
     ]
     _ir_start = row
     _ir_end   = row + len(_ir_rows) - 1
     _cat_label(_ir_start, _ir_end, "Insulation Resistance (MΩ) / Cách điện")
-    for _lbl in _ir_rows:
+    for _lbl, _vkey in _ir_rows:
+        if isinstance(_vkey, list):
+            _parts = [str(anh_do_luong.get(f"{k}_val", "") or "") for k in _vkey]
+            _val = " / ".join(p for p in _parts if p)
+        else:
+            _val = str(anh_do_luong.get(f"{_vkey}_val", "") or "")
         _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
         ws.merge_cells(f"D{row}:F{row}")
-        _sc(row, 4, "", size=13, border=brd_all)
+        _sc(row, 4, _val, size=13, border=brd_all)
         _brd_merge(row, 4, 6, brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
@@ -2712,7 +2728,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     for _lbl in ["Voltage (V)", "Current (A)"]:
         _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
         for _c in range(4, 7):
-            _sc(row, _c, "", size=13, border=brd_all)
+            _val = "380V" if _lbl == "Voltage (V)" else ""
+            _sc(row, _c, _val, size=13, border=brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
 
@@ -4194,6 +4211,13 @@ def _cb_xoa_do(task_id, do_key, label, url_d):
     cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
 
 
+def _cb_save_val(task_id, do_key, val_key, inp_key):
+    """Callback lưu giá trị thông số đo lường vào anh_do_luong dict."""
+    val = (st.session_state.get(inp_key) or "").strip()
+    st.session_state[do_key][val_key] = val
+    cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+
+
 def _cb_upload_do(task_id, do_key, label, up_key, done_key):
     """Callback upload ảnh đo lường — không cần st.rerun()"""
     f_do = st.session_state.get(up_key)
@@ -4218,8 +4242,21 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
             unsafe_allow_html=True,
         )
         for lbl_display, lbl_key in labels:
+            # ── Giá trị thông số đo ──────────────────────────────
+            _val_key = f"{lbl_key}_val"
+            _cur_val = st.session_state.get(do_key, {}).get(_val_key, "")
+            _inp_key = f"inp_val_{task_id}_{lbl_key}"
+            st.text_input(
+                lbl_display,
+                value=_cur_val,
+                key=_inp_key,
+                placeholder="Nhập giá trị đo (VD: 1.23 mΩ)...",
+                on_change=_cb_save_val,
+                args=(task_id, do_key, _val_key, _inp_key),
+            )
+            # ── Ảnh minh chứng ───────────────────────────────────
             urls_label = st.session_state.get(do_key, {}).get(lbl_key, [])
-            exp_lbl = f"📷 {lbl_display}  ✅" if urls_label else f"📷 {lbl_display}"
+            exp_lbl = f"📷 Ảnh {lbl_display}  ✅" if urls_label else f"📷 Ảnh {lbl_display}"
             with st.expander(exp_lbl, expanded=False):
                 if urls_label:
                     url_d = urls_label[0]
@@ -4267,8 +4304,21 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                 lbl_display, lbl_key = item
             else:
                 lbl_display = lbl_key = item
+            # ── Giá trị thông số đo ──────────────────────────────
+            _val_key = f"{lbl_key}_val"
+            _cur_val = st.session_state[do_key].get(_val_key, "")
+            _inp_key = f"inp_val_{task_id}_{lbl_key}"
+            st.text_input(
+                lbl_display,
+                value=_cur_val,
+                key=_inp_key,
+                placeholder="Nhập giá trị đo (VD: 1.23 mΩ)...",
+                on_change=_cb_save_val,
+                args=(task_id, do_key, _val_key, _inp_key),
+            )
+            # ── Ảnh minh chứng ───────────────────────────────────
             urls_label = st.session_state[do_key].get(lbl_key, [])
-            _exp_lbl = f"📷 {lbl_display} ({len(urls_label)})" if urls_label else f"📷 {lbl_display}"
+            _exp_lbl = f"📷 Ảnh {lbl_display} ✅" if urls_label else f"📷 Ảnh {lbl_display}"
             with st.expander(_exp_lbl, expanded=False):
                 if urls_label:
                     # Đã có ảnh — hiển thị + nút xoá
