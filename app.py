@@ -4332,29 +4332,34 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
     st.components.v1.html(
         """<script>
         (function() {
-            function applyInputMode() {
-                window.parent.document.querySelectorAll(
-                    'input[placeholder="Nhập số (VD: 5.8)..."]'
-                ).forEach(function(el) {
+            var NUM_PH = 'Nhập số (VD: 5.8)...';
+            function fixEl(el) {
+                if (el.placeholder === NUM_PH) {
                     el.setAttribute('inputmode', 'decimal');
-                    el.setAttribute('type', 'text');
                     if (!el._commaFixed) {
                         el._commaFixed = true;
                         el.addEventListener('input', function() {
                             var pos = el.selectionStart;
-                            var newVal = el.value.replace(/,/g, '.');
-                            if (newVal !== el.value) {
-                                el.value = newVal;
+                            var nv = el.value.replace(/,/g, '.');
+                            if (nv !== el.value) {
+                                el.value = nv;
                                 el.selectionStart = pos;
                                 el.selectionEnd = pos;
                                 el.dispatchEvent(new Event('input', {bubbles: true}));
                             }
                         });
                     }
-                });
+                } else {
+                    el.removeAttribute('inputmode');
+                }
             }
-            applyInputMode();
-            setTimeout(applyInputMode, 300);
+            function applyAll() {
+                window.parent.document.querySelectorAll('input').forEach(fixEl);
+            }
+            applyAll();
+            setTimeout(applyAll, 300);
+            var obs = new MutationObserver(applyAll);
+            obs.observe(window.parent.document.body, {childList: true, subtree: true});
         })();
         </script>""",
         height=0,
