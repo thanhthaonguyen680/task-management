@@ -2676,8 +2676,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _cat_label(_res_start, _res_end, "Resistance (mΩ) / Điện trở")
     for _lbl in _res_rows:
         _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
-        for _c in range(4, 7):
-            _sc(row, _c, "", size=13, border=brd_all)
+        ws.merge_cells(f"D{row}:F{row}")
+        _sc(row, 4, "", size=13, border=brd_all)
+        _brd_merge(row, 4, 6, brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
 
@@ -2691,8 +2692,9 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     _cat_label(_ir_start, _ir_end, "Insulation Resistance (MΩ) / Cách điện")
     for _lbl in _ir_rows:
         _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
-        for _c in range(4, 7):
-            _sc(row, _c, "", size=13, border=brd_all)
+        ws.merge_cells(f"D{row}:F{row}")
+        _sc(row, 4, "", size=13, border=brd_all)
+        _brd_merge(row, 4, 6, brd_all)
         ws.row_dimensions[row].height = 28
         row += 1
 
