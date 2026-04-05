@@ -465,7 +465,7 @@ def _create_session_token(data: dict) -> str:
     return f"{b64}.{sig}"
 
 
-def _verify_session_token(token: str) -> dict | None:
+def _verify_session_token(token: str):
     """Xác minh và giải mã token. Trả về user data hoặc None nếu không hợp lệ."""
     try:
         b64, sig = token.rsplit(".", 1)
@@ -3194,6 +3194,11 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
 
     st.divider()
 
+    # ── Khởi tạo _do_key (ảnh đo lường) — cần trước vòng lặp CVC ──
+    _do_key = f"do_luong_{task_id}"
+    if _do_key not in st.session_state:
+        st.session_state[_do_key] = doc_anh_do_luong(str(hang.get("Ảnh Đo Lường", "") or ""))
+
     # ── Công việc con ─────────────────────────────────────────
     raw_cv = hang.get("Công Việc Con", "") or "[]"
     try:
@@ -3380,6 +3385,29 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                 else:
                     st.warning("Chưa chọn file!")
 
+        # ── Ảnh đo lường thuộc công đoạn này ────────────────
+        import unicodedata as _ucd
+        _cv_name_upper = _ucd.normalize("NFC", _tcv.strip()).upper()
+        _cv_do_slots   = _STAGE_DO_LUONG.get(_cv_name_upper)
+        if _cv_do_slots:
+            _do_open_key = f"cv_do_open_{task_id}_{_cvi}"
+            if _do_open_key not in st.session_state:
+                st.session_state[_do_open_key] = False
+            _n_do = sum(
+                len(st.session_state.get(_do_key, {}).get(lk, []))
+                for _, lbss in _cv_do_slots for _, lk in lbss
+            )
+            _do_chevron = "▼" if st.session_state[_do_open_key] else "▶"
+            _do_btn_lbl = (
+                f"{_do_chevron}  📐 Ảnh Đo Lường  ({_n_do}/{sum(len(lbss) for _, lbss in _cv_do_slots)} ảnh)"
+            )
+            def _toggle_cv_do(_k=_do_open_key):
+                st.session_state[_k] = not st.session_state[_k]
+            st.button(_do_btn_lbl, key=f"cv_do_tog_{task_id}_{_cvi}",
+                      use_container_width=True, on_click=_toggle_cv_do)
+            if st.session_state[_do_open_key]:
+                _render_do_luong_inline(task_id, _do_key, _cv_do_slots)
+
     # ── Thêm công việc con — nhập tay tên công đoạn ──────────
     _cv_add_v  = f"dlg_cv_add_v_{task_id}"
     if _cv_add_v not in st.session_state: st.session_state[_cv_add_v] = 0
@@ -3423,15 +3451,14 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
 
     st.divider()
 
-    # ── Ảnh đo lường theo từng nhãn ──────────────────────────
-    st.markdown("**📐 Ảnh Đo Lường**")
-
-
-    _do_key = f"do_luong_{task_id}"
-    if _do_key not in st.session_state:
-        st.session_state[_do_key] = doc_anh_do_luong(str(hang.get("Ảnh Đo Lường", "") or ""))
-
-    _fragment_upload_do_luong(task_id, _do_key)
+    # ── Ảnh đo lường — fallback nếu không có công đoạn tiêu chuẩn ───────────
+    _has_stage_cvc = any(
+        cv.get("ten", "").strip().upper() in _STAGE_DO_LUONG
+        for cv in ds_cv_con if isinstance(cv, dict)
+    )
+    if not _has_stage_cvc:
+        st.markdown("**📐 Ảnh Đo Lường**")
+        _fragment_upload_do_luong(task_id, _do_key)
 
     # PDF
     tt_pdf = st.session_state.get(f"tt_select_{task_id}", trang_thai)
@@ -4083,6 +4110,78 @@ _NHOM_DO = [
       ("After / Sau",    "nde_brg_after")]),
 ]
 
+# Mapping: TÊN CÔNG ĐOẠn (uppercase) → nhóm ảnh đo lường thuộc công đoạn đó
+_STAGE_DO_LUONG = {
+    "ĐAI ĐẦU": [
+        ("📐 Resistance / Điện trở", [
+            ("R (U1 – U2)", "R_U1U2"),
+            ("R (V1 – V2)", "R_V1V2"),
+            ("R (W1 – W2)", "R_W1W2"),
+            ("R (PTC)",     "R_PTC"),
+        ]),
+    ],
+    # alias: người dùng có thể nhập 'đấu' (sắc) thay vì 'đầu' (huyền)
+    "ĐAI ĐẤU": [
+        ("📐 Resistance / Điện trở", [
+            ("R (U1 – U2)", "R_U1U2"),
+            ("R (V1 – V2)", "R_V1V2"),
+            ("R (W1 – W2)", "R_W1W2"),
+            ("R (PTC)",     "R_PTC"),
+        ]),
+    ],
+    "NHẬN MÁY": [
+        ("🔧 Engine Overview / Tổng Quan Động Cơ", [
+            ("Engine / Động cơ",          "eng_overview"),
+            ("Nameplate / Bảng thông số", "eng_nameplate"),
+        ]),
+    ],
+    "THÁO MÁY": [
+        ("🔌 Terminal Box / Hộp Điện",          [("Before / Trước", "tb_before")]),
+        ("🔌 Terminal Block / Cầu Đấu Điện",    [("Before / Trước", "tbl_before")]),
+        ("💨 Cover Fan / Chụp Bảo Vệ Cánh Quạt",[("Before / Trước", "cf_before")]),
+        ("💨 Rotor Fan / Cánh Quạt",            [("Before / Trước", "rf_before")]),
+        ("🔩 End Cover DE / Nắp Đầu Tải",       [("Before / Trước", "ec_de_before")]),
+        ("🔩 End Cover NDE / Nắp Đầu Không Tải",[("Before / Trước", "ec_nde_before")]),
+        ("⚙️ Shaft at DE / Trục Đầu Tải",       [("Before / Trước", "shaft_de_before")]),
+        ("⚙️ Shaft at NDE / Trục Đầu Không Tải",[("Before / Trước", "shaft_nde_before")]),
+        ("🔵 DE Bearing / Vòng Bi Đầu Tải",     [("Before / Trước", "de_brg_before")]),
+        ("🔵 NDE Bearing / Vòng Bi Đầu Không Tải",[("Before / Trước", "nde_brg_before")]),
+    ],
+    "ĐỤC DÂY": [
+        ("🌀 Coil / Cuộn dây", [("Before / Trước", "coil_before")]),
+    ],
+    "VÔ DÂY": [
+        ("🌀 Coil / Cuộn dây", [("After / Sau", "coil_after")]),
+    ],
+    "LẮP MÁY": [
+        ("📐 Resistance / Điện trở", [
+            ("R (PT100)",  "R_PT100"),
+            ("R (HEATER)", "R_HEATER"),
+        ]),
+        ("🔒 Insulation Resistance / Cách điện", [
+            ("IR (U – V)",       "IR_UV"),
+            ("IR (U – W)",       "IR_UW"),
+            ("IR (V – W)",       "IR_VW"),
+            ("IR (PTC – E)",     "IR_PTC_E"),
+            ("IR (PT100 – E)",   "IR_PT100_E"),
+            ("IR (HEATER – E)",  "IR_HEATER_E"),
+            ("IR (U – E)",       "IR_U_E"),
+            ("IR (V – E)",       "IR_V_E"),
+            ("IR (W – E)",       "IR_W_E"),
+        ]),
+        ("🔌 Terminal Box / Hộp Điện",          [("After / Sau", "tb_after")]),
+        ("🔌 Terminal Block / Cầu Đấu Điện",    [("After / Sau", "tbl_after")]),
+        ("💨 Cover Fan / Chụp Bảo Vệ Cánh Quạt",[("After / Sau", "cf_after")]),
+        ("💨 Rotor Fan / Cánh Quạt",            [("After / Sau", "rf_after")]),
+        ("🔩 End Cover DE / Nắp Đầu Tải",       [("After / Sau", "ec_de_after")]),
+        ("🔩 End Cover NDE / Nắp Đầu Không Tải",[("After / Sau", "ec_nde_after")]),
+        ("⚙️ Shaft at DE / Trục Đầu Tải",       [("After / Sau", "shaft_de_after")]),
+        ("⚙️ Shaft at NDE / Trục Đầu Không Tải",[("After / Sau", "shaft_nde_after")]),
+        ("🔵 DE Bearing / Vòng Bi Đầu Tải",     [("After / Sau", "de_brg_after")]),
+        ("🔵 NDE Bearing / Vòng Bi Đầu Không Tải",[("After / Sau", "nde_brg_after")]),
+    ],
+}
+
 
 def _cb_xoa_do(task_id, do_key, label, url_d):
     """Callback xóa ảnh đo lường — không cần st.rerun()"""
@@ -4105,6 +4204,49 @@ def _cb_upload_do(task_id, do_key, label, up_key, done_key):
     url_new = tai_anh_len_cloudinary(f_do)
     st.session_state[do_key].setdefault(label, []).append(url_new)
     cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+
+
+def _render_do_luong_inline(task_id, do_key, nhom_list):
+    """Render ảnh đo lường inline bên trong thẻ công việc con (không dùng @st.fragment)."""
+    for nhom_title, labels in nhom_list:
+        st.markdown(
+            f"<div style='background:#dbeafe;border-radius:6px;padding:5px 10px;"
+            f"font-weight:700;font-size:0.82rem;color:#1e3a8a;margin-top:6px;'>"
+            f"{nhom_title}</div>",
+            unsafe_allow_html=True,
+        )
+        for lbl_display, lbl_key in labels:
+            urls_label = st.session_state.get(do_key, {}).get(lbl_key, [])
+            exp_lbl = f"📷 {lbl_display}  ✅" if urls_label else f"📷 {lbl_display}"
+            with st.expander(exp_lbl, expanded=False):
+                if urls_label:
+                    url_d = urls_label[0]
+                    col_img, col_del = st.columns([3, 1], gap="small")
+                    with col_img:
+                        _hien_thi_anh_drive(url_d, width=120)
+                    with col_del:
+                        st.button(
+                            "🗑️", key=f"xoa_do_{task_id}_{lbl_key}_0",
+                            use_container_width=True,
+                            on_click=_cb_xoa_do,
+                            args=(task_id, do_key, lbl_key, url_d),
+                        )
+                else:
+                    up_key   = f"up_do_{task_id}_{lbl_key}"
+                    done_key = f"up_do_done_{task_id}_{lbl_key}"
+                    st.file_uploader(
+                        f"Ảnh {lbl_display}",
+                        type=["jpg", "jpeg", "png"],
+                        key=up_key,
+                        label_visibility="collapsed",
+                        accept_multiple_files=False,
+                    )
+                    st.button(
+                        "📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
+                        use_container_width=True,
+                        on_click=_cb_upload_do,
+                        args=(task_id, do_key, lbl_key, up_key, done_key),
+                    )
 
 
 @st.fragment
