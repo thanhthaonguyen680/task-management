@@ -4296,6 +4296,8 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                         float(_cur_val)
                     except ValueError:
                         st.error("❌ Chỉ được nhập số")
+            urls_label = st.session_state.get(do_key, {}).get(lbl_key, [])
+            exp_lbl = f"📷 Ảnh {lbl_display} ✅" if urls_label else f"📷 Ảnh {lbl_display}"
             with st.expander(exp_lbl, expanded=False):
                 if urls_label:
                     url_d = urls_label[0]
