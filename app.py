@@ -4254,8 +4254,9 @@ def _cb_upload_do(task_id, do_key, label, up_key, done_key):
     cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
 
 
+@st.fragment
 def _render_do_luong_inline(task_id, do_key, nhom_list):
-    """Render ảnh đo lường inline bên trong thẻ công việc con (không dùng @st.fragment)."""
+    """Render ảnh đo lường inline bên trong thẻ công việc con."""
     for nhom_title, labels in nhom_list:
         st.markdown(
             f"<div style='background:#dbeafe;border-radius:6px;padding:5px 10px;"
