@@ -3289,8 +3289,8 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     }}
     .cv-nv-row-{task_id} label {{ font-size: 0.78rem !important; color: #6b7280 !important; }}
     .cv-item-wrap-{task_id} {{
-        border-bottom: 1px solid #f3f4f6;
-        padding: 4px 0 2px 0; margin-bottom: 0;
+        border-bottom: 2px solid #c7d2fe;
+        padding: 4px 0 8px 0; margin-bottom: 6px;
     }}
     .cv-item-wrap-{task_id}.done {{ opacity: 0.6; }}
     </style>""", unsafe_allow_html=True)
