@@ -4287,7 +4287,8 @@ def _cb_save_val(task_id, do_key, val_key, inp_key):
         if len(parts) > 2:
             val = parts[0] + "." + "".join(parts[1:])
     st.session_state[do_key][val_key] = val
-    cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+    # Đánh dấu cần lưu — GSheets write sẽ thực hiện khi nhấn nút Lưu
+    st.session_state[f"_do_dirty_{do_key}"] = True
 
 
 def _cb_upload_do(task_id, do_key, label, up_key, done_key):
@@ -4386,6 +4387,16 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                 on_click=_cb_upload_do,
                                 args=(task_id, do_key, lbl_key, up_key, done_key),
                             )
+
+    # Nút lưu thông số — chỉ hiện khi có thay đổi chưa lưu
+    _dirty_key = f"_do_dirty_{do_key}"
+    if st.session_state.get(_dirty_key):
+        def _cb_luu_thong_so(_dk=do_key, _tid=task_id, _dkey=_dirty_key):
+            cap_nhat_anh_do_luong(_tid, st.session_state[_dk])
+            st.session_state[_dkey] = False
+        st.button("💾 Lưu thông số", key=f"btn_luu_do_{task_id}",
+                  use_container_width=True, type="primary",
+                  on_click=_cb_luu_thong_so)
 
     st.components.v1.html(
         """<script>
