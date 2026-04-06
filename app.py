@@ -4489,27 +4489,42 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                     }, true);
                 }
 
-                // Mỗi lần iframe tải lại (fragment rerun): khôi phục scroll nếu guard đang active
+                // Mỗi lần iframe tải lại (fragment rerun): khóa scrollTop setter + rAF loop
                 if (win._sfxGuard && win._sfxGuard.active) {
                     var g = win._sfxGuard;
-                    // Dùng rAF loop để liên tục đè scroll trong ~30 frames
-                    var frames = 0;
-                    function restoreLoop() {
-                        if (!g.active || frames > 30) return;
-                        frames++;
-                        var el = getScrollEl();
-                        if (el) el.scrollTop = g.mainY;
-                        requestAnimationFrame(restoreLoop);
+                    var el = getScrollEl();
+
+                    if (el && !el._scrollTopLocked) {
+                        el._scrollTopLocked = true;
+                        // Tìm descriptor gốc trên prototype chain
+                        var _proto = win.Element.prototype;
+                        var _desc = Object.getOwnPropertyDescriptor(_proto, 'scrollTop');
+                        if (!_desc || !_desc.set) {
+                            _proto = win.HTMLElement.prototype;
+                            _desc = Object.getOwnPropertyDescriptor(_proto, 'scrollTop');
+                        }
+                        if (_desc && _desc.set) {
+                            var _origSet = _desc.set;
+                            var _origGet = _desc.get;
+                            // Override trực tiếp trên instance → chặn mọi ghi scrollTop
+                            Object.defineProperty(el, 'scrollTop', {
+                                get: function() { return _origGet.call(this); },
+                                set: function(v) {
+                                    _origSet.call(this, g.active ? g.mainY : v);
+                                },
+                                configurable: true
+                            });
+                            // Tháo override khi guard hết hạn
+                            setTimeout(function() {
+                                try {
+                                    Object.defineProperty(el, 'scrollTop', { get: _origGet, set: _origSet, configurable: true });
+                                } catch(e) {}
+                                el._scrollTopLocked = false;
+                            }, 2100);
+                        }
+                        // Set về vị trí đúng ngay
+                        el.scrollTop = g.mainY;
                     }
-                    requestAnimationFrame(restoreLoop);
-                    // Thêm các setTimeout dự phòng
-                    [100, 300, 600].forEach(function(d) {
-                        setTimeout(function() {
-                            if (!g.active) return;
-                            var el = getScrollEl();
-                            if (el) el.scrollTop = g.mainY;
-                        }, d);
-                    });
                 }
             })();
         })();
