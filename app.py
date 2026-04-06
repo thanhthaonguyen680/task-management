@@ -4390,10 +4390,15 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
 
     # Nút lưu thông số — chỉ hiện khi có thay đổi chưa lưu
     _dirty_key = f"_do_dirty_{do_key}"
+    _saved_key = f"_do_saved_{do_key}"
+    if st.session_state.get(_saved_key):
+        st.session_state[_saved_key] = False
+        st.toast("✅ Đã lưu thông số!", icon="✅")
     if st.session_state.get(_dirty_key):
-        def _cb_luu_thong_so(_dk=do_key, _tid=task_id, _dkey=_dirty_key):
+        def _cb_luu_thong_so(_dk=do_key, _tid=task_id, _dkey=_dirty_key, _sk=_saved_key):
             cap_nhat_anh_do_luong(_tid, st.session_state[_dk])
             st.session_state[_dkey] = False
+            st.session_state[_sk] = True
         st.button("💾 Lưu thông số", key=f"btn_luu_do_{task_id}",
                   use_container_width=True, type="primary",
                   on_click=_cb_luu_thong_so)
@@ -4429,6 +4434,25 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
             setTimeout(applyAll, 300);
             var obs = new MutationObserver(applyAll);
             obs.observe(window.parent.document.body, {childList: true, subtree: true});
+
+            // Giữ scroll position khi fragment rerun
+            (function() {
+                var doc = window.parent.document;
+                var scrollEl = doc.querySelector('.main') || doc.documentElement;
+                var savedY = null;
+                var saveObs = new MutationObserver(function() {
+                    if (savedY !== null) {
+                        scrollEl.scrollTop = savedY;
+                        savedY = null;
+                    }
+                });
+                doc.querySelectorAll('button').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        savedY = scrollEl.scrollTop;
+                    });
+                });
+                saveObs.observe(scrollEl, {childList: true, subtree: true});
+            })();
         })();
         </script>""",
         height=0,
