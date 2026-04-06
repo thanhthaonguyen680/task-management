@@ -3414,11 +3414,19 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                 st.session_state[_do_open_key] = False
             _n_do = sum(
                 len(st.session_state.get(_do_key, {}).get(lk, []))
-                for _, lbss in _cv_do_slots for _, lk in lbss
+                for entry in _cv_do_slots for _, lk in entry[1]
+                if lk not in _DO_LUONG_NO_IMG_KEYS
+            )
+            _total_do = sum(
+                len(entry[1]) for entry in _cv_do_slots
+                if not (len(entry) >= 3 and entry[2])
+            ) + sum(
+                len([lk for _, lk in entry[1] if lk not in _DO_LUONG_NO_IMG_KEYS])
+                for entry in _cv_do_slots if len(entry) >= 3 and entry[2]
             )
             _do_chevron = "▼" if st.session_state[_do_open_key] else "▶"
             _do_btn_lbl = (
-                f"{_do_chevron}  📐 Ảnh Đo Lường  ({_n_do}/{sum(len(lbss) for _, lbss in _cv_do_slots)} ảnh)"
+                f"{_do_chevron}  📐 Ảnh Đo Lường  ({_n_do}/{_total_do} ảnh)"
             )
             def _toggle_cv_do(_k=_do_open_key):
                 st.session_state[_k] = not st.session_state[_k]
@@ -4232,6 +4240,14 @@ _STAGE_DO_LUONG = {
         ("⚙️ Shaft at NDE / Trục Đầu Không Tải",[("After / Sau", "shaft_nde_after")]),
         ("🔵 DE Bearing / Vòng Bi Đầu Tải",     [("After / Sau", "de_brg_after")]),
         ("🔵 NDE Bearing / Vòng Bi Đầu Không Tải",[("After / Sau", "nde_brg_after")]),
+        ("📳 Vibration / Rung Động",
+         [("Radial ↔ DE/AS",  "vib_rad_h_de"),
+          ("Radial ↑ DE/AS",  "vib_rad_v_de"),
+          ("Axial (X) DE/AS", "vib_axial_de"),
+          ("Radial ↔ NDE/AS", "vib_rad_h_nde"),
+          ("Radial ↑ NDE/AS", "vib_rad_v_nde"),
+          ("Axial (X) NDE/AS","vib_axial_nde")],
+         True),
     ],
 }
 
