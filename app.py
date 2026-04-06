@@ -4298,11 +4298,21 @@ def _cb_upload_do(task_id, do_key, label, up_key, done_key):
 def _render_do_luong_inline(task_id, do_key, nhom_list):
     """Render ảnh đo lường inline bên trong thẻ công việc con."""
     for nhom_entry in nhom_list:
-        # Hỗ trợ tuple 2 phần tử (title, labels) hoặc 3 phần tử (title, labels, use_expander)
         use_expander = len(nhom_entry) >= 3 and nhom_entry[2]
         nhom_title, labels = nhom_entry[0], nhom_entry[1]
 
-        def _render_nhom_body(nhom_title=nhom_title, labels=labels):
+        if use_expander:
+            _nhom_ctx = st.expander(nhom_title, expanded=False)
+        else:
+            st.markdown(
+                f"<div style='background:#dbeafe;border-radius:6px;padding:5px 10px;"
+                f"font-weight:700;font-size:0.82rem;color:#1e3a8a;margin-top:6px;'>"
+                f"{nhom_title}</div>",
+                unsafe_allow_html=True,
+            )
+            _nhom_ctx = st.container()
+
+        with _nhom_ctx:
             for lbl_display, lbl_key in labels:
                 if lbl_key in _DO_LUONG_VALUE_KEYS:
                     _val_key = f"{lbl_key}_val"
@@ -4334,7 +4344,6 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                             float(_cur_val)
                         except ValueError:
                             st.error("❌ Chỉ được nhập số")
-                # Ảnh minh chứng — bỏ qua nếu là key không cần ảnh
                 if lbl_key not in _DO_LUONG_NO_IMG_KEYS:
                     urls_label = st.session_state.get(do_key, {}).get(lbl_key, [])
                     exp_lbl = f"📷 Ảnh {lbl_display} ✅" if urls_label else f"📷 Ảnh {lbl_display}"
@@ -4367,18 +4376,6 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                 on_click=_cb_upload_do,
                                 args=(task_id, do_key, lbl_key, up_key, done_key),
                             )
-
-        if use_expander:
-            with st.expander(nhom_title, expanded=False):
-                _render_nhom_body()
-        else:
-            st.markdown(
-                f"<div style='background:#dbeafe;border-radius:6px;padding:5px 10px;"
-                f"font-weight:700;font-size:0.82rem;color:#1e3a8a;margin-top:6px;'>"
-                f"{nhom_title}</div>",
-                unsafe_allow_html=True,
-            )
-            _render_nhom_body()
 
     st.components.v1.html(
         """<script>
