@@ -2727,9 +2727,12 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     row += 1
     for _lbl in ["Voltage (V)", "Current (A)"]:
         _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
-        for _c in range(4, 7):
-            _val = "380V" if _lbl == "Voltage (V)" else ""
-            _sc(row, _c, _val, size=13, border=brd_all)
+        if _lbl == "Voltage (V)":
+            for _c in range(4, 7):
+                _sc(row, _c, "380V", size=13, border=brd_all)
+        else:
+            for _c, _ck in zip([4, 5, 6], ["cur_L1", "cur_L2", "cur_L3"]):
+                _sc(row, _c, anh_do_luong.get(f"{_ck}_val", ""), size=13, border=brd_all, h_align="center")
         ws.row_dimensions[row].height = 28
         row += 1
 
@@ -4157,17 +4160,20 @@ _DO_LUONG_VALUE_KEYS = {
     "IR_UV", "IR_UW", "IR_VW",
     "IR_PTC_E", "IR_PT100_E", "IR_HEATER_E",
     "IR_U_E", "IR_V_E", "IR_W_E",
+    "cur_L1", "cur_L2", "cur_L3",
     "vib_rad_h_de", "vib_rad_v_de", "vib_axial_de",
     "vib_rad_h_nde", "vib_rad_v_nde", "vib_axial_nde",
 }
 # Keys chỉ chấp nhận số
 _DO_LUONG_NUMERIC_KEYS = {
     "R_U1U2", "R_V1V2", "R_W1W2",
+    "cur_L1", "cur_L2", "cur_L3",
     "vib_rad_h_de", "vib_rad_v_de", "vib_axial_de",
     "vib_rad_h_nde", "vib_rad_v_nde", "vib_axial_nde",
 }
 # Keys không cần upload ảnh (chỉ nhập số)
 _DO_LUONG_NO_IMG_KEYS = {
+    "cur_L1", "cur_L2", "cur_L3",
     "vib_rad_h_de", "vib_rad_v_de", "vib_axial_de",
     "vib_rad_h_nde", "vib_rad_v_nde", "vib_axial_nde",
 }
@@ -4233,6 +4239,10 @@ _STAGE_DO_LUONG = {
             ("IR (V – E)",       "IR_V_E"),
             ("IR (W – E)",       "IR_W_E"),
         ]),
+        ("⚡ Current / Dòng Không Tải (A)",
+         [("L1", "cur_L1"),
+          ("L2", "cur_L2"),
+          ("L3", "cur_L3")]),
         ("📳 Vibration / Rung Động",
          [("Radial ↔ DE/AS",  "vib_rad_h_de"),
           ("Radial ↑ DE/AS",  "vib_rad_v_de"),
