@@ -4435,16 +4435,35 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
             var obs = new MutationObserver(applyAll);
             obs.observe(window.parent.document.body, {childList: true, subtree: true});
 
-            // Khoá scroll khi bấm button — override scrollTo của Streamlit
+            // Khoá scroll khi bấm button
             (function() {
                 if (window._scrollLockInit) return;
                 window._scrollLockInit = true;
                 var win = window.parent;
-                var _orig = win.scrollTo.bind(win);
                 var locked = false;
-                win.scrollTo = function(x, y) {
-                    if (!locked) _orig(x, y);
+
+                // 1. Override window.scrollTo
+                var _origScrollTo = win.scrollTo.bind(win);
+                win.scrollTo = function(x, y) { if (!locked) _origScrollTo(x, y); };
+
+                // 2. Override scrollIntoView
+                var _origSIV = win.Element.prototype.scrollIntoView;
+                win.Element.prototype.scrollIntoView = function() {
+                    if (!locked) _origSIV.apply(this, arguments);
                 };
+
+                // 3. Lock scrollTop trên .main container
+                var mainEl = win.document.querySelector('.main');
+                if (mainEl) {
+                    var desc = Object.getOwnPropertyDescriptor(win.Element.prototype, 'scrollTop');
+                    Object.defineProperty(mainEl, 'scrollTop', {
+                        get: function() { return desc.get.call(this); },
+                        set: function(v) { if (!locked) desc.set.call(this, v); },
+                        configurable: true
+                    });
+                }
+
+                // Bật lock 2s khi bấm button
                 win.document.addEventListener('mousedown', function(e) {
                     var t = e.target;
                     if (t && (t.tagName === 'BUTTON' || t.closest('button'))) {
