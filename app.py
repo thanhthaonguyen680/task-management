@@ -4084,6 +4084,16 @@ _NHOM_DO = [
       ("IR (V – E)",       "IR_V_E"),
       ("IR (W – E)",       "IR_W_E")]),
 
+    # Rung động — expander đóng mở, chỉ nhập số
+    ("📳 Vibration / Rung Động",
+     [("Radial ↔ DE/AS",  "vib_rad_h_de"),
+      ("Radial ↑ DE/AS",  "vib_rad_v_de"),
+      ("Axial (X) DE/AS", "vib_axial_de"),
+      ("Radial ↔ NDE/AS", "vib_rad_h_nde"),
+      ("Radial ↑ NDE/AS", "vib_rad_v_nde"),
+      ("Axial (X) NDE/AS","vib_axial_nde")],
+     True),  # True = wrap trong st.expander, mặc định đóng
+
     # Trang 5/8 — Engine Overview, Terminal Box, Terminal Block
     ("🔧 Engine Overview / Tổng Quan Động Cơ",
      [("Engine / Động cơ",            "eng_overview"),
@@ -4136,9 +4146,20 @@ _DO_LUONG_VALUE_KEYS = {
     "IR_UV", "IR_UW", "IR_VW",
     "IR_PTC_E", "IR_PT100_E", "IR_HEATER_E",
     "IR_U_E", "IR_V_E", "IR_W_E",
+    "vib_rad_h_de", "vib_rad_v_de", "vib_axial_de",
+    "vib_rad_h_nde", "vib_rad_v_nde", "vib_axial_nde",
 }
 # Keys chỉ chấp nhận số
-_DO_LUONG_NUMERIC_KEYS = {"R_U1U2", "R_V1V2", "R_W1W2"}
+_DO_LUONG_NUMERIC_KEYS = {
+    "R_U1U2", "R_V1V2", "R_W1W2",
+    "vib_rad_h_de", "vib_rad_v_de", "vib_axial_de",
+    "vib_rad_h_nde", "vib_rad_v_nde", "vib_axial_nde",
+}
+# Keys không cần upload ảnh (chỉ nhập số)
+_DO_LUONG_NO_IMG_KEYS = {
+    "vib_rad_h_de", "vib_rad_v_de", "vib_axial_de",
+    "vib_rad_h_nde", "vib_rad_v_nde", "vib_axial_nde",
+}
 # V1V2, W1W2 không được lệch quá 2% so với U1U2
 _DO_LUONG_REF_MAP = {"R_V1V2": "R_U1U2", "R_W1W2": "R_U1U2"}
 
@@ -4257,77 +4278,88 @@ def _cb_upload_do(task_id, do_key, label, up_key, done_key):
 @st.fragment
 def _render_do_luong_inline(task_id, do_key, nhom_list):
     """Render ảnh đo lường inline bên trong thẻ công việc con."""
-    for nhom_title, labels in nhom_list:
-        st.markdown(
-            f"<div style='background:#dbeafe;border-radius:6px;padding:5px 10px;"
-            f"font-weight:700;font-size:0.82rem;color:#1e3a8a;margin-top:6px;'>"
-            f"{nhom_title}</div>",
-            unsafe_allow_html=True,
-        )
-        for lbl_display, lbl_key in labels:
-            # ── Giá trị thông số đo (chỉ Resistance + IR) ──
-            if lbl_key in _DO_LUONG_VALUE_KEYS:
-                _val_key = f"{lbl_key}_val"
-                _cur_val = st.session_state.get(do_key, {}).get(_val_key, "")
-                _inp_key = f"inp_val_{task_id}_{lbl_key}"
-                _is_num = lbl_key in _DO_LUONG_NUMERIC_KEYS
-                st.text_input(
-                    lbl_display,
-                    value=_cur_val,
-                    key=_inp_key,
-                    placeholder="Nhập số (VD: 5.8)..." if _is_num else "Nhập giá trị đo...",
-                    on_change=_cb_save_val,
-                    args=(task_id, do_key, _val_key, _inp_key),
-                )
-                # Kiểm tra lệch 2% so với U1U2
-                _ref_key = _DO_LUONG_REF_MAP.get(lbl_key)
-                if _ref_key and _cur_val:
-                    _ref_val_str = st.session_state.get(do_key, {}).get(f"{_ref_key}_val", "")
-                    try:
-                        _ref_f = float(_ref_val_str)
-                        _this_f = float(_cur_val)
-                        if _ref_f > 0:
-                            _dev_pct = abs(_this_f - _ref_f) / _ref_f * 100
-                            if _dev_pct > 2:
-                                st.warning(f"⚠️ Lệch {_dev_pct:.1f}% so với R(U1–U2) = {_ref_val_str} (cho phép ≤2%)")
-                    except (ValueError, TypeError):
-                        pass
-                elif _is_num and _cur_val:
-                    try:
-                        float(_cur_val)
-                    except ValueError:
-                        st.error("❌ Chỉ được nhập số")
-            urls_label = st.session_state.get(do_key, {}).get(lbl_key, [])
-            exp_lbl = f"📷 Ảnh {lbl_display} ✅" if urls_label else f"📷 Ảnh {lbl_display}"
-            with st.expander(exp_lbl, expanded=False):
-                if urls_label:
-                    url_d = urls_label[0]
-                    col_img, col_del = st.columns([3, 1], gap="small")
-                    with col_img:
-                        _hien_thi_anh_drive(url_d, width=120)
-                    with col_del:
-                        st.button(
-                            "🗑️", key=f"xoa_do_{task_id}_{lbl_key}_0",
-                            use_container_width=True,
-                            on_click=_cb_xoa_do,
-                            args=(task_id, do_key, lbl_key, url_d),
-                        )
-                else:
-                    up_key   = f"up_do_{task_id}_{lbl_key}"
-                    done_key = f"up_do_done_{task_id}_{lbl_key}"
-                    st.file_uploader(
-                        f"Ảnh {lbl_display}",
-                        type=["jpg", "jpeg", "png"],
-                        key=up_key,
-                        label_visibility="collapsed",
-                        accept_multiple_files=False,
+    for nhom_entry in nhom_list:
+        # Hỗ trợ tuple 2 phần tử (title, labels) hoặc 3 phần tử (title, labels, use_expander)
+        use_expander = len(nhom_entry) >= 3 and nhom_entry[2]
+        nhom_title, labels = nhom_entry[0], nhom_entry[1]
+
+        def _render_nhom_body(nhom_title=nhom_title, labels=labels):
+            for lbl_display, lbl_key in labels:
+                if lbl_key in _DO_LUONG_VALUE_KEYS:
+                    _val_key = f"{lbl_key}_val"
+                    _cur_val = st.session_state.get(do_key, {}).get(_val_key, "")
+                    _inp_key = f"inp_val_{task_id}_{lbl_key}"
+                    _is_num = lbl_key in _DO_LUONG_NUMERIC_KEYS
+                    st.text_input(
+                        lbl_display,
+                        value=_cur_val,
+                        key=_inp_key,
+                        placeholder="Nhập số (VD: 5.8)..." if _is_num else "Nhập giá trị đo...",
+                        on_change=_cb_save_val,
+                        args=(task_id, do_key, _val_key, _inp_key),
                     )
-                    st.button(
-                        "📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
-                        use_container_width=True,
-                        on_click=_cb_upload_do,
-                        args=(task_id, do_key, lbl_key, up_key, done_key),
-                    )
+                    _ref_key = _DO_LUONG_REF_MAP.get(lbl_key)
+                    if _ref_key and _cur_val:
+                        _ref_val_str = st.session_state.get(do_key, {}).get(f"{_ref_key}_val", "")
+                        try:
+                            _ref_f = float(_ref_val_str)
+                            _this_f = float(_cur_val)
+                            if _ref_f > 0:
+                                _dev_pct = abs(_this_f - _ref_f) / _ref_f * 100
+                                if _dev_pct > 2:
+                                    st.warning(f"⚠️ Lệch {_dev_pct:.1f}% so với R(U1–U2) = {_ref_val_str} (cho phép ≤2%)")
+                        except (ValueError, TypeError):
+                            pass
+                    elif _is_num and _cur_val:
+                        try:
+                            float(_cur_val)
+                        except ValueError:
+                            st.error("❌ Chỉ được nhập số")
+                # Ảnh minh chứng — bỏ qua nếu là key không cần ảnh
+                if lbl_key not in _DO_LUONG_NO_IMG_KEYS:
+                    urls_label = st.session_state.get(do_key, {}).get(lbl_key, [])
+                    exp_lbl = f"📷 Ảnh {lbl_display} ✅" if urls_label else f"📷 Ảnh {lbl_display}"
+                    with st.expander(exp_lbl, expanded=False):
+                        if urls_label:
+                            url_d = urls_label[0]
+                            col_img, col_del = st.columns([3, 1], gap="small")
+                            with col_img:
+                                _hien_thi_anh_drive(url_d, width=120)
+                            with col_del:
+                                st.button(
+                                    "🗑️", key=f"xoa_do_{task_id}_{lbl_key}_0",
+                                    use_container_width=True,
+                                    on_click=_cb_xoa_do,
+                                    args=(task_id, do_key, lbl_key, url_d),
+                                )
+                        else:
+                            up_key   = f"up_do_{task_id}_{lbl_key}"
+                            done_key = f"up_do_done_{task_id}_{lbl_key}"
+                            st.file_uploader(
+                                f"Ảnh {lbl_display}",
+                                type=["jpg", "jpeg", "png"],
+                                key=up_key,
+                                label_visibility="collapsed",
+                                accept_multiple_files=False,
+                            )
+                            st.button(
+                                "📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
+                                use_container_width=True,
+                                on_click=_cb_upload_do,
+                                args=(task_id, do_key, lbl_key, up_key, done_key),
+                            )
+
+        if use_expander:
+            with st.expander(nhom_title, expanded=False):
+                _render_nhom_body()
+        else:
+            st.markdown(
+                f"<div style='background:#dbeafe;border-radius:6px;padding:5px 10px;"
+                f"font-weight:700;font-size:0.82rem;color:#1e3a8a;margin-top:6px;'>"
+                f"{nhom_title}</div>",
+                unsafe_allow_html=True,
+            )
+            _render_nhom_body()
 
     st.components.v1.html(
         """<script>
@@ -4369,14 +4401,21 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
 @st.fragment
 def _fragment_upload_do_luong(task_id, do_key: str):
     """Upload ảnh đo lường — @st.fragment để rerun cục bộ, giữ nguyên scroll của outer fragment."""
-    for nhom_title, labels in _NHOM_DO:
-        st.markdown(
-            f"<div style='background:#dbeafe;border-radius:8px 8px 0 0;padding:8px 14px;"
-            f"font-weight:700;font-size:0.88rem;color:#1e3a8a;margin-top:10px;'>"
-            f"{nhom_title}</div>",
-            unsafe_allow_html=True,
-        )
-        for item in labels:
+    for nhom_entry in _NHOM_DO:
+        use_exp = len(nhom_entry) >= 3 and nhom_entry[2]
+        nhom_title, labels = nhom_entry[0], nhom_entry[1]
+        if use_exp:
+            _ctx = st.expander(nhom_title, expanded=False)
+        else:
+            st.markdown(
+                f"<div style='background:#dbeafe;border-radius:8px 8px 0 0;padding:8px 14px;"
+                f"font-weight:700;font-size:0.88rem;color:#1e3a8a;margin-top:10px;'>"
+                f"{nhom_title}</div>",
+                unsafe_allow_html=True,
+            )
+            _ctx = None
+        with (_ctx if _ctx else st.container()):
+          for item in labels:
             # item là (display_label, storage_key) hoặc chuỗi cũ
             if isinstance(item, tuple):
                 lbl_display, lbl_key = item
@@ -4414,7 +4453,9 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                         float(_cur_val)
                     except ValueError:
                         st.error("❌ Chỉ được nhập số")
-            # ── Ảnh minh chứng ───────────────────────────────────
+            # ── Ảnh minh chứng (bỏ qua key không cần ảnh) ──────
+            if lbl_key in _DO_LUONG_NO_IMG_KEYS:
+                continue
             urls_label = st.session_state[do_key].get(lbl_key, [])
             _exp_lbl = f"📷 Ảnh {lbl_display} ✅" if urls_label else f"📷 Ảnh {lbl_display}"
             with st.expander(_exp_lbl, expanded=False):
