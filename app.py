@@ -3440,6 +3440,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                       use_container_width=True, on_click=_toggle_cv_do)
             if st.session_state[_do_open_key]:
                 _render_do_luong_inline(task_id, _do_key, _cv_do_slots)
+                _fragment_luu_thong_so(task_id, _do_key)
 
     # ── Thêm công việc con — nhập tay tên công đoạn ──────────
     _cv_add_v  = f"dlg_cv_add_v_{task_id}"
@@ -4291,6 +4292,23 @@ def _cb_save_val(task_id, do_key, val_key, inp_key):
     st.session_state[f"_do_dirty_{do_key}"] = True
 
 
+@st.fragment
+def _fragment_luu_thong_so(task_id, do_key):
+    """Fragment nhỏ chỉ chứa nút Lưu thông số — rerun độc lập, không kéo scroll."""
+    _dirty_key = f"_do_dirty_{do_key}"
+    _saved_key = f"_do_saved_{do_key}"
+    if st.session_state.get(_saved_key):
+        st.session_state[_saved_key] = False
+        st.success("✅ Đã lưu thông số thành công!")
+    elif st.session_state.get(_dirty_key):
+        def _cb(_dk=do_key, _tid=task_id, _dkey=_dirty_key, _sk=_saved_key):
+            cap_nhat_anh_do_luong(_tid, st.session_state[_dk])
+            st.session_state[_dkey] = False
+            st.session_state[_sk] = True
+        st.button("💾 Lưu thông số", key=f"btn_luu_do_{task_id}",
+                  use_container_width=True, type="primary", on_click=_cb)
+
+
 def _cb_upload_do(task_id, do_key, label, up_key, done_key):
     """Callback upload ảnh đo lường — không cần st.rerun()"""
     f_do = st.session_state.get(up_key)
@@ -4387,21 +4405,6 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                 on_click=_cb_upload_do,
                                 args=(task_id, do_key, lbl_key, up_key, done_key),
                             )
-
-    # Nút lưu thông số — chỉ hiện khi có thay đổi chưa lưu
-    _dirty_key = f"_do_dirty_{do_key}"
-    _saved_key = f"_do_saved_{do_key}"
-    if st.session_state.get(_saved_key):
-        st.session_state[_saved_key] = False
-        st.success("✅ Đã lưu thông số thành công!")
-    elif st.session_state.get(_dirty_key):
-        def _cb_luu_thong_so(_dk=do_key, _tid=task_id, _dkey=_dirty_key, _sk=_saved_key):
-            cap_nhat_anh_do_luong(_tid, st.session_state[_dk])
-            st.session_state[_dkey] = False
-            st.session_state[_sk] = True
-        st.button("💾 Lưu thông số", key=f"btn_luu_do_{task_id}",
-                  use_container_width=True, type="primary",
-                  on_click=_cb_luu_thong_so)
 
     st.components.v1.html(
         """<script>
