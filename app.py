@@ -3440,7 +3440,6 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                       use_container_width=True, on_click=_toggle_cv_do)
             if st.session_state[_do_open_key]:
                 _render_do_luong_inline(task_id, _do_key, _cv_do_slots)
-                _fragment_luu_thong_so(task_id, _do_key)
 
     # ── Thêm công việc con — nhập tay tên công đoạn ──────────
     _cv_add_v  = f"dlg_cv_add_v_{task_id}"
@@ -4292,23 +4291,6 @@ def _cb_save_val(task_id, do_key, val_key, inp_key):
     st.session_state[f"_do_dirty_{do_key}"] = True
 
 
-@st.fragment
-def _fragment_luu_thong_so(task_id, do_key):
-    """Fragment nhỏ chỉ chứa nút Lưu thông số — rerun độc lập, không kéo scroll."""
-    _dirty_key = f"_do_dirty_{do_key}"
-    _saved_key = f"_do_saved_{do_key}"
-    if st.session_state.get(_saved_key):
-        st.session_state[_saved_key] = False
-        st.success("✅ Đã lưu thông số thành công!")
-    elif st.session_state.get(_dirty_key):
-        def _cb(_dk=do_key, _tid=task_id, _dkey=_dirty_key, _sk=_saved_key):
-            cap_nhat_anh_do_luong(_tid, st.session_state[_dk])
-            st.session_state[_dkey] = False
-            st.session_state[_sk] = True
-        st.button("💾 Lưu thông số", key=f"btn_luu_do_{task_id}",
-                  use_container_width=True, type="primary", on_click=_cb)
-
-
 def _cb_upload_do(task_id, do_key, label, up_key, done_key):
     """Callback upload ảnh đo lường — không cần st.rerun()"""
     f_do = st.session_state.get(up_key)
@@ -4406,6 +4388,19 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                 args=(task_id, do_key, lbl_key, up_key, done_key),
                             )
 
+    _dirty_key = f"_do_dirty_{do_key}"
+    _saved_key = f"_do_saved_{do_key}"
+    if st.session_state.get(_saved_key):
+        st.session_state[_saved_key] = False
+        st.success("✅ Đã lưu thông số thành công!")
+    elif st.session_state.get(_dirty_key):
+        def _cb_luu(_dk=do_key, _tid=task_id, _dkey=_dirty_key, _sk=_saved_key):
+            cap_nhat_anh_do_luong(_tid, st.session_state[_dk])
+            st.session_state[_dkey] = False
+            st.session_state[_sk] = True
+        st.button("💾 Lưu thông số", key=f"btn_luu_do_{task_id}",
+                  use_container_width=True, type="primary", on_click=_cb_luu)
+
     st.components.v1.html(
         """<script>
         (function() {
@@ -4438,59 +4433,57 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
             var obs = new MutationObserver(applyAll);
             obs.observe(window.parent.document.body, {childList: true, subtree: true});
 
-            // Giữ scroll position vĩnh viễn sau khi bấm button
+            // Giữ scroll position sau khi bấm button (guard trên parent window để persist qua reruns)
             (function() {
-                if (window._scrollLockInit) return;
-                window._scrollLockInit = true;
                 var win = window.parent;
-                var userScrolling = false;
-                var savedWinY = win.scrollY;
-                var savedMainY = 0;
-                var mainEl = win.document.querySelector('.main');
-                if (mainEl) savedMainY = mainEl.scrollTop;
+                var doc = win.document;
 
-                // Cập nhật savedY khi user tự cuộn
-                function onUserScroll() {
-                    userScrolling = true;
-                    savedWinY = win.scrollY;
-                    if (mainEl) savedMainY = mainEl.scrollTop;
-                    setTimeout(function() { userScrolling = false; }, 300);
+                // Cài đặt 1 lần duy nhất trên parent window
+                if (!win._sfxGuard) {
+                    win._sfxGuard = { active: false, mainY: 0 };
+
+                    // Block scrollIntoView khi guard đang active
+                    var _origSIV = win.Element.prototype.scrollIntoView;
+                    win.Element.prototype.scrollIntoView = function() {
+                        if (!win._sfxGuard.active) _origSIV.apply(this, arguments);
+                    };
+
+                    // Block scrollTo khi guard đang active
+                    var _origST = Function.prototype.call.bind(
+                        Object.getOwnPropertyDescriptor(win, 'scrollTo') ?
+                        Object.getOwnPropertyDescriptor(win, 'scrollTo').value :
+                        win.__proto__.scrollTo, win
+                    );
+                    win.scrollTo = function(x, y) {
+                        if (!win._sfxGuard.active) _origST(x, y);
+                    };
+
+                    // Lưu vị trí khi bấm bất kỳ button nào
+                    doc.addEventListener('mousedown', function(e) {
+                        var t = e.target;
+                        var btn = (t && t.tagName === 'BUTTON') ? t :
+                                  (t && t.closest ? t.closest('button') : null);
+                        if (btn) {
+                            var mainEl = doc.querySelector('.main');
+                            win._sfxGuard.mainY = mainEl ? mainEl.scrollTop : win.scrollY;
+                            win._sfxGuard.active = true;
+                            clearTimeout(win._sfxGuard.timer);
+                            win._sfxGuard.timer = setTimeout(function() {
+                                win._sfxGuard.active = false;
+                            }, 2000);
+                        }
+                    }, true);
                 }
-                win.addEventListener('wheel', onUserScroll, {passive: true});
-                win.addEventListener('touchmove', onUserScroll, {passive: true});
 
-                // Lưu vị trí khi bấm button
-                win.document.addEventListener('mousedown', function(e) {
-                    var t = e.target;
-                    if (t && (t.tagName === 'BUTTON' || t.closest('button'))) {
-                        savedWinY = win.scrollY;
-                        if (mainEl) savedMainY = mainEl.scrollTop;
-                    }
-                }, true);
-
-                // Override window.scrollTo
-                var _origScrollTo = win.scrollTo.bind(win);
-                win.scrollTo = function(x, y) {
-                    if (userScrolling) { _origScrollTo(x, y); }
-                    else { _origScrollTo(0, savedWinY); }
-                };
-
-                // Override scrollIntoView
-                var _origSIV = win.Element.prototype.scrollIntoView;
-                win.Element.prototype.scrollIntoView = function() {
-                    if (userScrolling) _origSIV.apply(this, arguments);
-                };
-
-                // Override scrollTop trên .main
-                if (mainEl) {
-                    var desc = Object.getOwnPropertyDescriptor(win.Element.prototype, 'scrollTop');
-                    Object.defineProperty(mainEl, 'scrollTop', {
-                        get: function() { return desc.get.call(this); },
-                        set: function(v) {
-                            if (userScrolling) { desc.set.call(this, v); }
-                            else { desc.set.call(this, savedMainY); }
-                        },
-                        configurable: true
+                // Mỗi lần iframe tải lại (fragment rerun): khôi phục scroll nếu guard đang active
+                if (win._sfxGuard && win._sfxGuard.active) {
+                    var g = win._sfxGuard;
+                    [0, 50, 150, 300, 500].forEach(function(d) {
+                        setTimeout(function() {
+                            if (!g.active) return;
+                            var mainEl = doc.querySelector('.main');
+                            if (mainEl) mainEl.scrollTop = g.mainY;
+                        }, d);
                     });
                 }
             })();
