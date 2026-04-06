@@ -4438,6 +4438,14 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                 var win = window.parent;
                 var doc = win.document;
 
+                function getScrollEl() {
+                    // Thử nhiều selector vì Streamlit có thể dùng container khác nhau
+                    return doc.querySelector('.main') ||
+                           doc.querySelector('[data-testid="stAppViewContainer"]') ||
+                           doc.querySelector('[data-testid="stMain"]') ||
+                           doc.documentElement;
+                }
+
                 // Cài đặt 1 lần duy nhất trên parent window
                 if (!win._sfxGuard) {
                     win._sfxGuard = { active: false, mainY: 0 };
@@ -4448,12 +4456,8 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                         if (!win._sfxGuard.active) _origSIV.apply(this, arguments);
                     };
 
-                    // Block scrollTo khi guard đang active
-                    var _origST = Function.prototype.call.bind(
-                        Object.getOwnPropertyDescriptor(win, 'scrollTo') ?
-                        Object.getOwnPropertyDescriptor(win, 'scrollTo').value :
-                        win.__proto__.scrollTo, win
-                    );
+                    // Block scrollTo khi guard đang active (binding đơn giản, tránh lỗi)
+                    var _origST = win.scrollTo.bind(win);
                     win.scrollTo = function(x, y) {
                         if (!win._sfxGuard.active) _origST(x, y);
                     };
@@ -4464,8 +4468,8 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                         var btn = (t && t.tagName === 'BUTTON') ? t :
                                   (t && t.closest ? t.closest('button') : null);
                         if (btn) {
-                            var mainEl = doc.querySelector('.main');
-                            win._sfxGuard.mainY = mainEl ? mainEl.scrollTop : win.scrollY;
+                            var el = getScrollEl();
+                            win._sfxGuard.mainY = el ? el.scrollTop : 0;
                             win._sfxGuard.active = true;
                             clearTimeout(win._sfxGuard.timer);
                             win._sfxGuard.timer = setTimeout(function() {
@@ -4478,11 +4482,22 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                 // Mỗi lần iframe tải lại (fragment rerun): khôi phục scroll nếu guard đang active
                 if (win._sfxGuard && win._sfxGuard.active) {
                     var g = win._sfxGuard;
-                    [0, 50, 150, 300, 500].forEach(function(d) {
+                    // Dùng rAF loop để liên tục đè scroll trong ~30 frames
+                    var frames = 0;
+                    function restoreLoop() {
+                        if (!g.active || frames > 30) return;
+                        frames++;
+                        var el = getScrollEl();
+                        if (el) el.scrollTop = g.mainY;
+                        requestAnimationFrame(restoreLoop);
+                    }
+                    requestAnimationFrame(restoreLoop);
+                    // Thêm các setTimeout dự phòng
+                    [100, 300, 600].forEach(function(d) {
                         setTimeout(function() {
                             if (!g.active) return;
-                            var mainEl = doc.querySelector('.main');
-                            if (mainEl) mainEl.scrollTop = g.mainY;
+                            var el = getScrollEl();
+                            if (el) el.scrollTop = g.mainY;
                         }, d);
                     });
                 }
