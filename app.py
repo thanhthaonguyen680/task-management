@@ -18,6 +18,7 @@ import os
 import json
 import hashlib
 import hmac as _hmac_mod
+import threading
 import base64 as _b64_mod
 
 # ============================================================
@@ -1301,16 +1302,41 @@ def doc_anh_do_luong(gia_tri: str) -> dict:
         return {}
 
 
+# Cache row number theo task_id — row không thay đổi nên dùng module-level dict
+_ROW_CACHE: dict[int, int] = {}
+
+
 def cap_nhat_anh_do_luong(task_id: int, anh_dict: dict):
-    """Ghi toàn bộ dict ảnh đo lường (cột Y = col 25) lên Google Sheets."""
-    try:
-        sheet = _lay_sheet_fresh()
-        o_tim = sheet.find(str(task_id), in_column=1)
-        if o_tim:
-            sheet.update_cell(o_tim.row, 25, json.dumps(anh_dict, ensure_ascii=False))
+    """Ghi toàn bộ dict ảnh đo lường (cột Y = col 25) lên Google Sheets — background thread."""
+    payload = json.dumps(anh_dict, ensure_ascii=False)
+    task_id = int(task_id)
+
+    def _write():
+        try:
+            sheet = lay_sheet()  # dùng cached connection, không tạo mới mỗi lần
+            row = _ROW_CACHE.get(task_id)
+            if not row:
+                o_tim = sheet.find(str(task_id), in_column=1)
+                if not o_tim:
+                    return
+                row = o_tim.row
+                _ROW_CACHE[task_id] = row
+            sheet.update_cell(row, 25, payload)
             lay_danh_sach_cong_viec.clear()
-    except Exception:
-        pass
+        except Exception:
+            # Nếu cached sheet lỗi, thử lại với fresh connection
+            try:
+                sheet = _lay_sheet_fresh()
+                _ROW_CACHE.pop(task_id, None)  # xóa cache để find lại
+                o_tim = sheet.find(str(task_id), in_column=1)
+                if o_tim:
+                    _ROW_CACHE[task_id] = o_tim.row
+                    sheet.update_cell(o_tim.row, 25, payload)
+                    lay_danh_sach_cong_viec.clear()
+            except Exception:
+                pass
+
+    threading.Thread(target=_write, daemon=True).start()
 
 
 def doc_danh_sach_anh(gia_tri: str) -> list:
@@ -4275,20 +4301,17 @@ def _cb_xoa_do(task_id, do_key, label, url_d):
 
 
 def _cb_save_val(task_id, do_key, val_key, inp_key):
-    """Callback lưu giá trị thông số đo lường vào anh_do_luong dict."""
+    """Callback lưu giá trị thông số đo lường — tự động lưu GSheets khi rời field."""
     import re as _re
     val = (st.session_state.get(inp_key) or "").strip()
-    # Chỉ chấp nhận số với key numeric
     _lbl_key = val_key.replace("_val", "")
     if _lbl_key in _DO_LUONG_NUMERIC_KEYS:
         val = _re.sub(r"[^\d.]", "", val)
-        # giữ đúng định dạng số: bỏ dấu chấm thừa
         parts = val.split(".")
         if len(parts) > 2:
             val = parts[0] + "." + "".join(parts[1:])
     st.session_state[do_key][val_key] = val
-    # Đánh dấu cần lưu — GSheets write sẽ thực hiện khi nhấn nút Lưu
-    st.session_state[f"_do_dirty_{do_key}"] = True
+    cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
 
 
 def _cb_upload_do(task_id, do_key, label, up_key, done_key):
@@ -4388,19 +4411,6 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                 args=(task_id, do_key, lbl_key, up_key, done_key),
                             )
 
-    _dirty_key = f"_do_dirty_{do_key}"
-    _saved_key = f"_do_saved_{do_key}"
-    if st.session_state.get(_saved_key):
-        st.session_state[_saved_key] = False
-        st.success("✅ Đã lưu thông số thành công!")
-    elif st.session_state.get(_dirty_key):
-        def _cb_luu(_dk=do_key, _tid=task_id, _dkey=_dirty_key, _sk=_saved_key):
-            cap_nhat_anh_do_luong(_tid, st.session_state[_dk])
-            st.session_state[_dkey] = False
-            st.session_state[_sk] = True
-        st.button("💾 Lưu thông số", key=f"btn_luu_do_{task_id}",
-                  use_container_width=True, type="primary", on_click=_cb_luu)
-
     st.components.v1.html(
         """<script>
         (function() {
@@ -4432,101 +4442,6 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
             setTimeout(applyAll, 300);
             var obs = new MutationObserver(applyAll);
             obs.observe(window.parent.document.body, {childList: true, subtree: true});
-
-            // Giữ scroll position sau khi bấm button (guard trên parent window để persist qua reruns)
-            (function() {
-                var win = window.parent;
-                var doc = win.document;
-
-                function getScrollEl() {
-                    // Thử nhiều selector vì Streamlit có thể dùng container khác nhau
-                    return doc.querySelector('.main') ||
-                           doc.querySelector('[data-testid="stAppViewContainer"]') ||
-                           doc.querySelector('[data-testid="stMain"]') ||
-                           doc.documentElement;
-                }
-
-                // Cài đặt 1 lần duy nhất trên parent window
-                if (!win._sfxGuard) {
-                    win._sfxGuard = { active: false, mainY: 0 };
-
-                    // Block scrollIntoView khi guard đang active
-                    var _origSIV = win.Element.prototype.scrollIntoView;
-                    win.Element.prototype.scrollIntoView = function() {
-                        if (!win._sfxGuard.active) _origSIV.apply(this, arguments);
-                    };
-
-                    // Block scrollTo khi guard đang active (binding đơn giản, tránh lỗi)
-                    var _origST = win.scrollTo.bind(win);
-                    win.scrollTo = function(x, y) {
-                        if (!win._sfxGuard.active) _origST(x, y);
-                    };
-
-                    // Block focus() gây scroll — dùng preventScroll khi guard active
-                    var _origFocus = win.HTMLElement.prototype.focus;
-                    win.HTMLElement.prototype.focus = function(opts) {
-                        if (win._sfxGuard.active) {
-                            _origFocus.call(this, { preventScroll: true });
-                        } else {
-                            _origFocus.apply(this, arguments);
-                        }
-                    };
-
-                    // Lưu vị trí khi bấm bất kỳ button nào
-                    doc.addEventListener('mousedown', function(e) {
-                        var t = e.target;
-                        var btn = (t && t.tagName === 'BUTTON') ? t :
-                                  (t && t.closest ? t.closest('button') : null);
-                        if (btn) {
-                            var el = getScrollEl();
-                            win._sfxGuard.mainY = el ? el.scrollTop : 0;
-                            win._sfxGuard.active = true;
-                            clearTimeout(win._sfxGuard.timer);
-                            win._sfxGuard.timer = setTimeout(function() {
-                                win._sfxGuard.active = false;
-                            }, 2000);
-                        }
-                    }, true);
-                }
-
-                // Mỗi lần iframe tải lại (fragment rerun): khóa scrollTop setter + rAF loop
-                if (win._sfxGuard && win._sfxGuard.active) {
-                    var g = win._sfxGuard;
-                    var el = getScrollEl();
-
-                    if (el && !el._scrollTopLocked) {
-                        el._scrollTopLocked = true;
-                        // Tìm descriptor gốc trên prototype chain
-                        var _proto = win.Element.prototype;
-                        var _desc = Object.getOwnPropertyDescriptor(_proto, 'scrollTop');
-                        if (!_desc || !_desc.set) {
-                            _proto = win.HTMLElement.prototype;
-                            _desc = Object.getOwnPropertyDescriptor(_proto, 'scrollTop');
-                        }
-                        if (_desc && _desc.set) {
-                            var _origSet = _desc.set;
-                            var _origGet = _desc.get;
-                            // Override trực tiếp trên instance → chặn mọi ghi scrollTop
-                            Object.defineProperty(el, 'scrollTop', {
-                                get: function() { return _origGet.call(this); },
-                                set: function(v) {
-                                    _origSet.call(this, g.active ? g.mainY : v);
-                                },
-                                configurable: true
-                            });
-                            // Tháo override khi guard hết hạn
-                            setTimeout(function() {
-                                try {
-                                    Object.defineProperty(el, 'scrollTop', { get: _origGet, set: _origSet, configurable: true });
-                                } catch(e) {}
-                                el._scrollTopLocked = false;
-                            }, 2100);
-                        }
-                        // Set về vị trí đúng ngay
-                        el.scrollTop = g.mainY;
-                    }
-                }
-            })();
         })();
         </script>""",
         height=0,
