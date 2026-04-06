@@ -4462,6 +4462,16 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                         if (!win._sfxGuard.active) _origST(x, y);
                     };
 
+                    // Block focus() gây scroll — dùng preventScroll khi guard active
+                    var _origFocus = win.HTMLElement.prototype.focus;
+                    win.HTMLElement.prototype.focus = function(opts) {
+                        if (win._sfxGuard.active) {
+                            _origFocus.call(this, { preventScroll: true });
+                        } else {
+                            _origFocus.apply(this, arguments);
+                        }
+                    };
+
                     // Lưu vị trí khi bấm bất kỳ button nào
                     doc.addEventListener('mousedown', function(e) {
                         var t = e.target;
