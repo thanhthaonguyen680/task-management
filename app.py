@@ -4435,42 +4435,61 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
             var obs = new MutationObserver(applyAll);
             obs.observe(window.parent.document.body, {childList: true, subtree: true});
 
-            // Khoá scroll khi bấm button
+            // Giữ scroll position vĩnh viễn sau khi bấm button
             (function() {
                 if (window._scrollLockInit) return;
                 window._scrollLockInit = true;
                 var win = window.parent;
-                var locked = false;
+                var userScrolling = false;
+                var savedWinY = win.scrollY;
+                var savedMainY = 0;
+                var mainEl = win.document.querySelector('.main');
+                if (mainEl) savedMainY = mainEl.scrollTop;
 
-                // 1. Override window.scrollTo
+                // Cập nhật savedY khi user tự cuộn
+                function onUserScroll() {
+                    userScrolling = true;
+                    savedWinY = win.scrollY;
+                    if (mainEl) savedMainY = mainEl.scrollTop;
+                    setTimeout(function() { userScrolling = false; }, 300);
+                }
+                win.addEventListener('wheel', onUserScroll, {passive: true});
+                win.addEventListener('touchmove', onUserScroll, {passive: true});
+
+                // Lưu vị trí khi bấm button
+                win.document.addEventListener('mousedown', function(e) {
+                    var t = e.target;
+                    if (t && (t.tagName === 'BUTTON' || t.closest('button'))) {
+                        savedWinY = win.scrollY;
+                        if (mainEl) savedMainY = mainEl.scrollTop;
+                    }
+                }, true);
+
+                // Override window.scrollTo
                 var _origScrollTo = win.scrollTo.bind(win);
-                win.scrollTo = function(x, y) { if (!locked) _origScrollTo(x, y); };
-
-                // 2. Override scrollIntoView
-                var _origSIV = win.Element.prototype.scrollIntoView;
-                win.Element.prototype.scrollIntoView = function() {
-                    if (!locked) _origSIV.apply(this, arguments);
+                win.scrollTo = function(x, y) {
+                    if (userScrolling) { _origScrollTo(x, y); }
+                    else { _origScrollTo(0, savedWinY); }
                 };
 
-                // 3. Lock scrollTop trên .main container
-                var mainEl = win.document.querySelector('.main');
+                // Override scrollIntoView
+                var _origSIV = win.Element.prototype.scrollIntoView;
+                win.Element.prototype.scrollIntoView = function() {
+                    if (userScrolling) _origSIV.apply(this, arguments);
+                };
+
+                // Override scrollTop trên .main
                 if (mainEl) {
                     var desc = Object.getOwnPropertyDescriptor(win.Element.prototype, 'scrollTop');
                     Object.defineProperty(mainEl, 'scrollTop', {
                         get: function() { return desc.get.call(this); },
-                        set: function(v) { if (!locked) desc.set.call(this, v); },
+                        set: function(v) {
+                            if (userScrolling) { desc.set.call(this, v); }
+                            else { desc.set.call(this, savedMainY); }
+                        },
                         configurable: true
                     });
                 }
-
-                // Bật lock 2s khi bấm button
-                win.document.addEventListener('mousedown', function(e) {
-                    var t = e.target;
-                    if (t && (t.tagName === 'BUTTON' || t.closest('button'))) {
-                        locked = true;
-                        setTimeout(function() { locked = false; }, 2000);
-                    }
-                }, true);
             })();
         })();
         </script>""",
