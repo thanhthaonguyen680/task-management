@@ -6328,9 +6328,18 @@ def giao_dien_dang_nhap():
     # CSS riêng cho trang auth
     st.markdown("""
     <style>
+    /* Bỏ padding-top mặc định của Streamlit trên trang login */
+    .block-container {
+        padding-top: 1rem !important;
+    }
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 0.5rem !important;
+        }
+    }
     .auth-container {
         max-width: 460px;
-        margin: 2rem auto;
+        margin: 1rem auto;
         background: white;
         border-radius: 16px;
         padding: 2.2rem 2rem 2rem;
@@ -6369,6 +6378,82 @@ def giao_dien_dang_nhap():
         <div class="auth-title">📋 Quản Lý Công Việc</div>
         <div class="auth-sub">Đăng nhập để tiếp tục</div>
     """, unsafe_allow_html=True)
+
+    # JS: khôi phục session từ localStorage (nếu không phải logout thủ công)
+    _is_manual_logout = st.session_state.get("manual_logout", False)
+    _has_bad_token    = bool(st.query_params.get("s"))  # có token nhưng không hợp lệ
+    if _is_manual_logout or _has_bad_token:
+        # Đăng xuất thủ công hoặc token hết hạn → xóa localStorage
+        st.components.v1.html(
+            "<script>localStorage.removeItem('_qlcv_token');</script>",
+            height=0,
+        )
+    else:
+        # Thử khôi phục session từ localStorage
+        st.components.v1.html("""
+        <script>
+        (function() {
+            var t = localStorage.getItem('_qlcv_token');
+            if (t) {
+                var loc = window.parent.location;
+                if (loc.search.indexOf('s=') === -1) {
+                    loc.href = loc.pathname + '?s=' + encodeURIComponent(t);
+                }
+            }
+        })();
+        </script>""", height=0)
+
+    # JS: đọc localStorage và tự điền username/password vào form
+    st.components.v1.html("""
+    <script>
+    (function() {
+        var UN_KEY = '_qlcv_un';
+        var PW_KEY = '_qlcv_pw';
+        var doc = window.parent.document;
+
+        function fillInput(el, val) {
+            var setter = Object.getOwnPropertyDescriptor(
+                window.parent.HTMLInputElement.prototype, 'value'
+            ).set;
+            setter.call(el, val);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function tryAutoFill() {
+            var un = localStorage.getItem(UN_KEY);
+            var pw = localStorage.getItem(PW_KEY);
+            if (!un || !pw) return;
+            var inputs = doc.querySelectorAll('input[type="text"], input:not([type])');
+            var pwInputs = doc.querySelectorAll('input[type="password"]');
+            if (inputs.length > 0 && !inputs[0].value) fillInput(inputs[0], un);
+            if (pwInputs.length > 0 && !pwInputs[0].value) fillInput(pwInputs[0], pw);
+        }
+
+        function hookSave() {
+            // Hook vào nút Đăng Nhập để lưu credentials trước khi submit
+            var btns = doc.querySelectorAll('button[kind="primaryFormSubmit"], [data-testid="baseButton-primaryFormSubmit"]');
+            btns.forEach(function(btn) {
+                if (btn._credHooked) return;
+                btn._credHooked = true;
+                btn.addEventListener('click', function() {
+                    var unEl = doc.querySelector('input[type="text"], input:not([type])');
+                    var pwEl = doc.querySelector('input[type="password"]');
+                    if (unEl && unEl.value && pwEl && pwEl.value) {
+                        localStorage.setItem(UN_KEY, unEl.value);
+                        localStorage.setItem(PW_KEY, pwEl.value);
+                    }
+                });
+            });
+        }
+
+        // Thử ngay và retry để chắc DOM đã render
+        [100, 400, 900].forEach(function(d) {
+            setTimeout(function() { tryAutoFill(); hookSave(); }, d);
+        });
+    })();
+    </script>
+    """, height=0)
 
     tab_dn, tab_dmk = st.tabs(["🔑  Đăng Nhập", "🔒  Đổi Mật Khẩu"])
 
@@ -7142,6 +7227,14 @@ def main():
         else:
             giao_dien_dang_nhap()
             return
+
+    # Lưu token vào localStorage để khôi phục session khi mở lại app
+    _cur_token = st.session_state.get("session_token", "")
+    if _cur_token:
+        st.components.v1.html(
+            f"<script>localStorage.setItem('_qlcv_token','{_cur_token}');</script>",
+            height=0,
+        )
 
     vai_tro   = st.session_state.get("vai_tro", "nhan_vien")
     ho_ten    = st.session_state.get("ho_ten", "")
