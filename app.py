@@ -4435,27 +4435,23 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
             var obs = new MutationObserver(applyAll);
             obs.observe(window.parent.document.body, {childList: true, subtree: true});
 
-            // Giữ scroll position khi fragment rerun
+            // Khoá scroll khi bấm button — override scrollTo của Streamlit
             (function() {
                 if (window._scrollLockInit) return;
                 window._scrollLockInit = true;
                 var win = window.parent;
-                var savedY = null;
-                var clearTimer = null;
+                var _orig = win.scrollTo.bind(win);
+                var locked = false;
+                win.scrollTo = function(x, y) {
+                    if (!locked) _orig(x, y);
+                };
                 win.document.addEventListener('mousedown', function(e) {
                     var t = e.target;
                     if (t && (t.tagName === 'BUTTON' || t.closest('button'))) {
-                        savedY = win.scrollY;
-                        clearTimeout(clearTimer);
+                        locked = true;
+                        setTimeout(function() { locked = false; }, 2000);
                     }
                 }, true);
-                var obs = new MutationObserver(function() {
-                    if (savedY !== null) {
-                        win.scrollTo(0, savedY);
-                        clearTimer = setTimeout(function() { savedY = null; }, 1500);
-                    }
-                });
-                obs.observe(win.document.body, {childList: true, subtree: true});
             })();
         })();
         </script>""",
