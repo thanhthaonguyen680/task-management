@@ -4393,8 +4393,8 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
     _saved_key = f"_do_saved_{do_key}"
     if st.session_state.get(_saved_key):
         st.session_state[_saved_key] = False
-        st.toast("✅ Đã lưu thông số!", icon="✅")
-    if st.session_state.get(_dirty_key):
+        st.success("✅ Đã lưu thông số thành công!")
+    elif st.session_state.get(_dirty_key):
         def _cb_luu_thong_so(_dk=do_key, _tid=task_id, _dkey=_dirty_key, _sk=_saved_key):
             cap_nhat_anh_do_luong(_tid, st.session_state[_dk])
             st.session_state[_dkey] = False
@@ -4437,21 +4437,25 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
 
             // Giữ scroll position khi fragment rerun
             (function() {
-                var doc = window.parent.document;
-                var scrollEl = doc.querySelector('.main') || doc.documentElement;
+                if (window._scrollLockInit) return;
+                window._scrollLockInit = true;
+                var win = window.parent;
                 var savedY = null;
-                var saveObs = new MutationObserver(function() {
+                var clearTimer = null;
+                win.document.addEventListener('mousedown', function(e) {
+                    var t = e.target;
+                    if (t && (t.tagName === 'BUTTON' || t.closest('button'))) {
+                        savedY = win.scrollY;
+                        clearTimeout(clearTimer);
+                    }
+                }, true);
+                var obs = new MutationObserver(function() {
                     if (savedY !== null) {
-                        scrollEl.scrollTop = savedY;
-                        savedY = null;
+                        win.scrollTo(0, savedY);
+                        clearTimer = setTimeout(function() { savedY = null; }, 1500);
                     }
                 });
-                doc.querySelectorAll('button').forEach(function(btn) {
-                    btn.addEventListener('click', function() {
-                        savedY = scrollEl.scrollTop;
-                    });
-                });
-                saveObs.observe(scrollEl, {childList: true, subtree: true});
+                obs.observe(win.document.body, {childList: true, subtree: true});
             })();
         })();
         </script>""",
