@@ -2743,8 +2743,11 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             border=brd_all, fill_color=BLUE_HDR, h_align="center")
     ws.row_dimensions[row].height = 28
     row += 1
-    for _c_idx in range(1, 7):
-        _sc(row, _c_idx, "", size=13, border=brd_all)
+    _vib_keys = ["vib_rad_h_de", "vib_rad_v_de", "vib_axial_de",
+                 "vib_rad_h_nde", "vib_rad_v_nde", "vib_axial_nde"]
+    for _c_idx, _vk in enumerate(_vib_keys, start=1):
+        _vib_val = anh_do_luong.get(f"{_vk}_val", "")
+        _sc(row, _c_idx, _vib_val, size=13, border=brd_all, h_align="center")
     ws.row_dimensions[row].height = 30
     row += 1          # past vib values
     _apply_outer_thick(_terminal_tbl_start, row - 1)  # viền ngoài dày toàn bảng Terminal
