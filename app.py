@@ -1059,6 +1059,13 @@ def xoa_trang_thai_custom(record_id: str):
     lay_danh_sach_trang_thai_custom.clear()
     lay_ten_cac_trang_thai.clear()
 
+def _seed_trang_thai_mac_dinh():
+    """Seed các trạng thái mặc định vào TrangThai sheet nếu còn trống."""
+    df = lay_danh_sach_trang_thai_custom()
+    if df.empty:
+        for ten in _DS_TRANG_THAI_MAC_DINH:
+            them_trang_thai_custom(ten)
+
 @st.cache_data(ttl=60)
 def lay_ten_cac_trang_thai() -> list:
     df = lay_danh_sach_trang_thai_custom()
@@ -5075,6 +5082,7 @@ def giao_dien_admin():
             sua_func=sua_tinh_trang,
             xoa_func=xoa_tinh_trang,
         )
+        _seed_trang_thai_mac_dinh()
         _section_don_gian(
             "📋 Trạng Thái", "trang_thai",
             lay_danh_sach_trang_thai_custom, them_trang_thai_custom, "Tên Trạng Thái",
