@@ -1049,6 +1049,16 @@ def them_trang_thai_custom(ten: str) -> int:
     lay_ten_cac_trang_thai.clear()
     return result
 
+def sua_trang_thai_custom(record_id: str, ten_moi: str):
+    _sua_hang_don_gian("TrangThai", _TIEUDE_TRANG_THAI, record_id, "Tên Trạng Thái", ten_moi)
+    lay_danh_sach_trang_thai_custom.clear()
+    lay_ten_cac_trang_thai.clear()
+
+def xoa_trang_thai_custom(record_id: str):
+    _xoa_hang_don_gian("TrangThai", _TIEUDE_TRANG_THAI, record_id)
+    lay_danh_sach_trang_thai_custom.clear()
+    lay_ten_cac_trang_thai.clear()
+
 @st.cache_data(ttl=60)
 def lay_ten_cac_trang_thai() -> list:
     df = lay_danh_sach_trang_thai_custom()
@@ -5064,6 +5074,14 @@ def giao_dien_admin():
             mo_ta_them="Tên Tình Trạng *",
             sua_func=sua_tinh_trang,
             xoa_func=xoa_tinh_trang,
+        )
+        _section_don_gian(
+            "📋 Trạng Thái", "trang_thai",
+            lay_danh_sach_trang_thai_custom, them_trang_thai_custom, "Tên Trạng Thái",
+            placeholder="Ví dụ: Đang Kiểm Tra, Đã Phê Duyệt, Có Đơn...",
+            mo_ta_them="Tên Trạng Thái *",
+            sua_func=sua_trang_thai_custom,
+            xoa_func=xoa_trang_thai_custom,
         )
 
         _section_don_gian(
