@@ -4008,6 +4008,69 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
             st.button("📤 Upload", key=f"{key_prefix}_btn_up_cv_{i}",
                       use_container_width=True, on_click=_cb_upload_cv)
 
+        # Ảnh Đo Lường — chỉ hiện cho subtask "Nhận máy"
+        if ten.strip().upper() == "NHẬN MÁY":
+            _nm_do_key   = f"{key_prefix}_do_luong_creation"
+            if _nm_do_key not in st.session_state:
+                st.session_state[_nm_do_key] = {}
+            _nm_nhom_list = _STAGE_DO_LUONG.get("NHẬN MÁY", [])
+            _n_do    = sum(len(v) for v in st.session_state[_nm_do_key].values() if isinstance(v, list))
+            _total_do = sum(len(lbs) for e in _nm_nhom_list for lbs in [e[1]])
+            _do_open_key = f"{key_prefix}_nm_do_open_{i}"
+            if _do_open_key not in st.session_state:
+                st.session_state[_do_open_key] = False
+            _do_chev = "▼" if st.session_state[_do_open_key] else "▶"
+
+            def _toggle_nm_do(_k=_do_open_key):
+                st.session_state[_k] = not st.session_state[_k]
+
+            st.button(
+                f"{_do_chev}  📐 Ảnh Đo Lường  ({_n_do}/{_total_do} ảnh)",
+                key=f"{key_prefix}_nm_do_tog_{i}",
+                use_container_width=True,
+                on_click=_toggle_nm_do,
+            )
+            if st.session_state[_do_open_key]:
+                _nm_dict = st.session_state[_nm_do_key]
+                for _nhom_entry in _nm_nhom_list:
+                    _nhom_title, _nhom_lbs = _nhom_entry[0], _nhom_entry[1]
+                    st.markdown(
+                        f"<div style='background:#dbeafe;border-radius:6px;padding:5px 10px;"
+                        f"font-weight:700;font-size:0.82rem;color:#1e3a8a;margin-top:6px;'>"
+                        f"{_nhom_title}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    for _lbl_disp, _lbl_key in _nhom_lbs:
+                        _urls_lbl = _nm_dict.get(_lbl_key, [])
+                        _exp_lbl  = f"📷 Ảnh {_lbl_disp} ✅" if _urls_lbl else f"📷 Ảnh {_lbl_disp}"
+                        with st.expander(_exp_lbl, expanded=False):
+                            if _urls_lbl:
+                                _c_do = st.columns(min(len(_urls_lbl), 3))
+                                for _ai, _u in enumerate(_urls_lbl):
+                                    with _c_do[_ai % 3]:
+                                        _hien_thi_anh_drive(_u, use_container_width=True)
+                                        def _del_nm(dk=_nm_do_key, lk=_lbl_key, u=_u):
+                                            _d = st.session_state.get(dk, {})
+                                            _d[lk] = [x for x in _d.get(lk, []) if x != u]
+                                        st.button("🗑️ Xoá", key=f"{key_prefix}_del_nm_{i}_{_lbl_key}_{_ai}",
+                                                  use_container_width=True, on_click=_del_nm)
+                            _up_k  = f"{key_prefix}_up_nm_{i}_{_lbl_key}"
+                            _dn_k  = f"{key_prefix}_dn_nm_{i}_{_lbl_key}"
+                            st.file_uploader("Chọn ảnh", type=["jpg", "jpeg", "png"],
+                                             key=_up_k, label_visibility="collapsed")
+                            def _cb_up_nm(dk=_nm_do_key, lk=_lbl_key, uk=_up_k, dnk=_dn_k):
+                                f = st.session_state.get(uk)
+                                if not f:
+                                    return
+                                fid = f"{f.name}_{f.size}"
+                                if st.session_state.get(dnk) == fid:
+                                    return
+                                st.session_state[dnk] = fid
+                                url = tai_anh_len_cloudinary(f)
+                                st.session_state.setdefault(dk, {}).setdefault(lk, []).append(url)
+                            st.button("📤 Upload", key=f"{key_prefix}_btn_nm_{i}_{_lbl_key}",
+                                      use_container_width=True, on_click=_cb_up_nm)
+
     # Thêm thủ công một mục mới
     st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
     st.text_input(
@@ -6283,7 +6346,7 @@ def giao_dien_nhan_vien():
                     else:
                         phe_duyet_nv = nv_phe_duyet if nv_phe_duyet != "-- Không chọn --" else ""
                         with st.spinner("Đang lưu task mới..."):
-                            them_cong_viec(
+                            _id_moi = them_cong_viec(
                                 ten_task        = nv_ten_task.strip(),
                                 mo_ta           = nv_mo_ta.strip(),
                                 nguoi_duoc_giao = ten_nhan_vien,
@@ -6305,6 +6368,10 @@ def giao_dien_nhan_vien():
                                 so_po_kh        = nv_so_po_kh.strip(),
                                 so_bao_gia      = nv_so_bao_gia.strip(),
                             )
+                            # Sync ảnh đo lường Nhận Máy (nếu có)
+                            _nm_do_data = st.session_state.get(f"{_vp}_do_luong_creation", {})
+                            if _nm_do_data and _id_moi:
+                                cap_nhat_anh_do_luong(_id_moi, _nm_do_data)
                         # Tăng version → toàn bộ widget keys (kể cả checklist/cong_viec_con) đổi → reset sạch
                         st.session_state[_ver_key] = _v + 1
                         st.session_state["_nv_task_success"] = (
