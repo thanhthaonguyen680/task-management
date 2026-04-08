@@ -6315,7 +6315,7 @@ def giao_dien_nhan_vien():
                 ds_trang_thai_nv = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
                 # ── Hàng đầu: Công Ty ──
-                nv_cong_ty = st.selectbox("🏢 Công Ty *", options=ds_cong_ty_nv, key=f"{_nv_prefix}_ct_{_v}")
+                nv_cong_ty = st.selectbox("🏢 Công Ty *", options=["-- Chọn Công Ty --"] + ds_cong_ty_nv, key=f"{_nv_prefix}_ct_{_v}")
                 # ── Hàng tiếp theo: Người Phê Duyệt ──
                 nv_phe_duyet = st.selectbox(
                     "✅ Người Phê Duyệt",
@@ -6382,7 +6382,9 @@ def giao_dien_nhan_vien():
                 st.divider()
 
                 if st.button("✅ Tạo Task", use_container_width=True, type="primary", key=f"{_nv_prefix}_submit_{_v}"):
-                    if not nv_ten_task.strip():
+                    if nv_cong_ty == "-- Chọn Công Ty --":
+                        st.error("❌ Vui lòng chọn Công Ty!")
+                    elif not nv_ten_task.strip():
                         st.error("❌ Vui lòng nhập Tên Công Việc!")
                     else:
                         phe_duyet_nv = nv_phe_duyet if nv_phe_duyet != "-- Không chọn --" else ""
@@ -6392,7 +6394,7 @@ def giao_dien_nhan_vien():
                                 mo_ta           = nv_mo_ta.strip(),
                                 nguoi_duoc_giao = ten_nhan_vien,
                                 deadline        = str(nv_deadline),
-                                cong_ty         = nv_cong_ty,
+                                cong_ty         = nv_cong_ty if nv_cong_ty != "-- Chọn Công Ty --" else "",
                                 cong_so         = "",
                                 nam             = nv_nam.strip(),
                                 trang_thai      = nv_trang_thai,
