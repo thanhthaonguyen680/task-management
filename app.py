@@ -583,8 +583,13 @@ def tai_anh_len_drive(file_anh) -> str:
     """Upload ảnh lên Google Drive qua requests, set public, trả về thumbnail URL."""
     import io, json as _json
     session = _lay_drive_session()
-    file_anh.seek(0)
+    try:
+        file_anh.seek(0)
+    except Exception:
+        pass
     content = file_anh.read()
+    if not content:
+        raise ValueError("File ảnh rỗng hoặc không hợp lệ — vui lòng chọn lại ảnh.")
     mime = getattr(file_anh, "type", "image/jpeg")
     name = getattr(file_anh, "name", "image.jpg")
 
@@ -4017,13 +4022,17 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 key=_up_key_frag,
                 label_visibility="collapsed",
             )
-            def _cb_upload_cv(idx=i, up_k=_up_key_frag):
-                _files = st.session_state.get(up_k) or []
-                for _fm in _files:
-                    _new_url = _tai_media_len_drive(_fm)
-                    st.session_state[cv_key][idx].setdefault("anh", []).append(_new_url)
-            st.button("📤 Upload", key=f"{key_prefix}_btn_up_cv_{i}",
-                      use_container_width=True, on_click=_cb_upload_cv)
+            if st.button("📤 Upload", key=f"{key_prefix}_btn_up_cv_{i}",
+                         use_container_width=True):
+                _files = st.session_state.get(_up_key_frag) or []
+                if _files:
+                    try:
+                        with st.spinner("Đang tải lên..."):
+                            for _fm in _files:
+                                _new_url = _tai_media_len_drive(_fm)
+                                st.session_state[cv_key][i].setdefault("anh", []).append(_new_url)
+                    except Exception:
+                        st.error("❌ File không hợp lệ. Vui lòng chọn lại và thử lại.")
 
         # Ảnh Đo Lường — chỉ hiện cho subtask "Nhận máy"
         if ten.strip().upper() == "NHẬN MÁY":
@@ -4478,10 +4487,13 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                          use_container_width=True):
                                 f_do = st.session_state.get(up_key)
                                 if f_do:
-                                    with st.spinner("Đang tải ảnh lên..."):
-                                        url_new = tai_anh_len_cloudinary(f_do)
-                                    st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
-                                    cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+                                    try:
+                                        with st.spinner("Đang tải ảnh lên..."):
+                                            url_new = tai_anh_len_cloudinary(f_do)
+                                        st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
+                                        cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+                                    except Exception:
+                                        st.error("❌ File ảnh không hợp lệ. Vui lòng chọn lại ảnh và thử lại.")
 
     st.components.v1.html(
         """<script>
@@ -4608,10 +4620,13 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                                  use_container_width=True):
                         f_do = st.session_state.get(up_key)
                         if f_do:
-                            with st.spinner("Đang tải ảnh lên..."):
-                                url_new = tai_anh_len_cloudinary(f_do)
-                            st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
-                            cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+                            try:
+                                with st.spinner("Đang tải ảnh lên..."):
+                                    url_new = tai_anh_len_cloudinary(f_do)
+                                st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
+                                cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+                            except Exception:
+                                st.error("❌ File ảnh không hợp lệ. Vui lòng chọn lại ảnh và thử lại.")
 
 
 # ─── helper: lưu công việc con về sheet ───────────────────────────────────────
