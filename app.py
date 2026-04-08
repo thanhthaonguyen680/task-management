@@ -3998,7 +3998,11 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         # Hàng 3: upload ảnh cho từng công việc con
         _cv_anh = st.session_state[cv_key][i].get("anh", [])
         _exp_anh_lbl = f"📎 Hình/Video ({len(_cv_anh)})" if _cv_anh else "📎 Thêm hình/video"
-        with st.expander(_exp_anh_lbl, expanded=False):
+        _exp_open_key = f"{key_prefix}_exp_anh_open_{i}"
+        if _exp_open_key not in st.session_state:
+            st.session_state[_exp_open_key] = False
+        with st.expander(_exp_anh_lbl, expanded=st.session_state[_exp_open_key]) as _exp_anh:
+            st.session_state[_exp_open_key] = _exp_anh
             if _cv_anh:
                 _cols_a = st.columns(min(len(_cv_anh), 3))
                 for _ai, _url_a in enumerate(_cv_anh):
@@ -4031,6 +4035,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                             for _fm in _files:
                                 _new_url = _tai_media_len_drive(_fm)
                                 st.session_state[cv_key][i].setdefault("anh", []).append(_new_url)
+                        st.session_state[_exp_open_key] = True
                         st.rerun()
                     except Exception:
                         st.error("❌ File không hợp lệ. Vui lòng chọn lại và thử lại.")
