@@ -3999,7 +3999,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         _cv_anh = st.session_state[cv_key][i].get("anh", [])
         _exp_anh_lbl = f"📎 Hình/Video ({len(_cv_anh)})" if _cv_anh else "📎 Thêm hình/video"
         _exp_open_key = f"{key_prefix}_exp_anh_open_{i}"
-        if _exp_open_key not in st.session_state:
+        if not isinstance(st.session_state.get(_exp_open_key), bool):
             st.session_state[_exp_open_key] = False
         with st.expander(_exp_anh_lbl, expanded=st.session_state[_exp_open_key]):
             if _cv_anh:
