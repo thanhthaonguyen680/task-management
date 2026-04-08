@@ -3876,9 +3876,8 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] input {{
         border: none !important; border-bottom: 2px solid #c4b5fd !important;
         background: transparent !important; box-shadow: none !important;
-        padding: 3px 6px !important; font-size: 1.05rem !important;
-        font-weight: 700 !important; color: #4c1d95 !important;
-        min-height: 36px !important; letter-spacing: 0.01em !important;
+        padding: 3px 6px !important; color: #4c1d95 !important;
+        min-height: 36px !important; font-weight: 600 !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] input:focus {{
         border-bottom-color: #7c3aed !important; background: #f5f3ff !important;
@@ -4002,8 +4001,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         _exp_open_key = f"{key_prefix}_exp_anh_open_{i}"
         if _exp_open_key not in st.session_state:
             st.session_state[_exp_open_key] = False
-        with st.expander(_exp_anh_lbl, expanded=st.session_state[_exp_open_key]) as _exp_anh:
-            st.session_state[_exp_open_key] = _exp_anh
+        with st.expander(_exp_anh_lbl, expanded=st.session_state[_exp_open_key]):
             if _cv_anh:
                 _cols_a = st.columns(min(len(_cv_anh), 3))
                 for _ai, _url_a in enumerate(_cv_anh):
