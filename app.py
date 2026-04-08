@@ -4394,18 +4394,9 @@ def _cb_save_val(task_id, do_key, val_key, inp_key):
     cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
 
 
-def _cb_upload_do(task_id, do_key, label, up_key, done_key):
-    """Callback upload ảnh đo lường — không cần st.rerun()"""
-    f_do = st.session_state.get(up_key)
-    if f_do is None:
-        return
-    _file_id = f"{f_do.name}_{f_do.size}"
-    if st.session_state.get(done_key) == _file_id:
-        return
-    st.session_state[done_key] = _file_id
-    url_new = tai_anh_len_cloudinary(f_do)
-    st.session_state[do_key].setdefault(label, []).append(url_new)
-    cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+def _cb_upload_do(task_id, do_key, label, up_key, done_key=None):
+    """Kept for compatibility — logic đã chuyển vào inline button."""
+    pass
 
 
 @st.fragment
@@ -4475,8 +4466,7 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                     args=(task_id, do_key, lbl_key, url_d),
                                 )
                         else:
-                            up_key   = f"up_do_{task_id}_{lbl_key}"
-                            done_key = f"up_do_done_{task_id}_{lbl_key}"
+                            up_key = f"up_do_{task_id}_{lbl_key}"
                             st.file_uploader(
                                 f"Ảnh {lbl_display}",
                                 type=["jpg", "jpeg", "png"],
@@ -4484,12 +4474,14 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                 label_visibility="collapsed",
                                 accept_multiple_files=False,
                             )
-                            st.button(
-                                "📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
-                                use_container_width=True,
-                                on_click=_cb_upload_do,
-                                args=(task_id, do_key, lbl_key, up_key, done_key),
-                            )
+                            if st.button("📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
+                                         use_container_width=True):
+                                f_do = st.session_state.get(up_key)
+                                if f_do:
+                                    with st.spinner("Đang tải ảnh lên..."):
+                                        url_new = tai_anh_len_cloudinary(f_do)
+                                    st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
+                                    cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
 
     st.components.v1.html(
         """<script>
@@ -4604,8 +4596,7 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                         )
                 else:
                     # Chưa có ảnh — hiển thị uploader
-                    up_key   = f"up_do_{task_id}_{lbl_key}"
-                    done_key = f"up_do_done_{task_id}_{lbl_key}"
+                    up_key = f"up_do_{task_id}_{lbl_key}"
                     st.file_uploader(
                         f"Ảnh {lbl_display}",
                         type=["jpg", "jpeg", "png"],
@@ -4613,12 +4604,14 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                         label_visibility="collapsed",
                         accept_multiple_files=False,
                     )
-                    st.button(
-                        "📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
-                        use_container_width=True,
-                        on_click=_cb_upload_do,
-                        args=(task_id, do_key, lbl_key, up_key, done_key),
-                    )
+                    if st.button("📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
+                                 use_container_width=True):
+                        f_do = st.session_state.get(up_key)
+                        if f_do:
+                            with st.spinner("Đang tải ảnh lên..."):
+                                url_new = tai_anh_len_cloudinary(f_do)
+                            st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
+                            cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
 
 
 # ─── helper: lưu công việc con về sheet ───────────────────────────────────────
