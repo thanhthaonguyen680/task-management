@@ -4031,6 +4031,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                             for _fm in _files:
                                 _new_url = _tai_media_len_drive(_fm)
                                 st.session_state[cv_key][i].setdefault("anh", []).append(_new_url)
+                        st.rerun()
                     except Exception:
                         st.error("❌ File không hợp lệ. Vui lòng chọn lại và thử lại.")
 
@@ -4492,6 +4493,7 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                             url_new = tai_anh_len_cloudinary(f_do)
                                         st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
                                         cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+                                        st.rerun()
                                     except Exception:
                                         st.error("❌ File ảnh không hợp lệ. Vui lòng chọn lại ảnh và thử lại.")
 
@@ -4625,6 +4627,7 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                                     url_new = tai_anh_len_cloudinary(f_do)
                                 st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
                                 cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
+                                st.rerun()
                             except Exception:
                                 st.error("❌ File ảnh không hợp lệ. Vui lòng chọn lại ảnh và thử lại.")
 
