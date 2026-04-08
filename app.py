@@ -3320,7 +3320,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
     [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stCheckbox"] {{ margin: 0 !important; }}
     [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) p {{
         margin: 0 !important; font-size: 0.93rem !important; font-weight: 600;
-        color: #1e1b4b; padding: 2px 0;
+        color: #4c1d95; padding: 2px 0;
     }}
     [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) [data-testid="stColumn"]:nth-child(3) button {{
         background: transparent !important; border: none !important;
