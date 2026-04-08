@@ -3872,17 +3872,18 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) > [data-testid="stColumn"]:last-child {{
         flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
     }}
-    /* Tên công việc trông như plain text */
+    /* Tên công việc — nổi bật, dễ nhìn */
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] input {{
-        border: 1.5px solid transparent !important;
+        border: none !important; border-bottom: 2px solid #c4b5fd !important;
         background: transparent !important; box-shadow: none !important;
-        padding: 3px 6px !important; font-size: 0.93rem !important;
-        color: #1e1b4b !important; min-height: 32px !important;
+        padding: 3px 6px !important; font-size: 1.05rem !important;
+        font-weight: 700 !important; color: #4c1d95 !important;
+        min-height: 36px !important; letter-spacing: 0.01em !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] input:focus {{
-        border-color: #7c3aed !important; background: white !important;
-        border-radius: 6px !important;
-        box-shadow: 0 0 0 2px rgba(124,58,237,0.12) !important;
+        border-bottom-color: #7c3aed !important; background: #f5f3ff !important;
+        border-radius: 6px 6px 0 0 !important;
+        box-shadow: none !important;
     }}
     [data-testid="stHorizontalBlock"]:has(.{mk_cv}) [data-testid="stTextInput"] > div {{
         border: none !important; box-shadow: none !important; background: transparent !important;
