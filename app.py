@@ -4769,6 +4769,7 @@ def _task_dialog(hang_dict, ds_tt):
         if st.button("💾 Lưu tên công việc", key=f"dlg_btn_luu_ten_{tid}", use_container_width=True):
             with st.spinner("Đang lưu..."):
                 cap_nhat_nhieu_truong_task(int(tid), {"Tên Công Việc": _ten_new.strip()})
+            st.session_state["_board_dirty"] = True
             st.toast("✅ Đã lưu tên!")
     # ── Công ty có thể chỉnh sửa ─────────────────────────────────
     def _cb_luu_cty():
@@ -5559,6 +5560,8 @@ def giao_dien_admin():
                 label_visibility="collapsed",
             )
 
+        if st.session_state.pop("_board_dirty", False):
+            lay_danh_sach_cong_viec.clear()
         with st.spinner("Đang tải..."):
             df_board = lay_danh_sach_cong_viec()
 
@@ -6262,6 +6265,8 @@ def giao_dien_nhan_vien():
                 label_visibility="collapsed",
             )
 
+        if st.session_state.pop("_board_dirty", False):
+            lay_danh_sach_cong_viec.clear()
         with st.spinner("Đang tải công việc..."):
             df = lay_danh_sach_cong_viec()
 
