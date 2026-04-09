@@ -4646,15 +4646,32 @@ def _parse_date_display(val: str):
 
 
 def _save_cv_to_sheet(task_id, cv_key):
-    data = st.session_state.get(cv_key, [])
-    try:
-        _sh = _lay_sheet_fresh()
-        _o  = _sh.find(str(task_id), in_column=1)
-        if _o:
-            _sh.update_cell(_o.row, 14, json.dumps(data, ensure_ascii=False))
+    data = list(st.session_state.get(cv_key, []))
+    payload = json.dumps(data, ensure_ascii=False)
+    task_id = int(task_id)
+    def _write():
+        try:
+            sh = lay_sheet()
+            row = _ROW_CACHE.get(task_id)
+            if not row:
+                o = sh.find(str(task_id), in_column=1)
+                if not o: return
+                row = o.row
+                _ROW_CACHE[task_id] = row
+            sh.update_cell(row, 14, payload)
             lay_danh_sach_cong_viec.clear()
-    except Exception:
-        pass
+        except Exception:
+            try:
+                sh = _lay_sheet_fresh()
+                _ROW_CACHE.pop(task_id, None)
+                o = sh.find(str(task_id), in_column=1)
+                if o:
+                    _ROW_CACHE[task_id] = o.row
+                    sh.update_cell(o.row, 14, payload)
+                    lay_danh_sach_cong_viec.clear()
+            except Exception:
+                pass
+    threading.Thread(target=_write, daemon=True).start()
 
 
 # ============================================================
