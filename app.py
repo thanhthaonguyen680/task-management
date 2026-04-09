@@ -637,13 +637,19 @@ def tai_anh_len_drive(file_anh) -> str:
         st.stop()
     file_id = resp.json()["id"]
 
-    # Set public read
-    session.post(
-        f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions"
-        "?supportsAllDrives=true",
-        json={"type": "anyone", "role": "reader"},
-        timeout=30,
-    )
+    # Set public read — chạy nền để không block UI
+    def _set_public(fid):
+        try:
+            session.post(
+                f"https://www.googleapis.com/drive/v3/files/{fid}/permissions"
+                "?supportsAllDrives=true",
+                json={"type": "anyone", "role": "reader"},
+                timeout=30,
+            )
+        except Exception:
+            pass
+    threading.Thread(target=_set_public, args=(file_id,), daemon=True).start()
+
     # thumbnail URL — lưu vào DB, dùng file_id để fetch khi hiển thị
     return f"https://drive.google.com/thumbnail?id={file_id}&sz=w800"
 
