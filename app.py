@@ -562,8 +562,9 @@ GDRIVE_FOLDER_ID = "1-o1gny8zFKQ5NejyUjeinLVdmDpKfWgH"
 _DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 
+@st.cache_resource
 def _lay_drive_session():
-    """Tạo AuthorizedSession mới mỗi lần — dùng requests, không dùng httplib2."""
+    """Tạo AuthorizedSession — cache lại để tái sử dụng, không tạo mới mỗi lần."""
     from google.oauth2.service_account import Credentials as SACredentials
     from google.auth.transport.requests import AuthorizedSession
     try:
@@ -579,6 +580,27 @@ def _lay_drive_session():
     return AuthorizedSession(creds)
 
 
+def _compress_image(content: bytes, mime: str, max_px: int = 1200, quality: int = 82) -> bytes:
+    """Giảm kích thước ảnh xuống max_px cạnh dài, giữ tỉ lệ. Bỏ qua nếu đã nhỏ."""
+    try:
+        from PIL import Image
+        import io as _io
+        img = Image.open(_io.BytesIO(content))
+        w, h = img.size
+        if max(w, h) > max_px:
+            ratio = max_px / max(w, h)
+            img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        buf = _io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        compressed = buf.getvalue()
+        # Chỉ dùng bản nén nếu nhỏ hơn bản gốc
+        return compressed if len(compressed) < len(content) else content
+    except Exception:
+        return content
+
+
 def tai_anh_len_drive(file_anh) -> str:
     """Upload ảnh lên Google Drive qua requests, set public, trả về thumbnail URL."""
     import io, json as _json
@@ -592,6 +614,12 @@ def tai_anh_len_drive(file_anh) -> str:
         raise ValueError("File ảnh rỗng hoặc không hợp lệ — vui lòng chọn lại ảnh.")
     mime = getattr(file_anh, "type", "image/jpeg")
     name = getattr(file_anh, "name", "image.jpg")
+
+    # Compress ảnh trước khi upload (bỏ qua video)
+    if mime.startswith("image/"):
+        content = _compress_image(content, mime)
+        name = name.rsplit(".", 1)[0] + ".jpg"
+        mime = "image/jpeg"
 
     # Multipart upload trực tiếp — không qua httplib2
     metadata = _json.dumps({"name": name, "parents": [GDRIVE_FOLDER_ID]})
@@ -4733,7 +4761,8 @@ def _task_dialog(hang_dict, ds_tt):
     )
     if _ten_new and _ten_new != ten:
         if st.button("💾 Lưu tên công việc", key=f"dlg_btn_luu_ten_{tid}", use_container_width=True):
-            _cb_luu_ten()
+            with st.spinner("Đang lưu..."):
+                cap_nhat_nhieu_truong_task(int(tid), {"Tên Công Việc": _ten_new.strip()})
             st.toast("✅ Đã lưu tên!")
     # ── Công ty có thể chỉnh sửa ─────────────────────────────────
     def _cb_luu_cty():
