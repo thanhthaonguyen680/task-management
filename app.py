@@ -4497,7 +4497,7 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                             url_new = tai_anh_len_cloudinary(f_do)
                                         st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
                                         cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
-                                        st.rerun()
+                                        st.rerun(scope="fragment")
                                     except Exception:
                                         st.error("❌ File ảnh không hợp lệ. Vui lòng chọn lại ảnh và thử lại.")
 
@@ -4631,7 +4631,7 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                                     url_new = tai_anh_len_cloudinary(f_do)
                                 st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
                                 cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
-                                st.rerun()
+                                st.rerun(scope="fragment")
                             except Exception:
                                 st.error("❌ File ảnh không hợp lệ. Vui lòng chọn lại ảnh và thử lại.")
 
