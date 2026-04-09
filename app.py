@@ -5811,11 +5811,10 @@ def giao_dien_admin():
                 gb_cvc = GridOptionsBuilder.from_dataframe(_df_grid_cvc)
                 gb_cvc.configure_default_column(
                     resizable=True, sortable=True, minWidth=80,
-                    filter="agTextColumnFilter", floatingFilter=True,
-                    floatingFilterComponentParams={"suppressFilterButton": True},
+                    filter="agTextColumnFilter",
                 )
                 gb_cvc.configure_column("_task_id", hide=True)
-                gb_cvc.configure_column("STT", maxWidth=60, minWidth=50, filter=False, floatingFilter=False)
+                gb_cvc.configure_column("STT", maxWidth=60, minWidth=50, filter=False)
                 gb_cvc.configure_column("Tình Trạng", cellRenderer=_badge_tt, minWidth=110)
                 gb_cvc.configure_column("Trạng Thái", cellRenderer=_badge_ts, minWidth=155)
                 gb_cvc.configure_column("Tên Công Ty", minWidth=220, flex=2)
