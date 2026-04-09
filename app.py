@@ -4716,26 +4716,39 @@ def _task_dialog(hang_dict, ds_tt):
         unsafe_allow_html=True,
     )
     # ── Tên công việc có thể chỉnh sửa ──────────────────────────
-    _ten_new = st.text_input(
+    def _cb_luu_ten():
+        val = st.session_state.get(f"dlg_ten_{tid}", "").strip()
+        if val:
+            threading.Thread(
+                target=cap_nhat_nhieu_truong_task,
+                args=(int(tid), {"Tên Công Việc": val}),
+                daemon=True,
+            ).start()
+    st.text_input(
         "📌 Tên công việc",
         value=ten,
         key=f"dlg_ten_{tid}",
         label_visibility="collapsed",
+        on_change=_cb_luu_ten,
     )
-    if _ten_new and _ten_new != ten:
-        cap_nhat_nhieu_truong_task(int(tid), {"Tên Công Việc": _ten_new})
     # ── Công ty có thể chỉnh sửa ─────────────────────────────────
+    def _cb_luu_cty():
+        val = st.session_state.get(f"dlg_cty_{tid}", "")
+        threading.Thread(
+            target=cap_nhat_nhieu_truong_task,
+            args=(int(tid), {"Công Ty": val}),
+            daemon=True,
+        ).start()
     _ds_cty = [""] + lay_ten_cac_cong_ty()
     _cty_idx = _ds_cty.index(cty) if cty in _ds_cty else 0
-    _cty_new = st.selectbox(
+    st.selectbox(
         "🏢 Công ty",
         _ds_cty,
         index=_cty_idx,
         key=f"dlg_cty_{tid}",
         label_visibility="collapsed",
+        on_change=_cb_luu_cty,
     )
-    if _cty_new != cty:
-        cap_nhat_nhieu_truong_task(int(tid), {"Công Ty": _cty_new})
     # ── Mô Tả (ngay bên dưới Công ty) ────────────────────────────
     _mo_ta_cur = hang_dict.get("Mô Tả", "") or ""
     _mo_ta_new = st.text_area(
