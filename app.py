@@ -5838,6 +5838,22 @@ def giao_dien_admin():
                     custom_css=_aggrid_css,
                     key="aggrid_cvc",
                 )
+                st.components.v1.html("""<script>
+                (function(){
+                    var par = window.parent;
+                    par.addEventListener('click', function(e){
+                        var iframes = par.document.querySelectorAll('iframe');
+                        iframes.forEach(function(f){
+                            try {
+                                if(!f.contains(e.target)){
+                                    var esc = new KeyboardEvent('keydown',{key:'Escape',keyCode:27,bubbles:true,cancelable:true});
+                                    f.contentDocument.dispatchEvent(esc);
+                                }
+                            } catch(_){}
+                        });
+                    }, true);
+                })();
+                </script>""", height=0)
                 st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con · 👆 Click vào hàng để xem chi tiết")
 
                 _sel_cvc = _resp_cvc.get("selected_rows")
