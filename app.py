@@ -4965,6 +4965,12 @@ def giao_dien_admin():
                                  "font-size": "0.8rem !important", "text-transform": "uppercase !important"},
         ".ag-header-icon": {"color": "white !important"},
         ".ag-header-cell-resize::after": {"background-color": "rgba(255,255,255,0.25) !important"},
+        ".ag-floating-filter": {"background": "#e07b00 !important", "border-bottom": "1px solid #c56a00 !important"},
+        ".ag-floating-filter-input": {"background": "rgba(255,255,255,0.18) !important",
+                                      "border": "1px solid rgba(255,255,255,0.35) !important",
+                                      "color": "white !important", "border-radius": "4px !important"},
+        ".ag-input-field-input": {"color": "white !important"},
+        ".ag-input-field-input::placeholder": {"color": "rgba(255,255,255,0.6) !important"},
         ".ag-row-even": {"background-color": "#fffbeb !important"},
         ".ag-row-odd": {"background-color": "#ffffff !important"},
         ".ag-row-hover": {"background-color": "#fef3c7 !important"},
@@ -5811,10 +5817,11 @@ def giao_dien_admin():
                 gb_cvc = GridOptionsBuilder.from_dataframe(_df_grid_cvc)
                 gb_cvc.configure_default_column(
                     resizable=True, sortable=True, minWidth=80,
-                    filter="agTextColumnFilter",
+                    filter="agTextColumnFilter", floatingFilter=True,
+                    floatingFilterComponentParams={"suppressFilterButton": True},
                 )
                 gb_cvc.configure_column("_task_id", hide=True)
-                gb_cvc.configure_column("STT", maxWidth=60, minWidth=50, filter=False)
+                gb_cvc.configure_column("STT", maxWidth=60, minWidth=50, filter=False, floatingFilter=False)
                 gb_cvc.configure_column("Tình Trạng", cellRenderer=_badge_tt, minWidth=110)
                 gb_cvc.configure_column("Trạng Thái", cellRenderer=_badge_ts, minWidth=155)
                 gb_cvc.configure_column("Tên Công Ty", minWidth=220, flex=2)
@@ -5838,22 +5845,6 @@ def giao_dien_admin():
                     custom_css=_aggrid_css,
                     key="aggrid_cvc",
                 )
-                st.components.v1.html("""<script>
-                (function(){
-                    var par = window.parent;
-                    par.addEventListener('click', function(e){
-                        var iframes = par.document.querySelectorAll('iframe');
-                        iframes.forEach(function(f){
-                            try {
-                                if(!f.contains(e.target)){
-                                    var esc = new KeyboardEvent('keydown',{key:'Escape',keyCode:27,bubbles:true,cancelable:true});
-                                    f.contentDocument.dispatchEvent(esc);
-                                }
-                            } catch(_){}
-                        });
-                    }, true);
-                })();
-                </script>""", height=0)
                 st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con · 👆 Click vào hàng để xem chi tiết")
 
                 _sel_cvc = _resp_cvc.get("selected_rows")
