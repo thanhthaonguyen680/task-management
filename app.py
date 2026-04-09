@@ -4724,17 +4724,15 @@ def _task_dialog(hang_dict, ds_tt):
                 args=(int(tid), {"Tên Công Việc": val}),
                 daemon=True,
             ).start()
-    _col_ten, _col_luu = st.columns([6, 1])
-    with _col_ten:
-        st.text_input(
-            "📌 Tên công việc",
-            value=ten,
-            key=f"dlg_ten_{tid}",
-            label_visibility="collapsed",
-            on_change=_cb_luu_ten,
-        )
-    with _col_luu:
-        if st.button("💾 Lưu", key=f"dlg_btn_luu_ten_{tid}", use_container_width=True):
+    _ten_new = st.text_input(
+        "📌 Tên công việc",
+        value=ten,
+        key=f"dlg_ten_{tid}",
+        label_visibility="collapsed",
+        on_change=_cb_luu_ten,
+    )
+    if _ten_new and _ten_new != ten:
+        if st.button("💾 Lưu tên công việc", key=f"dlg_btn_luu_ten_{tid}", use_container_width=True):
             _cb_luu_ten()
             st.toast("✅ Đã lưu tên!")
     # ── Công ty có thể chỉnh sửa ─────────────────────────────────
