@@ -5809,17 +5809,23 @@ def giao_dien_admin():
                 }""")
 
                 gb_cvc = GridOptionsBuilder.from_dataframe(_df_grid_cvc)
-                gb_cvc.configure_default_column(resizable=True, sortable=True, minWidth=80)
+                gb_cvc.configure_default_column(
+                    resizable=True, sortable=True, minWidth=80,
+                    filter="agTextColumnFilter", floatingFilter=True,
+                    floatingFilterComponentParams={"suppressFilterButton": True},
+                )
                 gb_cvc.configure_column("_task_id", hide=True)
-                gb_cvc.configure_column("STT", maxWidth=60, minWidth=50)
-                gb_cvc.configure_column("Tình Trạng", cellRenderer=_badge_tt, minWidth=110)
-                gb_cvc.configure_column("Trạng Thái", cellRenderer=_badge_ts, minWidth=155)
-                gb_cvc.configure_column("Tên Công Ty", minWidth=220, flex=2)
+                gb_cvc.configure_column("STT", maxWidth=60, minWidth=50, filter=False, floatingFilter=False)
+                gb_cvc.configure_column("Tình Trạng", cellRenderer=_badge_tt, minWidth=110,
+                                        filter="agSetColumnFilter")
+                gb_cvc.configure_column("Trạng Thái", cellRenderer=_badge_ts, minWidth=155,
+                                        filter="agSetColumnFilter")
+                gb_cvc.configure_column("Tên Công Ty", minWidth=220, flex=2, filter="agSetColumnFilter")
                 gb_cvc.configure_column("Tên Công Việc", minWidth=180, flex=2)
-                gb_cvc.configure_column("Công Việc Con", minWidth=120)
-                gb_cvc.configure_column("Nhân Viên", minWidth=140)
+                gb_cvc.configure_column("Công Việc Con", minWidth=120, filter="agSetColumnFilter")
+                gb_cvc.configure_column("Nhân Viên", minWidth=140, filter="agSetColumnFilter")
                 gb_cvc.configure_column("Ngày Hoàn Thành", minWidth=130)
-                gb_cvc.configure_column("Loại Máy", minWidth=140)
+                gb_cvc.configure_column("Loại Máy", minWidth=140, filter="agSetColumnFilter")
                 gb_cvc.configure_selection(selection_mode="single", use_checkbox=False)
                 gb_cvc.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38)
                 _go_cvc = gb_cvc.build()
