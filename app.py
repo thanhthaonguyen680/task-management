@@ -4746,6 +4746,16 @@ def _task_dialog(hang_dict, ds_tt):
     ten  = hang_dict.get("Tên Công Việc", "")
     cty  = hang_dict.get("Công Ty", "")
     tt   = hang_dict.get("Trạng Thái", "")
+    mau  = _STATUS_BG.get(tt, "#607d8b")
+    mau_fg = "#1a1a1a" if mau in ("#f9c74f", "#ffd166") else "#ffffff"
+    dlg_txt, dlg_bg = _STATUS_HEADER_COLOR.get(tt, ("#37474f", "#eceff1"))
+    st.markdown(
+        f"<div style='background:{dlg_bg};color:{dlg_txt};border-radius:7px;"
+        f"padding:6px 14px;font-weight:800;font-size:0.85rem;margin-bottom:10px;"
+        f"border:1.5px solid {dlg_txt}44;display:inline-block;'>"
+        f"{tt}</div>",
+        unsafe_allow_html=True,
+    )
     # ── Tên công việc có thể chỉnh sửa ──────────────────────────
     def _cb_luu_ten():
         val = st.session_state.get(f"dlg_ten_{tid}", "").strip()
