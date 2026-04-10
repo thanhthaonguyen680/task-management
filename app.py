@@ -4369,6 +4369,12 @@ _STAGE_DO_LUONG = {
         ("🔵 NDE Bearing / Vòng Bi Đầu Không Tải",[("Before / Trước", "nde_brg_before")]),
     ],
     "ĐỤC DÂY": [
+        ("📐 Resistance / Điện trở", [
+            ("R (U1 – U2)", "R_U1U2"),
+            ("R (V1 – V2)", "R_V1V2"),
+            ("R (W1 – W2)", "R_W1W2"),
+            ("R (PTC)",     "R_PTC"),
+        ]),
         ("🌀 Coil / Cuộn dây", [("Before / Trước", "coil_before")]),
     ],
     "VÔ DÂY": [
