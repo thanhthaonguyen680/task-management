@@ -6696,6 +6696,8 @@ def giao_dien_dang_nhap():
                     st.session_state["ho_ten"]         = user["ho_ten"]
                     st.session_state["vai_tro"]        = user["vai_tro"]
                     st.session_state.pop("manual_logout", None)
+                    st.session_state.pop("_open_task_data", None)
+                    st.session_state.pop("_open_task_id", None)
                     token = _create_session_token({
                         "user_id":  str(user["id"]),
                         "username": user["username"],
@@ -7515,7 +7517,8 @@ def main():
             if token:
                 _session_store().pop(token, None)
             _saved_un = st.session_state.get("username", "")
-            for k in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro", "session_token"]:
+            for k in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro", "session_token",
+                      "_open_task_data", "_open_task_id"]:
                 st.session_state.pop(k, None)
             st.query_params.clear()
             st.session_state["manual_logout"] = True
