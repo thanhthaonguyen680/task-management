@@ -3521,7 +3521,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
             st.button(_do_btn_lbl, key=f"cv_do_tog_{task_id}_{_cvi}",
                       use_container_width=True, on_click=_toggle_cv_do)
             if st.session_state[_do_open_key]:
-                _render_do_luong_inline(task_id, _do_key, _cv_do_slots)
+                _render_do_luong_inline(task_id, _do_key, _cv_do_slots, cvi=_cvi)
 
     # ── Thêm công việc con — nhập tay tên công đoạn ──────────
     _cv_add_v  = f"dlg_cv_add_v_{task_id}"
@@ -4448,7 +4448,7 @@ def _cb_upload_do(task_id, do_key, label, up_key, done_key=None):
 
 
 @st.fragment
-def _render_do_luong_inline(task_id, do_key, nhom_list):
+def _render_do_luong_inline(task_id, do_key, nhom_list, cvi=0):
     """Render ảnh đo lường inline bên trong thẻ công việc con."""
     for nhom_entry in nhom_list:
         use_expander = len(nhom_entry) >= 3 and nhom_entry[2]
@@ -4470,7 +4470,7 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                 if lbl_key in _DO_LUONG_VALUE_KEYS:
                     _val_key = f"{lbl_key}_val"
                     _cur_val = st.session_state.get(do_key, {}).get(_val_key, "")
-                    _inp_key = f"inp_val_{task_id}_{lbl_key}"
+                    _inp_key = f"inp_val_{task_id}_{cvi}_{lbl_key}"
                     _is_num = lbl_key in _DO_LUONG_NUMERIC_KEYS
                     st.text_input(
                         lbl_display,
@@ -4508,13 +4508,13 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                 _hien_thi_anh_drive(url_d, width=120)
                             with col_del:
                                 st.button(
-                                    "🗑️", key=f"xoa_do_{task_id}_{lbl_key}_0",
+                                    "🗑️", key=f"xoa_do_{task_id}_{cvi}_{lbl_key}_0",
                                     use_container_width=True,
                                     on_click=_cb_xoa_do,
                                     args=(task_id, do_key, lbl_key, url_d),
                                 )
                         else:
-                            up_key = f"up_do_{task_id}_{lbl_key}"
+                            up_key = f"up_do_{task_id}_{cvi}_{lbl_key}"
                             st.file_uploader(
                                 f"Ảnh {lbl_display}",
                                 type=["jpg", "jpeg", "png"],
@@ -4522,7 +4522,7 @@ def _render_do_luong_inline(task_id, do_key, nhom_list):
                                 label_visibility="collapsed",
                                 accept_multiple_files=False,
                             )
-                            if st.button("📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
+                            if st.button("📤 Upload", key=f"btn_do_{task_id}_{cvi}_{lbl_key}",
                                          use_container_width=True):
                                 f_do = st.session_state.get(up_key)
                                 if f_do:
