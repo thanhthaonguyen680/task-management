@@ -4809,13 +4809,26 @@ def _task_dialog(hang_dict, ds_tt):
             with st.spinner("Đang lưu..."):
                 cap_nhat_nhieu_truong_task(int(tid), {"Mô Tả": _mo_ta_new})
             st.success("✅ Đã lưu!")
-    # ── Nút Đóng (xóa trạng thái reconnect) ─────────────────────────────
-    if st.button("✕ Đóng", key=f"dlg_dong_{tid}", use_container_width=False):
-        st.session_state.pop("_open_task_id", None)
-        st.session_state.pop("_open_task_data", None)
-        # Đổi key AgGrid để xóa selection (tránh dialog tự mở lại)
-        st.session_state["_aggrid_ver"] = st.session_state.get("_aggrid_ver", 0) + 1
-        st.rerun()
+    # JS detect nút X (native close) để xóa _open_task_data qua query param
+    components.html("""<script>
+    (function(){
+        function setClose(){
+            var u=new URL(window.parent.location.href);
+            u.searchParams.set('_dlg_x','1');
+            window.parent.history.replaceState(null,'',u.toString());
+        }
+        function attach(){
+            var d=window.parent.document;
+            var btns=d.querySelectorAll('[data-testid="stDialog"] button, [data-baseweb="modal"] button');
+            btns.forEach(function(b){
+                if(!b._xh && (b.getAttribute('aria-label')==='Close'||b.innerHTML.includes('×')||b.innerHTML.includes('✕'))){
+                    b._xh=true; b.addEventListener('click',setClose);
+                }
+            });
+        }
+        setTimeout(attach,300); setTimeout(attach,800);
+    })();
+    </script>""", height=0)
     st.divider()
     _fragment_chi_tiet_task(hang_dict, ds_tt)
 
@@ -7543,12 +7556,19 @@ def main():
             st.warning(f"Không tìm thấy Task #{_tid_tb}")
 
     # ── Tự động mở lại dialog nếu bị văng ra (đổi app / mất kết nối) ────
-    _reconnect_task_data = st.session_state.get("_open_task_data")
-    if _reconnect_task_data:
-        _rc_dict, _rc_ds_tt = _reconnect_task_data
-        _task_dialog(_rc_dict, _rc_ds_tt)
-        # Đánh dấu để các handler khác (pending_dlg) không gọi thêm lần nữa
-        st.session_state["_dlg_called_this_run"] = True
+    # Nếu JS báo user bấm X → xóa session data, không mở lại
+    if st.query_params.get("_dlg_x") == "1":
+        del st.query_params["_dlg_x"]
+        st.session_state.pop("_open_task_data", None)
+        st.session_state.pop("_open_task_id", None)
+        st.session_state["_aggrid_ver"] = st.session_state.get("_aggrid_ver", 0) + 1
+    else:
+        _reconnect_task_data = st.session_state.get("_open_task_data")
+        if _reconnect_task_data:
+            _rc_dict, _rc_ds_tt = _reconnect_task_data
+            _task_dialog(_rc_dict, _rc_ds_tt)
+            # Đánh dấu để các handler khác (pending_dlg) không gọi thêm lần nữa
+            st.session_state["_dlg_called_this_run"] = True
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
