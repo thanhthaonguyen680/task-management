@@ -4930,7 +4930,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                         if st.button("📂 Xem & chỉnh sửa", key=f"kopen_{task_id}", use_container_width=True):
                             st.session_state["_open_task_id"] = task_id
                             st.session_state["_open_task_data"] = (h.to_dict(), ds_tt)
-                            _task_dialog(h.to_dict(), ds_tt)
+                            st.rerun()
 
 
 def _render_detail_expanders(df, ds_tt):
@@ -6194,10 +6194,11 @@ def giao_dien_admin():
                     use_container_width=False,
                 )
 
-    # ── Gọi dialog 1 lần duy nhất cuối render để tránh DuplicateElementId ──
+    # ── Gọi dialog qua _open_task_data để tránh DuplicateElementId ──
     _pdlg = st.session_state.pop("_pending_dlg", None)
     if _pdlg:
-        _task_dialog(_pdlg[0], _pdlg[1])
+        st.session_state["_open_task_data"] = (_pdlg[0], _pdlg[1])
+        st.rerun()
 
 
 def giao_dien_nhan_vien():
@@ -6377,7 +6378,7 @@ def giao_dien_nhan_vien():
                 if st.button("📂 Xem & Phê Duyệt", key=f"pd_open_{task_id}", use_container_width=False):
                     st.session_state["_open_task_id"] = task_id
                     st.session_state["_open_task_data"] = (h.to_dict(), ds_tt_pd)
-                    _task_dialog(h.to_dict(), ds_tt_pd)
+                    st.rerun()
 
     # ========================================================
     # Tab 3: Tạo Công Việc Mới (nhân viên tự nhập)
@@ -7514,13 +7515,14 @@ def main():
             _ds_tt   = lay_ten_cac_trang_thai()
             _matched = _df_all[_df_all["ID"].astype(str) == str(_tid_tb)]
             if not _matched.empty:
-                _task_dialog(_matched.iloc[0].to_dict(), _ds_tt)
+                st.session_state["_open_task_data"] = (_matched.iloc[0].to_dict(), _ds_tt)
+                st.rerun()
         except Exception:
             st.warning(f"Không tìm thấy Task #{_tid_tb}")
 
     # ── Tự động mở lại dialog nếu bị văng ra (đổi app / mất kết nối) ────
     _reconnect_task_data = st.session_state.get("_open_task_data")
-    if _reconnect_task_data and not st.session_state.get("_open_task_id_from_tb"):
+    if _reconnect_task_data:
         _rc_dict, _rc_ds_tt = _reconnect_task_data
         _task_dialog(_rc_dict, _rc_ds_tt)
 
