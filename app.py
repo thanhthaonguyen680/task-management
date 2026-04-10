@@ -5554,6 +5554,8 @@ def giao_dien_admin():
                     st.session_state["_adm_task_success"] = (
                         f"✅ Đã tạo task #{id_moi} thành công! Công ty: **{adm_cong_ty}**"
                     )
+                    st.session_state.pop("_open_task_data", None)
+                    st.session_state.pop("_open_task_id", None)
                     st.rerun(scope="app")
 
         _fragment_tao_task_admin()
@@ -6518,6 +6520,8 @@ def giao_dien_nhan_vien():
                             f"🎉 Đã tạo task **{nv_ten_task}** thành công! "
                             f"Chuyển sang tab **Công Việc Của Tôi** để xem."
                         )
+                        st.session_state.pop("_open_task_data", None)
+                        st.session_state.pop("_open_task_id", None)
                         st.session_state.pop("_last_nv_load", None)
                         st.rerun(scope="app")
 
