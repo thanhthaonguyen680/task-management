@@ -7518,22 +7518,11 @@ def main():
         except Exception:
             st.warning(f"Không tìm thấy Task #{_tid_tb}")
 
-    # ── Mở lại dialog nếu bị văng ra (đổi app / mất kết nối WebSocket) ────
+    # ── Tự động mở lại dialog nếu bị văng ra (đổi app / mất kết nối) ────
     _reconnect_task_data = st.session_state.get("_open_task_data")
     if _reconnect_task_data and not st.session_state.get("_open_task_id_from_tb"):
         _rc_dict, _rc_ds_tt = _reconnect_task_data
-        _rc_ten = str(_rc_dict.get("Tên Công Việc", f"#{st.session_state.get('_open_task_id', '')}"))[:60]
-        _rc_col1, _rc_col2, _rc_col3 = st.columns([5, 1, 1])
-        with _rc_col1:
-            st.info(f"📂 Task đang mở: **{_rc_ten}**")
-        with _rc_col2:
-            if st.button("🔄 Mở lại", key="_reopen_task_dlg"):
-                _task_dialog(_rc_dict, _rc_ds_tt)
-        with _rc_col3:
-            if st.button("✕ Đóng", key="_dismiss_task_dlg"):
-                st.session_state.pop("_open_task_id", None)
-                st.session_state.pop("_open_task_data", None)
-                st.rerun()
+        _task_dialog(_rc_dict, _rc_ds_tt)
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
