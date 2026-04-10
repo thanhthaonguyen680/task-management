@@ -3506,11 +3506,8 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
                 if lk not in _DO_LUONG_NO_IMG_KEYS
             )
             _total_do = sum(
-                len(entry[1]) for entry in _cv_do_slots
-                if not (len(entry) >= 3 and entry[2])
-            ) + sum(
                 len([lk for _, lk in entry[1] if lk not in _DO_LUONG_NO_IMG_KEYS])
-                for entry in _cv_do_slots if len(entry) >= 3 and entry[2]
+                for entry in _cv_do_slots
             )
             _do_chevron = "▼" if st.session_state[_do_open_key] else "▶"
             _do_btn_lbl = (
