@@ -4933,9 +4933,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                         if meta:
                             st.caption(" · ".join(meta))
                         if st.button("📂 Xem & chỉnh sửa", key=f"kopen_{task_id}", use_container_width=True):
-                            st.session_state["_open_task_id"] = task_id
-                            st.session_state["_open_task_data"] = (h.to_dict(), ds_tt)
-                            st.rerun()
+                            _task_dialog(h.to_dict(), ds_tt)
 
 
 def _render_detail_expanders(df, ds_tt):
@@ -5553,8 +5551,6 @@ def giao_dien_admin():
                     st.session_state["_adm_task_success"] = (
                         f"✅ Đã tạo task #{id_moi} thành công! Công ty: **{adm_cong_ty}**"
                     )
-                    st.session_state.pop("_open_task_data", None)
-                    st.session_state.pop("_open_task_id", None)
                     st.rerun(scope="app")
 
         _fragment_tao_task_admin()
@@ -5854,7 +5850,7 @@ def giao_dien_admin():
                     fit_columns_on_grid_load=False,
                     theme="alpine",
                     custom_css=_aggrid_css,
-                    key=f"aggrid_cvc_{st.session_state.get('_aggrid_ver', 0)}",
+                    key="aggrid_cvc",
                 )
                 st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con · 👆 Click vào hàng để xem chi tiết")
 
@@ -6148,7 +6144,7 @@ def giao_dien_admin():
                     fit_columns_on_grid_load=False,
                     theme="alpine",
                     custom_css=_aggrid_css,
-                    key=f"aggrid_tdm_{st.session_state.get('_aggrid_ver', 0)}",
+                    key="aggrid_tdm",
                 )
                 st.caption(f"Hiển thị {len(df_show_tdm)} / {total_tdm} máy · 👆 Click vào hàng để xem chi tiết")
 
@@ -6207,8 +6203,7 @@ def giao_dien_admin():
 
     # ── Gọi dialog trực tiếp (tránh loop vô hạn do AgGrid giữ selection) ──
     _pdlg = st.session_state.pop("_pending_dlg", None)
-    if _pdlg and not st.session_state.pop("_dlg_called_this_run", False):
-        st.session_state["_open_task_data"] = (_pdlg[0], _pdlg[1])
+    if _pdlg:
         _task_dialog(_pdlg[0], _pdlg[1])
 
 
@@ -6387,9 +6382,7 @@ def giao_dien_nhan_vien():
                 </div>"""
                 st.markdown(card_html, unsafe_allow_html=True)
                 if st.button("📂 Xem & Phê Duyệt", key=f"pd_open_{task_id}", use_container_width=False):
-                    st.session_state["_open_task_id"] = task_id
-                    st.session_state["_open_task_data"] = (h.to_dict(), ds_tt_pd)
-                    st.rerun()
+                    _task_dialog(h.to_dict(), ds_tt_pd)
 
     # ========================================================
     # Tab 3: Tạo Công Việc Mới (nhân viên tự nhập)
@@ -6523,8 +6516,6 @@ def giao_dien_nhan_vien():
                             f"🎉 Đã tạo task **{nv_ten_task}** thành công! "
                             f"Chuyển sang tab **Công Việc Của Tôi** để xem."
                         )
-                        st.session_state.pop("_open_task_data", None)
-                        st.session_state.pop("_open_task_id", None)
                         st.session_state.pop("_last_nv_load", None)
                         st.rerun(scope="app")
 
@@ -7513,8 +7504,7 @@ def main():
             if token:
                 _session_store().pop(token, None)
             _saved_un = st.session_state.get("username", "")
-            for k in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro", "session_token",
-                      "_open_task_data", "_open_task_id"]:
+            for k in ["dang_nhap", "user_id", "username", "ho_ten", "vai_tro", "session_token"]:
                 st.session_state.pop(k, None)
             st.query_params.clear()
             st.session_state["manual_logout"] = True
@@ -7531,29 +7521,9 @@ def main():
             _ds_tt   = lay_ten_cac_trang_thai()
             _matched = _df_all[_df_all["ID"].astype(str) == str(_tid_tb)]
             if not _matched.empty:
-                st.session_state["_open_task_data"] = (_matched.iloc[0].to_dict(), _ds_tt)
-                st.rerun()
+                _task_dialog(_matched.iloc[0].to_dict(), _ds_tt)
         except Exception:
             st.warning(f"Không tìm thấy Task #{_tid_tb}")
-
-    # ── Khôi phục dialog nếu bị văng (đổi app / mất kết nối WebSocket) ────
-    _reconnect_task_data = st.session_state.get("_open_task_data")
-    if _reconnect_task_data:
-        _rc_dict, _rc_ds_tt = _reconnect_task_data
-        _rc_ten = str(_rc_dict.get("Tên Công Việc", ""))[:55]
-        _rc1, _rc2, _rc3 = st.columns([5, 1, 1])
-        with _rc1:
-            st.info(f"📂 **{_rc_ten}** — task đang mở dở")
-        with _rc2:
-            if st.button("🔄 Mở lại", key="_reopen_dlg"):
-                st.session_state["_dlg_called_this_run"] = True
-                _task_dialog(_rc_dict, _rc_ds_tt)
-        with _rc3:
-            if st.button("✕ Đóng", key="_dismiss_dlg"):
-                st.session_state.pop("_open_task_data", None)
-                st.session_state.pop("_open_task_id", None)
-                st.session_state["_aggrid_ver"] = st.session_state.get("_aggrid_ver", 0) + 1
-                st.rerun()
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
