@@ -210,6 +210,7 @@ components.html(
         '[data-testid="stDeployButton"]',
         '[data-testid="manage-app-button"]',
         '[data-testid="stToolbar"]',
+        '[data-testid="appCreatorAvatar"]',
         '[class*="StatusWidget"]',
         '[class*="statusWidget"]',
         '[class*="viewerBadge"]',
@@ -217,6 +218,10 @@ components.html(
         '[class*="deployButton"]',
         '[class*="createdBy"]',
         '[class*="CreatedBy"]',
+        '[class*="profileContainer"]',
+        '[class*="profilePreview"]',
+        '[class*="profileImage"]',
+        'a[href*="share.streamlit.io/user"]',
         'footer',
         'img[style*="border-radius: 50"]',
         'img[style*="border-radius:50"]',
@@ -393,6 +398,29 @@ components.html(
         } catch(e) {}
     }
 
+    function removeAvatarFromDOM(doc) {
+        try {
+            // Xóa hẳn element khỏi DOM thay vì chỉ ẩn
+            var avatar = doc.querySelector('img[data-testid="appCreatorAvatar"]');
+            if (avatar) {
+                // Leo lên DOM tìm container ngoài cùng (_profileContainer)
+                var el = avatar;
+                for (var i = 0; i < 6; i++) {
+                    var parent = el.parentElement;
+                    if (!parent || parent === doc.body) break;
+                    if (parent.className && typeof parent.className === 'string' &&
+                        parent.className.indexOf('profileContainer') !== -1) {
+                        parent.remove(); return;
+                    }
+                    el = parent;
+                }
+                // Fallback: xóa thẳng phần tử leo lên 3 cấp
+                var up = avatar.parentElement && avatar.parentElement.parentElement && avatar.parentElement.parentElement.parentElement;
+                if (up) up.remove(); else avatar.remove();
+            }
+        } catch(e) {}
+    }
+
     // Thử inject vào window.top và tất cả ancestors
     var frames = [];
     try { frames.push(window.document); } catch(e) {}
@@ -403,6 +431,7 @@ components.html(
     frames.forEach(function(doc) {
         injectCSS(doc);
         hideElements(doc);
+        removeAvatarFromDOM(doc);
         fixSelectedValue(doc);
         fixCvCmSelectboxes(doc);
     });
@@ -423,6 +452,7 @@ components.html(
             var obs = new MutationObserver(function(mutations) {
                 injectCSS(doc);
                 hideElements(doc);
+                removeAvatarFromDOM(doc);
                 // Chỉ fix khi menu MỚI xuất hiện (không có → có)
                 // Không chạy lại khi user gõ/xóa bên trong menu đang mở
                 var menuNow = !!(doc.querySelector('[data-baseweb="menu"]') || doc.querySelector('[role="listbox"]'));
