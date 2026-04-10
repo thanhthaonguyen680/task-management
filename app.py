@@ -91,13 +91,17 @@ st.markdown(
         display: none !important; visibility: hidden !important;
     }
     /* ẩn app creator avatar / viewer badge (bottom-right) */
-    [data-testid="appCreatorAvatar"]  { display: none !important; visibility: hidden !important; }
-    [class*="viewerBadge"]            { display: none !important; visibility: hidden !important; }
-    [class*="profileContainer"]       { display: none !important; visibility: hidden !important; }
-    [class*="profilePreview"]         { display: none !important; visibility: hidden !important; }
-    [class*="profileImage"]           { display: none !important; visibility: hidden !important; }
-    a[href*="share.streamlit.io/user"]{ display: none !important; visibility: hidden !important; }
-    a[href*="streamlit.io/cloud"]     { display: none !important; visibility: hidden !important; }
+    [data-testid="appCreatorAvatar"]          { display: none !important; }
+    img[data-testid="appCreatorAvatar"]        { display: none !important; width:0 !important; height:0 !important; }
+    div:has(> img[data-testid="appCreatorAvatar"])   { display: none !important; }
+    div:has(img[data-testid="appCreatorAvatar"])      { display: none !important; }
+    a:has(img[data-testid="appCreatorAvatar"])        { display: none !important; }
+    [class*="viewerBadge"]                    { display: none !important; }
+    [class*="profileContainer"]               { display: none !important; }
+    [class*="profilePreview"]                 { display: none !important; }
+    [class*="profileImage"]                   { display: none !important; }
+    a[href*="share.streamlit.io/user"]        { display: none !important; }
+    a[href*="streamlit.io/cloud"]             { display: none !important; }
     /* Giảm font placeholder toàn app */
     input::placeholder, textarea::placeholder {
         font-size: 0.78rem !important;
