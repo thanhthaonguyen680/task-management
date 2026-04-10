@@ -4800,6 +4800,11 @@ def _task_dialog(hang_dict, ds_tt):
             with st.spinner("Đang lưu..."):
                 cap_nhat_nhieu_truong_task(int(tid), {"Mô Tả": _mo_ta_new})
             st.success("✅ Đã lưu!")
+    # ── Nút Đóng (xóa trạng thái reconnect) ─────────────────────────────
+    if st.button("✕ Đóng", key=f"dlg_dong_{tid}", use_container_width=False):
+        st.session_state.pop("_open_task_id", None)
+        st.session_state.pop("_open_task_data", None)
+        st.rerun()
     st.divider()
     _fragment_chi_tiet_task(hang_dict, ds_tt)
 
@@ -4923,6 +4928,8 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                         if meta:
                             st.caption(" · ".join(meta))
                         if st.button("📂 Xem & chỉnh sửa", key=f"kopen_{task_id}", use_container_width=True):
+                            st.session_state["_open_task_id"] = task_id
+                            st.session_state["_open_task_data"] = (h.to_dict(), ds_tt)
                             _task_dialog(h.to_dict(), ds_tt)
 
 
@@ -6368,6 +6375,8 @@ def giao_dien_nhan_vien():
                 </div>"""
                 st.markdown(card_html, unsafe_allow_html=True)
                 if st.button("📂 Xem & Phê Duyệt", key=f"pd_open_{task_id}", use_container_width=False):
+                    st.session_state["_open_task_id"] = task_id
+                    st.session_state["_open_task_data"] = (h.to_dict(), ds_tt_pd)
                     _task_dialog(h.to_dict(), ds_tt_pd)
 
     # ========================================================
@@ -7508,6 +7517,23 @@ def main():
                 _task_dialog(_matched.iloc[0].to_dict(), _ds_tt)
         except Exception:
             st.warning(f"Không tìm thấy Task #{_tid_tb}")
+
+    # ── Mở lại dialog nếu bị văng ra (đổi app / mất kết nối WebSocket) ────
+    _reconnect_task_data = st.session_state.get("_open_task_data")
+    if _reconnect_task_data and not st.session_state.get("_open_task_id_from_tb"):
+        _rc_dict, _rc_ds_tt = _reconnect_task_data
+        _rc_ten = str(_rc_dict.get("Tên Công Việc", f"#{st.session_state.get('_open_task_id', '')}"))[:60]
+        _rc_col1, _rc_col2, _rc_col3 = st.columns([5, 1, 1])
+        with _rc_col1:
+            st.info(f"📂 Task đang mở: **{_rc_ten}**")
+        with _rc_col2:
+            if st.button("🔄 Mở lại", key="_reopen_task_dlg"):
+                _task_dialog(_rc_dict, _rc_ds_tt)
+        with _rc_col3:
+            if st.button("✕ Đóng", key="_dismiss_task_dlg"):
+                st.session_state.pop("_open_task_id", None)
+                st.session_state.pop("_open_task_data", None)
+                st.rerun()
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
