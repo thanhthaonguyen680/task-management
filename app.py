@@ -90,12 +90,18 @@ st.markdown(
     [class*="badge"], [class*="Badge"], [class*="avatar"], [class*="Avatar"] {
         display: none !important; visibility: hidden !important;
     }
-    /* ẩn user avatar Streamlit (ảnh tròn góc phải) */
-    [data-testid="stUserAvatar"]   { display: none !important; visibility: hidden !important; }
-    [data-testid="stUserAvatar"] * { display: none !important; visibility: hidden !important; }
-    header [data-testid="stImage"] { display: none !important; visibility: hidden !important; }
-    header img                     { display: none !important; visibility: hidden !important; }
+    /* ẩn user avatar Streamlit (ảnh tròn góc phải / góc dưới) */
+    [data-testid="stUserAvatar"]          { display: none !important; visibility: hidden !important; }
+    [data-testid="stUserAvatar"] *        { display: none !important; visibility: hidden !important; }
+    [data-testid="stBottom"]              { display: none !important; visibility: hidden !important; }
+    [data-testid="stBottomBlockContainer"]{ display: none !important; visibility: hidden !important; }
+    [data-testid="stAppViewBlockContainer"] > div:last-child > div:last-child img {
+        display: none !important; visibility: hidden !important;
+    }
+    header img                            { display: none !important; visibility: hidden !important; }
     [class*="userAvatar"], [class*="UserAvatar"] { display: none !important; visibility: hidden !important; }
+    /* Avatar tròn cứng bằng border-radius */
+    img[style*="border-radius"] { display: none !important; visibility: hidden !important; }
     /* Giảm font placeholder toàn app */
     input::placeholder, textarea::placeholder {
         font-size: 0.78rem !important;
