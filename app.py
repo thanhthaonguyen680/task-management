@@ -3053,10 +3053,6 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
         label_visibility="collapsed",
     )
     if tt_moi != trang_thai:
-        with st.spinner("Đang lưu..."):
-            cap_nhat_trang_thai(task_id, tt_moi)
-            lay_danh_sach_cong_viec.clear()
-        # Gửi thông báo cho tất cả khi trạng thái thay đổi
         _ten_task  = hang.get("Tên Công Việc", "")
         _nguoi_doi = st.session_state.get("ho_ten", "")
         _ct        = hang.get("Công Ty", "")
@@ -3066,7 +3062,12 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
             + (f" ({_ct})" if _ct else "")
             + f" từ **{trang_thai}** → **{tt_moi}**"
         )
-        them_thong_bao_tat_ca(_tb_tt, task_id=task_id, loai="trang_thai", tru_nguoi="")
+        def _bg_doi_tt(_tid, _tt, _msg, _tid2):
+            cap_nhat_trang_thai(_tid, _tt)
+            lay_danh_sach_cong_viec.clear()
+            them_thong_bao_tat_ca(_msg, task_id=_tid2, loai="trang_thai", tru_nguoi="")
+        threading.Thread(target=_bg_doi_tt, args=(task_id, tt_moi, _tb_tt, task_id), daemon=True).start()
+        st.toast(f"✅ Đã chuyển → **{tt_moi}**")
 
     st.markdown("---")
     # Công ty, Công số, Năm, Hạn, Ngày tạo
@@ -4066,7 +4067,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                                 _new_url = _tai_media_len_drive(_fm)
                                 st.session_state[cv_key][i].setdefault("anh", []).append(_new_url)
                         st.session_state[_exp_open_key] = True
-                        st.rerun()
+                        st.rerun(scope="fragment")
                     except Exception:
                         st.error("❌ File không hợp lệ. Vui lòng chọn lại và thử lại.")
 
@@ -4809,26 +4810,6 @@ def _task_dialog(hang_dict, ds_tt):
             with st.spinner("Đang lưu..."):
                 cap_nhat_nhieu_truong_task(int(tid), {"Mô Tả": _mo_ta_new})
             st.success("✅ Đã lưu!")
-    # JS detect nút X (native close) để xóa _open_task_data qua query param
-    components.html("""<script>
-    (function(){
-        function setClose(){
-            var u=new URL(window.parent.location.href);
-            u.searchParams.set('_dlg_x','1');
-            window.parent.history.replaceState(null,'',u.toString());
-        }
-        function attach(){
-            var d=window.parent.document;
-            var btns=d.querySelectorAll('[data-testid="stDialog"] button, [data-baseweb="modal"] button');
-            btns.forEach(function(b){
-                if(!b._xh && (b.getAttribute('aria-label')==='Close'||b.innerHTML.includes('×')||b.innerHTML.includes('✕'))){
-                    b._xh=true; b.addEventListener('click',setClose);
-                }
-            });
-        }
-        setTimeout(attach,300); setTimeout(attach,800);
-    })();
-    </script>""", height=0)
     st.divider()
     _fragment_chi_tiet_task(hang_dict, ds_tt)
 
@@ -7555,20 +7536,24 @@ def main():
         except Exception:
             st.warning(f"Không tìm thấy Task #{_tid_tb}")
 
-    # ── Tự động mở lại dialog nếu bị văng ra (đổi app / mất kết nối) ────
-    # Nếu JS báo user bấm X → xóa session data, không mở lại
-    if st.query_params.get("_dlg_x") == "1":
-        del st.query_params["_dlg_x"]
-        st.session_state.pop("_open_task_data", None)
-        st.session_state.pop("_open_task_id", None)
-        st.session_state["_aggrid_ver"] = st.session_state.get("_aggrid_ver", 0) + 1
-    else:
-        _reconnect_task_data = st.session_state.get("_open_task_data")
-        if _reconnect_task_data:
-            _rc_dict, _rc_ds_tt = _reconnect_task_data
-            _task_dialog(_rc_dict, _rc_ds_tt)
-            # Đánh dấu để các handler khác (pending_dlg) không gọi thêm lần nữa
-            st.session_state["_dlg_called_this_run"] = True
+    # ── Khôi phục dialog nếu bị văng (đổi app / mất kết nối WebSocket) ────
+    _reconnect_task_data = st.session_state.get("_open_task_data")
+    if _reconnect_task_data:
+        _rc_dict, _rc_ds_tt = _reconnect_task_data
+        _rc_ten = str(_rc_dict.get("Tên Công Việc", ""))[:55]
+        _rc1, _rc2, _rc3 = st.columns([5, 1, 1])
+        with _rc1:
+            st.info(f"📂 **{_rc_ten}** — task đang mở dở")
+        with _rc2:
+            if st.button("🔄 Mở lại", key="_reopen_dlg"):
+                st.session_state["_dlg_called_this_run"] = True
+                _task_dialog(_rc_dict, _rc_ds_tt)
+        with _rc3:
+            if st.button("✕ Đóng", key="_dismiss_dlg"):
+                st.session_state.pop("_open_task_data", None)
+                st.session_state.pop("_open_task_id", None)
+                st.session_state["_aggrid_ver"] = st.session_state.get("_aggrid_ver", 0) + 1
+                st.rerun()
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
