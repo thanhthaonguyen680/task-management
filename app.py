@@ -2943,10 +2943,78 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
 
 
 # ============================================================
+# FRAGMENT: BADGE + SELECTBOX TRẠNG THÁI (dùng trong dialog, rerun riêng)
+# ============================================================
+@st.fragment
+def _fragment_trang_thai_dialog(hang: dict, ds_trang_thai: list):
+    """Badge màu + selectbox đổi trạng thái — đặt ở đầu _task_dialog.
+    Vì là @st.fragment riêng nên badge cập nhật ngay khi selectbox thay đổi.
+    """
+    task_id    = int(hang.get("ID", 0))
+    trang_thai = hang.get("Trạng Thái", "Chờ Làm")
+    _MAU = {
+        "Đang Kiểm Tra":           ("#1d4ed8", "#dbeafe"),
+        "Đã Phê Duyệt":            ("#15803d", "#dcfce7"),
+        "Đã Báo Giá":              ("#b45309", "#fef3c7"),
+        "Có Đơn":                  ("#7c3aed", "#ede9fe"),
+        "Chờ Giao":                ("#a16207", "#fef9c3"),
+        "Đã Hoàn Thành - Giao Máy":("#166534", "#bbf7d0"),
+        "Đã Xuất Hóa Đơn":        ("#374151", "#f3f4f6"),
+        "Bảo Hành - Trả Lại":     ("#b91c1c", "#fee2e2"),
+        "Chờ Làm":                 ("#dc2626", "#fee2e2"),
+        "Đang Làm":                ("#d97706", "#fef3c7"),
+        "Hoàn Thành":              ("#16a34a", "#dcfce7"),
+    }
+    # Track trạng thái đã lưu để tránh gửi background thread nhiều lần
+    _saved_key = f"_dlg_saved_tt_{task_id}"
+    if _saved_key not in st.session_state:
+        st.session_state[_saved_key] = trang_thai
+
+    tt_cur = st.session_state.get(f"tt_select_dlg_{task_id}", st.session_state[_saved_key])
+    tt_color, tt_bg = _MAU.get(tt_cur, ("#6b7280", "#f3f4f6"))
+    st.markdown(
+        f'<div style="margin:0 0 6px 0">'
+        f'<span style="display:inline-block;padding:5px 14px;border-radius:20px;'
+        f'font-size:0.82rem;font-weight:700;letter-spacing:0.3px;'
+        f'border:1.5px solid {tt_color}40;color:{tt_color};background:{tt_bg};">'
+        f'{tt_cur}</span></div>',
+        unsafe_allow_html=True,
+    )
+    _idx = ds_trang_thai.index(st.session_state[_saved_key]) if st.session_state[_saved_key] in ds_trang_thai else 0
+    tt_moi = st.selectbox(
+        "Chọn trạng thái",
+        options=ds_trang_thai,
+        index=_idx,
+        key=f"tt_select_dlg_{task_id}",
+        label_visibility="collapsed",
+    )
+    if tt_moi != st.session_state[_saved_key]:
+        _ten_task  = hang.get("Tên Công Việc", "")
+        _nguoi_doi = st.session_state.get("ho_ten", "")
+        _ct        = hang.get("Công Ty", "")
+        _tb_tt = (
+            f"🔄 **{_nguoi_doi}** đã chuyển công việc **{_ten_task}**"
+            + (f" ({_ct})" if _ct else "")
+            + f" từ **{st.session_state[_saved_key]}** → **{tt_moi}**"
+        )
+        st.session_state[_saved_key] = tt_moi
+        # Lưu override vào session_state để board cập nhật ngay khi đóng dialog
+        if "_tt_overrides" not in st.session_state:
+            st.session_state["_tt_overrides"] = {}
+        st.session_state["_tt_overrides"][task_id] = tt_moi
+        def _bg_doi_tt(_tid, _tt, _msg, _tid2):
+            cap_nhat_trang_thai(_tid, _tt)
+            lay_danh_sach_cong_viec.clear()
+            them_thong_bao_tat_ca(_msg, task_id=_tid2, loai="trang_thai", tru_nguoi="")
+        threading.Thread(target=_bg_doi_tt, args=(task_id, tt_moi, _tb_tt, task_id), daemon=True).start()
+        st.toast(f"✅ Đã chuyển → **{tt_moi}**")
+
+
+# ============================================================
 # FRAGMENT: CHI TIẾT TASK NHÂN VIÊN (rerun cục bộ khi tick checkbox / đổi trạng thái)
 # ============================================================
 @st.fragment
-def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
+def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool = True):
     """
     Hiển thị toàn bộ thông tin một task cho nhân viên:
     - Thông tin đầy đủ (công ty, công số, năm, mô tả, hạn, người phê duyệt)
@@ -3027,47 +3095,46 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list):
 
     task_id    = int(hang.get("ID", 0))
     trang_thai = hang.get("Trạng Thái", "Chờ Làm")
-    # Dùng session_state để badge cập nhật ngay khi đổi, không cần rerun
-    tt_hien_thi = st.session_state.get(f"tt_select_{task_id}", trang_thai)
-    tt_color, tt_bg = _MAU_TRANG_THAI.get(tt_hien_thi, ("#6b7280", "#f3f4f6"))
 
     # Khởi đầu danh sách ảnh từ hang (nếu chưa có trong session_state)
     _anh_key = f"anh_editable_{task_id}"
     if _anh_key not in st.session_state:
         st.session_state[_anh_key] = doc_danh_sach_anh(str(hang.get("Link Ảnh", "")))
 
-    # ── Thông tin chính + trạng thái (full width, không chia cột) ──────────
-    # Trạng thái lên đầu
-    st.markdown(
-        f'<div style="margin:0 0 6px 0">'
-        f'<span class="badge-trang-thai" style="color:{tt_color};background:{tt_bg};border-color:{tt_color}40;">'
-        f'{tt_hien_thi}</span></div>',
-        unsafe_allow_html=True,
-    )
-    idx_hien_tai = ds_trang_thai.index(trang_thai) if trang_thai in ds_trang_thai else 0
-    tt_moi = st.selectbox(
-        "Chọn trạng thái",
-        options=ds_trang_thai,
-        index=idx_hien_tai,
-        key=f"tt_select_{task_id}",
-        label_visibility="collapsed",
-    )
-    if tt_moi != trang_thai:
-        _ten_task  = hang.get("Tên Công Việc", "")
-        _nguoi_doi = st.session_state.get("ho_ten", "")
-        _ct        = hang.get("Công Ty", "")
-        _tb_tt = (
-            f"🔄 **{_nguoi_doi}** đã chuyển công việc "
-            f"**{_ten_task}**"
-            + (f" ({_ct})" if _ct else "")
-            + f" từ **{trang_thai}** → **{tt_moi}**"
+    if show_status:
+        # ── Badge + selectbox trạng thái (khi hiển thị standalone, không qua dialog) ──
+        tt_hien_thi = st.session_state.get(f"tt_select_{task_id}", trang_thai)
+        tt_color, tt_bg = _MAU_TRANG_THAI.get(tt_hien_thi, ("#6b7280", "#f3f4f6"))
+        st.markdown(
+            f'<div style="margin:0 0 6px 0">'
+            f'<span class="badge-trang-thai" style="color:{tt_color};background:{tt_bg};border-color:{tt_color}40;">'
+            f'{tt_hien_thi}</span></div>',
+            unsafe_allow_html=True,
         )
-        def _bg_doi_tt(_tid, _tt, _msg, _tid2):
-            cap_nhat_trang_thai(_tid, _tt)
-            lay_danh_sach_cong_viec.clear()
-            them_thong_bao_tat_ca(_msg, task_id=_tid2, loai="trang_thai", tru_nguoi="")
-        threading.Thread(target=_bg_doi_tt, args=(task_id, tt_moi, _tb_tt, task_id), daemon=True).start()
-        st.toast(f"✅ Đã chuyển → **{tt_moi}**")
+        idx_hien_tai = ds_trang_thai.index(trang_thai) if trang_thai in ds_trang_thai else 0
+        tt_moi = st.selectbox(
+            "Chọn trạng thái",
+            options=ds_trang_thai,
+            index=idx_hien_tai,
+            key=f"tt_select_{task_id}",
+            label_visibility="collapsed",
+        )
+        if tt_moi != trang_thai:
+            _ten_task  = hang.get("Tên Công Việc", "")
+            _nguoi_doi = st.session_state.get("ho_ten", "")
+            _ct        = hang.get("Công Ty", "")
+            _tb_tt = (
+                f"🔄 **{_nguoi_doi}** đã chuyển công việc "
+                f"**{_ten_task}**"
+                + (f" ({_ct})" if _ct else "")
+                + f" từ **{trang_thai}** → **{tt_moi}**"
+            )
+            def _bg_doi_tt(_tid, _tt, _msg, _tid2):
+                cap_nhat_trang_thai(_tid, _tt)
+                lay_danh_sach_cong_viec.clear()
+                them_thong_bao_tat_ca(_msg, task_id=_tid2, loai="trang_thai", tru_nguoi="")
+            threading.Thread(target=_bg_doi_tt, args=(task_id, tt_moi, _tb_tt, task_id), daemon=True).start()
+            st.toast(f"✅ Đã chuyển → **{tt_moi}**")
 
     st.markdown("---")
     # Công ty, Công số, Năm, Hạn, Ngày tạo
@@ -4746,16 +4813,8 @@ def _task_dialog(hang_dict, ds_tt):
     ten  = hang_dict.get("Tên Công Việc", "")
     cty  = hang_dict.get("Công Ty", "")
     tt   = hang_dict.get("Trạng Thái", "")
-    mau  = _STATUS_BG.get(tt, "#607d8b")
-    mau_fg = "#1a1a1a" if mau in ("#f9c74f", "#ffd166") else "#ffffff"
-    dlg_txt, dlg_bg = _STATUS_HEADER_COLOR.get(tt, ("#37474f", "#eceff1"))
-    st.markdown(
-        f"<div style='background:{dlg_bg};color:{dlg_txt};border-radius:7px;"
-        f"padding:6px 14px;font-weight:800;font-size:0.85rem;margin-bottom:10px;"
-        f"border:1.5px solid {dlg_txt}44;display:inline-block;'>"
-        f"{tt}</div>",
-        unsafe_allow_html=True,
-    )
+    # Badge + selectbox trạng thái — fragment riêng để cập nhật ngay khi đổi
+    _fragment_trang_thai_dialog(hang_dict, ds_tt)
     # ── Tên công việc có thể chỉnh sửa ──────────────────────────
     def _cb_luu_ten():
         val = st.session_state.get(f"dlg_ten_{tid}", "").strip()
@@ -4811,7 +4870,7 @@ def _task_dialog(hang_dict, ds_tt):
                 cap_nhat_nhieu_truong_task(int(tid), {"Mô Tả": _mo_ta_new})
             st.success("✅ Đã lưu!")
     st.divider()
-    _fragment_chi_tiet_task(hang_dict, ds_tt)
+    _fragment_chi_tiet_task(hang_dict, ds_tt, show_status=False)
 
 
 @st.fragment
@@ -4826,6 +4885,13 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
     ds_show = [t for t in ds_tt if t not in _EXCLUDE]
     today = datetime.now().date()
     COLS  = 4  # card per row
+
+    # Áp dụng override trạng thái từ session_state (để board cập nhật ngay sau khi đổi)
+    _overrides = st.session_state.get("_tt_overrides", {})
+    if _overrides and not df.empty:
+        df = df.copy()
+        for _oid, _ott in _overrides.items():
+            df.loc[df["ID"].astype(str) == str(_oid), "Trạng Thái"] = _ott
 
     # ── Inject CSS màu cho từng nút toggle ──────────────────
     # Dùng selector theo element-container (wrapper thật của Streamlit)
