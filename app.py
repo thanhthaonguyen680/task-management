@@ -6123,9 +6123,13 @@ def giao_dien_admin():
                 _df_grid_tdm = df_show_tdm[["_task_id"] + _cols_display_tdm].copy().reset_index(drop=True)
 
                 gb_tdm = GridOptionsBuilder.from_dataframe(_df_grid_tdm)
-                gb_tdm.configure_default_column(resizable=True, sortable=True, minWidth=80)
+                gb_tdm.configure_default_column(
+                    resizable=True, sortable=True, minWidth=80,
+                    filter="agTextColumnFilter", floatingFilter=True,
+                    floatingFilterComponentParams={"suppressFilterButton": True},
+                )
                 gb_tdm.configure_column("_task_id", hide=True)
-                gb_tdm.configure_column("STT", maxWidth=60, minWidth=50)
+                gb_tdm.configure_column("STT", maxWidth=60, minWidth=50, filter=False, floatingFilter=False)
                 gb_tdm.configure_column("Tình Trạng", cellRenderer=_badge_tt_tdm, minWidth=110)
                 gb_tdm.configure_column("Trạng Thái", cellRenderer=_badge_ts_tdm, minWidth=155)
                 gb_tdm.configure_column("Tên Công Ty", minWidth=220, flex=2)
