@@ -90,18 +90,14 @@ st.markdown(
     [class*="badge"], [class*="Badge"], [class*="avatar"], [class*="Avatar"] {
         display: none !important; visibility: hidden !important;
     }
-    /* ẩn user avatar Streamlit (ảnh tròn góc phải / góc dưới) */
-    [data-testid="stUserAvatar"]          { display: none !important; visibility: hidden !important; }
-    [data-testid="stUserAvatar"] *        { display: none !important; visibility: hidden !important; }
-    [data-testid="stBottom"]              { display: none !important; visibility: hidden !important; }
-    [data-testid="stBottomBlockContainer"]{ display: none !important; visibility: hidden !important; }
-    [data-testid="stAppViewBlockContainer"] > div:last-child > div:last-child img {
-        display: none !important; visibility: hidden !important;
-    }
-    header img                            { display: none !important; visibility: hidden !important; }
-    [class*="userAvatar"], [class*="UserAvatar"] { display: none !important; visibility: hidden !important; }
-    /* Avatar tròn cứng bằng border-radius */
-    img[style*="border-radius"] { display: none !important; visibility: hidden !important; }
+    /* ẩn app creator avatar / viewer badge (bottom-right) */
+    [data-testid="appCreatorAvatar"]  { display: none !important; visibility: hidden !important; }
+    [class*="viewerBadge"]            { display: none !important; visibility: hidden !important; }
+    [class*="profileContainer"]       { display: none !important; visibility: hidden !important; }
+    [class*="profilePreview"]         { display: none !important; visibility: hidden !important; }
+    [class*="profileImage"]           { display: none !important; visibility: hidden !important; }
+    a[href*="share.streamlit.io/user"]{ display: none !important; visibility: hidden !important; }
+    a[href*="streamlit.io/cloud"]     { display: none !important; visibility: hidden !important; }
     /* Giảm font placeholder toàn app */
     input::placeholder, textarea::placeholder {
         font-size: 0.78rem !important;
