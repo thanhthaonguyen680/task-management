@@ -4813,6 +4813,8 @@ def _task_dialog(hang_dict, ds_tt):
     if st.button("✕ Đóng", key=f"dlg_dong_{tid}", use_container_width=False):
         st.session_state.pop("_open_task_id", None)
         st.session_state.pop("_open_task_data", None)
+        # Đổi key AgGrid để xóa selection (tránh dialog tự mở lại)
+        st.session_state["_aggrid_ver"] = st.session_state.get("_aggrid_ver", 0) + 1
         st.rerun()
     st.divider()
     _fragment_chi_tiet_task(hang_dict, ds_tt)
@@ -5858,7 +5860,7 @@ def giao_dien_admin():
                     fit_columns_on_grid_load=False,
                     theme="alpine",
                     custom_css=_aggrid_css,
-                    key="aggrid_cvc",
+                    key=f"aggrid_cvc_{st.session_state.get('_aggrid_ver', 0)}",
                 )
                 st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con · 👆 Click vào hàng để xem chi tiết")
 
@@ -6152,7 +6154,7 @@ def giao_dien_admin():
                     fit_columns_on_grid_load=False,
                     theme="alpine",
                     custom_css=_aggrid_css,
-                    key="aggrid_tdm",
+                    key=f"aggrid_tdm_{st.session_state.get('_aggrid_ver', 0)}",
                 )
                 st.caption(f"Hiển thị {len(df_show_tdm)} / {total_tdm} máy · 👆 Click vào hàng để xem chi tiết")
 
@@ -6209,11 +6211,11 @@ def giao_dien_admin():
                     use_container_width=False,
                 )
 
-    # ── Gọi dialog qua _open_task_data để tránh DuplicateElementId ──
+    # ── Gọi dialog trực tiếp (tránh loop vô hạn do AgGrid giữ selection) ──
     _pdlg = st.session_state.pop("_pending_dlg", None)
-    if _pdlg:
+    if _pdlg and not st.session_state.pop("_dlg_called_this_run", False):
         st.session_state["_open_task_data"] = (_pdlg[0], _pdlg[1])
-        st.rerun()
+        _task_dialog(_pdlg[0], _pdlg[1])
 
 
 def giao_dien_nhan_vien():
@@ -7545,6 +7547,8 @@ def main():
     if _reconnect_task_data:
         _rc_dict, _rc_ds_tt = _reconnect_task_data
         _task_dialog(_rc_dict, _rc_ds_tt)
+        # Đánh dấu để các handler khác (pending_dlg) không gọi thêm lần nữa
+        st.session_state["_dlg_called_this_run"] = True
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
