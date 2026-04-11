@@ -5312,6 +5312,30 @@ def giao_dien_admin():
     # TAB 2 — NHÂN VIÊN
     # ══════════════════════════════════════════════
     with tab_nhan_vien:
+        st.markdown("#### ➕ Tạo Tài Khoản Nhân Viên Mới")
+        with st.expander("📝 Điền thông tin đăng ký", expanded=False):
+            with st.form("adm_form_dang_ky_nv", clear_on_submit=True):
+                _nv_ho_ten   = st.text_input("👤 Họ và tên *", placeholder="Nguyễn Văn A")
+                _nv_username = st.text_input("🔑 Username *", placeholder="nguyenvana")
+                _nv_mat_khau = st.text_input("🔒 Mật khẩu *", type="password", placeholder="Ít nhất 6 ký tự")
+                _nv_ngay_sinh = st.date_input("🎂 Ngày sinh", value=None)
+                _nv_submitted = st.form_submit_button("✅ Tạo tài khoản", use_container_width=True)
+
+            if _nv_submitted:
+                _ns_str = str(_nv_ngay_sinh) if _nv_ngay_sinh else ""
+                _ok, _msg = dang_ky_tai_khoan(
+                    username=_nv_username,
+                    mat_khau=_nv_mat_khau,
+                    ho_ten=_nv_ho_ten,
+                    ngay_sinh=_ns_str,
+                    vai_tro="nhan_vien",
+                )
+                if _ok:
+                    st.success(f"✅ Đã tạo tài khoản **{_nv_ho_ten}** (@{_nv_username.strip()}) thành công!")
+                else:
+                    st.error(f"❌ {_msg}")
+
+        st.markdown("---")
         st.markdown("#### 👥 Danh Sách Nhân Viên Đã Đăng Ký")
 
         if st.button("🔄 Làm mới", key="adm_nv_refresh"):
