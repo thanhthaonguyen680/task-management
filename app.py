@@ -1372,6 +1372,35 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
     return id_moi
 
 
+def xoa_cong_viec(task_id: int):
+    """Xóa vĩnh viễn một công việc khỏi sheet Tasks theo ID."""
+    try:
+        sheet = _lay_sheet_fresh()
+        o_tim = sheet.find(str(task_id), in_column=1)
+        if o_tim:
+            sheet.delete_rows(o_tim.row)
+            lay_danh_sach_cong_viec.clear()
+            _ROW_CACHE.pop(int(task_id), None)
+    except Exception:
+        pass
+
+
+@st.dialog("🗑️ Xác nhận xóa công việc")
+def _dialog_xac_nhan_xoa(task_id, ten_cv: str):
+    st.warning(f"Bạn có chắc muốn **xóa vĩnh viễn** công việc:\n\n**{ten_cv}**?", icon="⚠️")
+    st.caption("Hành động này không thể hoàn tác.")
+    col_ok, col_cancel = st.columns(2)
+    with col_ok:
+        if st.button("🗑️ Xóa", type="primary", use_container_width=True):
+            with st.spinner("Đang xóa..."):
+                xoa_cong_viec(int(task_id))
+            st.session_state["_board_dirty"] = True
+            st.rerun()
+    with col_cancel:
+        if st.button("Hủy", use_container_width=True):
+            st.rerun()
+
+
 def cap_nhat_trang_thai(task_id: int, trang_thai_moi: str):
     """
     Cập nhật trạng thái (Status) của công việc theo ID.
@@ -5078,8 +5107,16 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                             st.error("⚠️ Quá hạn", icon="🔴")
                         if anh_lst:
                             st.image(anh_lst[0], use_container_width=True)
-                        short = ten_cv[:40] + ("…" if len(ten_cv) > 40 else "")
-                        st.markdown(f"**{short}**")
+                        # Tên + nút xóa cùng hàng
+                        _col_ten, _col_del = st.columns([5, 1], gap="small")
+                        with _col_ten:
+                            short = ten_cv[:40] + ("…" if len(ten_cv) > 40 else "")
+                            st.markdown(f"**{short}**")
+                        with _col_del:
+                            if st.button("✕", key=f"kdel_{task_id}",
+                                         help="Xóa công việc này",
+                                         use_container_width=True):
+                                _dialog_xac_nhan_xoa(task_id, ten_cv)
                         meta = []
                         if cong_ty:   meta.append(f"🏢 {cong_ty}")
                         if nhan_vien: meta.append(f"👤 {nhan_vien}")
