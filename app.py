@@ -1603,18 +1603,31 @@ def lay_sheet_users():
 
 
 @st.cache_data(ttl=30)
-def lay_danh_sach_users() -> pd.DataFrame:
-    """Đọc toàn bộ danh sách tài khoản từ sheet Users."""
-    try:
-        sheet = lay_sheet_users()
-        allvals = sheet.get_all_values()
-    except Exception:
-        return pd.DataFrame(columns=_TIEUDE_USERS)
+def _fetch_users_cached() -> pd.DataFrame:
+    """Fetch users từ GSheets — raise on error (không cache kết quả lỗi)."""
+    sheet = lay_sheet_users()
+    allvals = sheet.get_all_values()
     if len(allvals) <= 1:
-        return pd.DataFrame(columns=_TIEUDE_USERS)
+        raise RuntimeError("Users sheet trống")
     n = len(_TIEUDE_USERS)
     rows = [r[:n] for r in allvals[1:] if any(r[:n])]
     return pd.DataFrame(rows, columns=_TIEUDE_USERS)
+
+
+def lay_danh_sach_users() -> pd.DataFrame:
+    """Đọc danh sách tài khoản, tự retry nếu connection stale."""
+    try:
+        return _fetch_users_cached()
+    except Exception:
+        try:
+            lay_sheet_users.clear()
+            _fetch_users_cached.clear()
+            return _fetch_users_cached()
+        except Exception:
+            return pd.DataFrame(columns=_TIEUDE_USERS)
+
+
+lay_danh_sach_users.clear = _fetch_users_cached.clear
 
 
 def kiem_tra_dang_nhap(username: str, mat_khau: str):
