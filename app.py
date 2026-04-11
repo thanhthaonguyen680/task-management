@@ -6514,7 +6514,7 @@ def giao_dien_nhan_vien():
         else:
             # ── KANBAN BOARD ────────────────────────────────────
             _render_kanban_board(df_cua_toi, ds_tt, board_key="nv_kb",
-                                 force_open=bool(q_search.strip()))
+                                 force_open=bool(q_search.strip() or q_cty.strip()))
 
     # ========================================================
     # Tab 2: Việc Cần Phê Duyệt
