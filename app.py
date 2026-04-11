@@ -3625,7 +3625,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                 key=_up_key_m,
                 label_visibility="collapsed",
             )
-            if st.button("📤 Upload", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True):
+            if st.button("📤 Tải ảnh", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True):
                 _files_m = st.session_state.get(_up_key_m) or []
                 if _files_m:
                     with st.spinner("Đang upload..."):
@@ -4202,7 +4202,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 key=_up_key_frag,
                 label_visibility="collapsed",
             )
-            if st.button("📤 Upload", key=f"{key_prefix}_btn_up_cv_{i}",
+            if st.button("📤 Tải ảnh", key=f"{key_prefix}_btn_up_cv_{i}",
                          use_container_width=True):
                 _files = st.session_state.get(_up_key_frag) or []
                 if _files:
@@ -4276,7 +4276,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                                 st.session_state[dnk] = fid
                                 url = tai_anh_len_cloudinary(f)
                                 st.session_state.setdefault(dk, {}).setdefault(lk, []).append(url)
-                            st.button("📤 Upload", key=f"{key_prefix}_btn_nm_{i}_{_lbl_key}",
+                            st.button("📤 Tải ảnh", key=f"{key_prefix}_btn_nm_{i}_{_lbl_key}",
                                       use_container_width=True, on_click=_cb_up_nm)
 
     # Thêm thủ công một mục mới
@@ -4674,7 +4674,7 @@ def _render_do_luong_inline(task_id, do_key, nhom_list, cvi=0):
                                 label_visibility="collapsed",
                                 accept_multiple_files=False,
                             )
-                            if st.button("📤 Upload", key=f"btn_do_{task_id}_{cvi}_{lbl_key}",
+                            if st.button("📤 Tải ảnh", key=f"btn_do_{task_id}_{cvi}_{lbl_key}",
                                          use_container_width=True):
                                 f_do = st.session_state.get(up_key)
                                 if f_do:
@@ -4809,7 +4809,7 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                         label_visibility="collapsed",
                         accept_multiple_files=False,
                     )
-                    if st.button("📤 Upload", key=f"btn_do_{task_id}_{lbl_key}",
+                    if st.button("📤 Tải ảnh", key=f"btn_do_{task_id}_{lbl_key}",
                                  use_container_width=True):
                         f_do = st.session_state.get(up_key)
                         if f_do:
