@@ -11,7 +11,7 @@ import cloudinary.uploader
 import uuid
 from fpdf import FPDF
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import requests
 import tempfile
 import os
@@ -5318,7 +5318,9 @@ def giao_dien_admin():
                 _nv_ho_ten   = st.text_input("👤 Họ và tên *", placeholder="Nguyễn Văn A")
                 _nv_username = st.text_input("🔑 Username *", placeholder="nguyenvana")
                 _nv_mat_khau = st.text_input("🔒 Mật khẩu *", type="password", placeholder="Ít nhất 6 ký tự")
-                _nv_ngay_sinh = st.date_input("🎂 Ngày sinh", value=None)
+                _nv_ngay_sinh = st.date_input("🎂 Ngày sinh", value=None,
+                                              min_value=date(1970, 1, 1),
+                                              max_value=date(2010, 12, 31))
                 _nv_submitted = st.form_submit_button("✅ Tạo tài khoản", use_container_width=True)
 
             if _nv_submitted:
