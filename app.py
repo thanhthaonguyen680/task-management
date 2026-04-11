@@ -385,6 +385,27 @@ components.html(
         } catch(e) {}
     }
 
+    var _VI_TEXT = [
+        ['Drag and drop file here', 'Kéo thả hoặc chọn file'],
+        ['Drop file here', 'Thả file vào đây'],
+        ['Limit 200MB per file', 'Tối đa 200MB mỗi file'],
+        ['Browse files', 'Chọn file'],
+    ];
+    function vietHoaUploader(doc) {
+        try {
+            _VI_TEXT.forEach(function(pair) {
+                doc.querySelectorAll('span, p, small, div, button').forEach(function(el) {
+                    if (el.childNodes.length === 1 && el.childNodes[0].nodeType === 3) {
+                        var t = el.childNodes[0].nodeValue;
+                        if (t && t.trim() === pair[0]) {
+                            el.childNodes[0].nodeValue = pair[1];
+                        }
+                    }
+                });
+            });
+        } catch(e) {}
+    }
+
     function hideElements(doc) {
         try {
             HIDE.forEach(function(sel) {
@@ -432,6 +453,7 @@ components.html(
         injectCSS(doc);
         hideElements(doc);
         removeAvatarFromDOM(doc);
+        vietHoaUploader(doc);
         fixSelectedValue(doc);
         fixCvCmSelectboxes(doc);
     });
@@ -453,6 +475,7 @@ components.html(
                 injectCSS(doc);
                 hideElements(doc);
                 removeAvatarFromDOM(doc);
+                vietHoaUploader(doc);
                 // Chỉ fix khi menu MỚI xuất hiện (không có → có)
                 // Không chạy lại khi user gõ/xóa bên trong menu đang mở
                 var menuNow = !!(doc.querySelector('[data-baseweb="menu"]') || doc.querySelector('[role="listbox"]'));
