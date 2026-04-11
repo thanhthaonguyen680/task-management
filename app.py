@@ -643,7 +643,7 @@ def _compress_image(content: bytes, mime: str, max_px: int = 1200, quality: int 
         return content
 
 
-def tai_anh_len_drive(file_anh) -> str:
+def tai_anh_len_drive(file_anh, max_px: int = 1200, quality: int = 82) -> str:
     """Upload ảnh lên Google Drive qua requests, set public, trả về thumbnail URL."""
     import io, json as _json
     session = _lay_drive_session()
@@ -659,7 +659,7 @@ def tai_anh_len_drive(file_anh) -> str:
 
     # Compress ảnh trước khi upload (bỏ qua video)
     if mime.startswith("image/"):
-        content = _compress_image(content, mime)
+        content = _compress_image(content, mime, max_px=max_px, quality=quality)
         name = name.rsplit(".", 1)[0] + ".jpg"
         mime = "image/jpeg"
 
@@ -728,9 +728,9 @@ def cau_hinh_cloudinary():
     pass
 
 
-def tai_anh_len_cloudinary(file_anh) -> str:
+def tai_anh_len_cloudinary(file_anh, max_px: int = 1200, quality: int = 82) -> str:
     """Wrapper gọi sang Drive (giữ tên cũ để không cần đổi call sites)."""
-    return tai_anh_len_drive(file_anh)
+    return tai_anh_len_drive(file_anh, max_px=max_px, quality=quality)
 
 
 def _tai_media_len_drive(file_obj) -> str:
@@ -4657,7 +4657,8 @@ def _render_do_luong_inline(task_id, do_key, nhom_list, cvi=0):
                                 if f_do:
                                     try:
                                         with st.spinner("Đang tải ảnh lên..."):
-                                            url_new = tai_anh_len_cloudinary(f_do)
+                                            # Compress mạnh hơn (800px/70) → file nhỏ hơn → upload nhanh hơn
+                                            url_new = tai_anh_len_cloudinary(f_do, max_px=800, quality=70)
                                         st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
                                         cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
                                         st.rerun(scope="fragment")
