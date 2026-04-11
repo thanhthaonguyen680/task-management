@@ -6458,6 +6458,13 @@ def giao_dien_nhan_vien():
                 label_visibility="collapsed",
             )
 
+        q_cty = st.text_input(
+            "🏢",
+            placeholder="Tìm kiếm theo công ty...",
+            key="nv_search_cty",
+            label_visibility="collapsed",
+        )
+
         if st.session_state.pop("_board_dirty", False):
             lay_danh_sach_cong_viec.clear()
         with st.spinner("Đang tải công việc..."):
@@ -6469,6 +6476,11 @@ def giao_dien_nhan_vien():
         if q_search.strip():
             df_cua_toi = df_cua_toi[
                 df_cua_toi["Tên Công Việc"].fillna("").str.lower().str.contains(q_search.strip().lower())
+            ]
+
+        if q_cty.strip():
+            df_cua_toi = df_cua_toi[
+                df_cua_toi["Công Ty"].fillna("").str.lower().str.contains(q_cty.strip().lower())
             ]
 
         # Bộ lọc — mỗi cái 1 hàng full width
@@ -6483,12 +6495,6 @@ def giao_dien_nhan_vien():
         ) if ds_nam_nv else "Tất cả"
         if loc_nam_nv != "Tất cả":
             df_cua_toi = df_cua_toi[df_cua_toi["Năm"].astype(str) == loc_nam_nv]
-
-        ds_ct_nv = df_cua_toi["Công Ty"].dropna().unique().tolist() if "Công Ty" in df_cua_toi.columns else []
-        if ds_ct_nv:
-            loc_ct_nv = st.multiselect("🏢 Lọc công ty", ds_ct_nv, key="nv_loc_ct", placeholder="Tất cả")
-            if loc_ct_nv:
-                df_cua_toi = df_cua_toi[df_cua_toi["Công Ty"].isin(loc_ct_nv)]
 
         ds_tt = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
