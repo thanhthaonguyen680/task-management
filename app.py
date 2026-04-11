@@ -759,8 +759,9 @@ def tai_anh_len_cloudinary(file_anh, max_px: int = 1200, quality: int = 82) -> s
 def _tai_media_len_drive(file_obj) -> str:
     """Upload ảnh hoặc video lên Drive. Video → trả view URL; ảnh → thumbnail URL."""
     import re as _re
-    url = tai_anh_len_drive(file_obj)
     mime = getattr(file_obj, "type", "")
+    # Ảnh: compress 900px/75 thay vì 1200px/82 để upload nhanh hơn
+    url = tai_anh_len_drive(file_obj, max_px=900, quality=75)
     if mime.startswith("video/"):
         m = _re.search(r"[?&]id=([^&]+)", url)
         if m:
@@ -3628,11 +3629,16 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
             if st.button("📤 Tải ảnh", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True):
                 _files_m = st.session_state.get(_up_key_m) or []
                 if _files_m:
-                    with st.spinner("Đang upload..."):
+                    with st.spinner(f"Đang tải {len(_files_m)} ảnh lên..."):
                         _cvl = st.session_state.get(_cv_key, [])
-                        for _fm in _files_m:
-                            _new_url = _tai_media_len_drive(_fm)
+                        if len(_files_m) == 1:
+                            _new_url = _tai_media_len_drive(_files_m[0])
                             _cvl[_cvi].setdefault("anh", []).append(_new_url)
+                        else:
+                            import concurrent.futures as _cf
+                            with _cf.ThreadPoolExecutor(max_workers=4) as _ex:
+                                _urls = list(_ex.map(_tai_media_len_drive, _files_m))
+                            _cvl[_cvi].setdefault("anh", []).extend(_urls)
                     _save_cv_to_sheet(task_id, _cv_key)
                     st.rerun(scope="fragment")
                 else:
@@ -4207,10 +4213,15 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 _files = st.session_state.get(_up_key_frag) or []
                 if _files:
                     try:
-                        with st.spinner("Đang tải lên..."):
-                            for _fm in _files:
-                                _new_url = _tai_media_len_drive(_fm)
+                        with st.spinner(f"Đang tải {len(_files)} ảnh lên..."):
+                            if len(_files) == 1:
+                                _new_url = _tai_media_len_drive(_files[0])
                                 st.session_state[cv_key][i].setdefault("anh", []).append(_new_url)
+                            else:
+                                import concurrent.futures as _cf
+                                with _cf.ThreadPoolExecutor(max_workers=4) as _ex:
+                                    _urls = list(_ex.map(_tai_media_len_drive, _files))
+                                st.session_state[cv_key][i].setdefault("anh", []).extend(_urls)
                         st.session_state[_exp_open_key] = True
                         st.rerun(scope="fragment")
                     except Exception:
