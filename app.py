@@ -393,29 +393,26 @@ components.html(
     };
     function vietHoaCalendar(doc) {
         try {
-            // Thay tên tháng trong <option> của month select (react-datepicker / baseweb calendar)
-            doc.querySelectorAll('select option').forEach(function(opt) {
-                var t = opt.text ? opt.text.trim() : '';
-                if (_VI_MONTHS_MAP[t]) opt.text = _VI_MONTHS_MAP[t];
+            // 1. Thay option text trong <select> (month select của react-datepicker)
+            doc.querySelectorAll('select').forEach(function(sel) {
+                sel.querySelectorAll('option').forEach(function(opt) {
+                    var t = (opt.text || '').trim();
+                    if (_VI_MONTHS_MAP[t]) opt.text = _VI_MONTHS_MAP[t];
+                });
             });
-            // Thay text hiển thị trong header calendar (react-datepicker__month-read-view--selected-month)
-            var selectors = [
-                '[class*="month-read-view--selected-month"]',
-                '[class*="MonthYearDropdownContainer"] [class*="read-view--down-arrow"]',
-                '[class*="datepicker__current-month"]',
-            ];
-            selectors.forEach(function(sel) {
-                try {
-                    doc.querySelectorAll(sel).forEach(function(el) {
-                        el.childNodes.forEach(function(node) {
-                            if (node.nodeType === 3) {
-                                var t = node.nodeValue ? node.nodeValue.trim() : '';
-                                if (_VI_MONTHS_MAP[t]) node.nodeValue = _VI_MONTHS_MAP[t];
-                            }
-                        });
-                    });
-                } catch(e) {}
-            });
+            // 2. TreeWalker: thay bất kỳ text node nào chứa đúng tên tháng tiếng Anh
+            try {
+                var walk = doc.createTreeWalker(doc.documentElement, 4, null, false);
+                var n;
+                while ((n = walk.nextNode())) {
+                    var val = n.nodeValue;
+                    if (!val) continue;
+                    var trimmed = val.trim();
+                    if (_VI_MONTHS_MAP[trimmed]) {
+                        n.nodeValue = val.replace(trimmed, _VI_MONTHS_MAP[trimmed]);
+                    }
+                }
+            } catch(e2) {}
         } catch(e) {}
     }
 
@@ -7544,6 +7541,42 @@ def inject_css():
         }
     }
     </style>
+    <script>
+    (function() {
+        var _VI_M = {
+            'January':'Tháng 1','February':'Tháng 2','March':'Tháng 3',
+            'April':'Tháng 4','May':'Tháng 5','June':'Tháng 6',
+            'July':'Tháng 7','August':'Tháng 8','September':'Tháng 9',
+            'October':'Tháng 10','November':'Tháng 11','December':'Tháng 12'
+        };
+        function replaceMonths(root) {
+            try {
+                // 1. select option
+                (root.querySelectorAll ? root : document).querySelectorAll('select option').forEach(function(o){
+                    var t=(o.text||'').trim(); if(_VI_M[t]) o.text=_VI_M[t];
+                });
+                // 2. TreeWalker: text node chứa đúng tên tháng
+                var walk=document.createTreeWalker(root.nodeType===9?root.documentElement:root,4,null,false),n;
+                while((n=walk.nextNode())){
+                    var v=n.nodeValue; if(!v) continue;
+                    var tr=v.trim(); if(_VI_M[tr]) n.nodeValue=v.replace(tr,_VI_M[tr]);
+                }
+            } catch(e){}
+        }
+        // Chạy ngay + sau load
+        document.addEventListener('DOMContentLoaded',function(){replaceMonths(document);});
+        setTimeout(function(){replaceMonths(document);},800);
+        // MutationObserver: bắt calendar popup
+        var _calObs=new MutationObserver(function(ms){
+            ms.forEach(function(m){
+                m.addedNodes.forEach(function(nd){
+                    if(nd.nodeType===1) replaceMonths(nd);
+                });
+            });
+        });
+        _calObs.observe(document.documentElement,{childList:true,subtree:true});
+    })();
+    </script>
     """, unsafe_allow_html=True)
 
 
