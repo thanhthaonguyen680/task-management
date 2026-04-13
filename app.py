@@ -385,6 +385,40 @@ components.html(
         } catch(e) {}
     }
 
+    var _VI_MONTHS_MAP = {
+        'January':'Tháng 1','February':'Tháng 2','March':'Tháng 3',
+        'April':'Tháng 4','May':'Tháng 5','June':'Tháng 6',
+        'July':'Tháng 7','August':'Tháng 8','September':'Tháng 9',
+        'October':'Tháng 10','November':'Tháng 11','December':'Tháng 12'
+    };
+    function vietHoaCalendar(doc) {
+        try {
+            // Thay tên tháng trong <option> của month select (react-datepicker / baseweb calendar)
+            doc.querySelectorAll('select option').forEach(function(opt) {
+                var t = opt.text ? opt.text.trim() : '';
+                if (_VI_MONTHS_MAP[t]) opt.text = _VI_MONTHS_MAP[t];
+            });
+            // Thay text hiển thị trong header calendar (react-datepicker__month-read-view--selected-month)
+            var selectors = [
+                '[class*="month-read-view--selected-month"]',
+                '[class*="MonthYearDropdownContainer"] [class*="read-view--down-arrow"]',
+                '[class*="datepicker__current-month"]',
+            ];
+            selectors.forEach(function(sel) {
+                try {
+                    doc.querySelectorAll(sel).forEach(function(el) {
+                        el.childNodes.forEach(function(node) {
+                            if (node.nodeType === 3) {
+                                var t = node.nodeValue ? node.nodeValue.trim() : '';
+                                if (_VI_MONTHS_MAP[t]) node.nodeValue = _VI_MONTHS_MAP[t];
+                            }
+                        });
+                    });
+                } catch(e) {}
+            });
+        } catch(e) {}
+    }
+
     var _VI_TEXT = [
         ['Drag and drop file here', 'Kéo thả hoặc chọn file'],
         ['Drop file here', 'Thả file vào đây'],
@@ -454,6 +488,7 @@ components.html(
         hideElements(doc);
         removeAvatarFromDOM(doc);
         vietHoaUploader(doc);
+        vietHoaCalendar(doc);
         fixSelectedValue(doc);
         fixCvCmSelectboxes(doc);
     });
@@ -476,6 +511,7 @@ components.html(
                 hideElements(doc);
                 removeAvatarFromDOM(doc);
                 vietHoaUploader(doc);
+                vietHoaCalendar(doc);
                 // Chỉ fix khi menu MỚI xuất hiện (không có → có)
                 // Không chạy lại khi user gõ/xóa bên trong menu đang mở
                 var menuNow = !!(doc.querySelector('[data-baseweb="menu"]') || doc.querySelector('[role="listbox"]'));
@@ -510,6 +546,7 @@ components.html(
                 fixDropdownOptions(doc);
                 fixSelectedValue(doc);
                 fixCvCmSelectboxes(doc);
+                vietHoaCalendar(doc);
             });
         }, delay);
     });
