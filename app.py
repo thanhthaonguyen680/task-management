@@ -5135,6 +5135,560 @@ def _render_detail_expanders(df, ds_tt):
 
 
 # ============================================================
+# FRAGMENT: Công Việc Con AgGrid
+# ============================================================
+@st.fragment
+def _fragment_cvc_content(df_all_cvc, aggrid_css):
+    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+    from st_aggrid.shared import JsCode
+    import io
+
+    if df_all_cvc.empty:
+        st.info("ℹ️ Chưa có công việc nào.")
+        return
+
+    today = datetime.today().date()
+    rows_cvc = []
+    stt = 0
+    for _, task_row in df_all_cvc.iterrows():
+        raw = task_row.get("Công Việc Con", "") or "[]"
+        try:
+            ds_cv = json.loads(raw) if raw else []
+        except Exception:
+            ds_cv = []
+        if not isinstance(ds_cv, list) or not ds_cv:
+            continue
+
+        han_str  = str(task_row.get("Hạn Hoàn Thành", "") or "")
+        han_date = None
+        try:
+            if han_str:
+                han_date = datetime.strptime(han_str[:10], "%Y-%m-%d").date()
+        except Exception:
+            pass
+
+        for cv in ds_cv:
+            if not isinstance(cv, dict):
+                continue
+            done = bool(cv.get("done", False))
+            if not done:
+                continue
+            stt += 1
+            ten_cv   = cv.get("ten", cv.get("Tên", ""))
+            nv       = cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))) or ""
+            ngay_ht  = cv.get("ngay_hoan_thanh", "") or str(task_row.get("Ngày Tạo", ""))[:10]
+
+            if done and ngay_ht:
+                try:
+                    ht_date = datetime.strptime(ngay_ht[:10], "%Y-%m-%d").date()
+                    if han_date:
+                        if ht_date < han_date:
+                            tinh_trang_td = "Trước hạn"
+                        elif ht_date == han_date:
+                            tinh_trang_td = "Đúng hạn"
+                        else:
+                            tinh_trang_td = "Quá hạn"
+                    else:
+                        tinh_trang_td = "Hoàn thành"
+                except Exception:
+                    tinh_trang_td = "Hoàn thành"
+            elif done:
+                tinh_trang_td = "Hoàn thành"
+            elif han_date and today > han_date:
+                tinh_trang_td = "Quá hạn"
+            elif han_date and today == han_date:
+                tinh_trang_td = "Đúng hạn"
+            else:
+                tinh_trang_td = "Chưa xong"
+
+            ngay_ht_date = None
+            ngay_ht_hien = ""
+            if done and ngay_ht:
+                try:
+                    ngay_ht_date = datetime.strptime(ngay_ht[:10], "%Y-%m-%d").date()
+                    ngay_ht_hien = ngay_ht_date.strftime("%d/%m/%Y")
+                except Exception:
+                    ngay_ht_hien = "✅ (chưa rõ ngày)"
+            elif done:
+                ngay_ht_hien = "✅ (chưa rõ ngày)"
+
+            rows_cvc.append({
+                "STT":             stt,
+                "Tên Công Ty":     task_row.get("Công Ty", ""),
+                "Tên Công Việc":   task_row.get("Tên Công Việc", ""),
+                "Công Suất":       task_row.get("Công Suất", ""),
+                "Mã Số":           task_row.get("Mã Số", ""),
+                "Công Việc Con":   ten_cv,
+                "Nhân Viên":       nv,
+                "Ngày Hoàn Thành": ngay_ht_hien,
+                "_ngay_ht_raw":    ngay_ht_date,
+                "Trạng Thái":      task_row.get("Trạng Thái", ""),
+                "Loại Máy":        task_row.get("Loại Máy", ""),
+                "Tình Trạng":      tinh_trang_td,
+                "_task_id":        task_row.get("ID", ""),
+                "_task_dict":      task_row.to_dict(),
+            })
+
+    if not rows_cvc:
+        st.info("ℹ️ Chưa có công việc con nào.")
+        return
+
+    df_cvc = pd.DataFrame(rows_cvc)
+
+    col_f1, col_f2, col_f3 = st.columns(3)
+    with col_f1:
+        ds_nv_cvc = sorted(df_cvc["Nhân Viên"].dropna().unique().tolist())
+        loc_nv_cvc = st.multiselect("👤 Lọc nhân viên", ds_nv_cvc, key="cvc_loc_nv", placeholder="Tất cả")
+    with col_f2:
+        ds_ct_cvc = sorted(df_cvc["Tên Công Ty"].dropna().unique().tolist())
+        loc_ct_cvc = st.multiselect("🏢 Lọc công ty", ds_ct_cvc, key="cvc_loc_ct", placeholder="Tất cả")
+    with col_f3:
+        ds_tt_cvc = sorted(df_cvc["Tình Trạng"].dropna().unique().tolist())
+        loc_tt_cvc = st.multiselect("📊 Lọc tình trạng", ds_tt_cvc, key="cvc_loc_tt", placeholder="Tất cả")
+
+    col_d1, col_d2, _ = st.columns(3)
+    with col_d1:
+        tu_ngay = st.date_input("📅 Từ ngày (Ngày Hoàn Thành)", value=None, format="DD/MM/YYYY", key="cvc_tu_ngay")
+    with col_d2:
+        den_ngay = st.date_input("📅 Đến ngày", value=None, format="DD/MM/YYYY", key="cvc_den_ngay")
+
+    df_show_cvc = df_cvc.copy()
+    if loc_nv_cvc:
+        df_show_cvc = df_show_cvc[df_show_cvc["Nhân Viên"].isin(loc_nv_cvc)]
+    if loc_ct_cvc:
+        df_show_cvc = df_show_cvc[df_show_cvc["Tên Công Ty"].isin(loc_ct_cvc)]
+    if loc_tt_cvc:
+        df_show_cvc = df_show_cvc[df_show_cvc["Tình Trạng"].isin(loc_tt_cvc)]
+    if tu_ngay:
+        df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(lambda d: d is not None and d >= tu_ngay)]
+    if den_ngay:
+        df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(lambda d: d is not None and d <= den_ngay)]
+
+    total = len(df_show_cvc)
+    done_count  = len(df_show_cvc[df_show_cvc["Ngày Hoàn Thành"] != ""])
+    qua_han     = len(df_show_cvc[df_show_cvc["Tình Trạng"] == "Quá hạn"])
+    truoc_han   = len(df_show_cvc[df_show_cvc["Tình Trạng"] == "Trước hạn"])
+    kpi_cols = st.columns(4)
+    kpi_cols[0].metric("📋 Tổng việc con", total)
+    kpi_cols[1].metric("✅ Hoàn thành", done_count)
+    kpi_cols[2].metric("🔴 Quá hạn", qua_han)
+    kpi_cols[3].metric("🟢 Trước hạn", truoc_han)
+
+    st.divider()
+
+    cols_show = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
+                 "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
+                 "Loại Máy", "Tình Trạng"]
+    _df_grid_cvc = df_show_cvc[["_task_id"] + cols_show].copy().reset_index(drop=True)
+
+    _badge_tt = JsCode("""
+    class TinhTrangRenderer {
+        init(p) {
+            const c={'Trước hạn':{bg:'#dcfce7',fg:'#16a34a'},'Đúng hạn':{bg:'#fef9c3',fg:'#d97706'},
+                'Quá hạn':{bg:'#fee2e2',fg:'#dc2626'},'Hoàn thành':{bg:'#dbeafe',fg:'#1d4ed8'},
+                'Chưa xong':{bg:'#f3f4f6',fg:'#6b7280'}};
+            const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
+            this.el=document.createElement('span');
+            this.el.innerText=p.value||'';
+            Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
+                borderRadius:'20px',fontWeight:'700',fontSize:'0.82rem',
+                border:'1.5px solid '+s.fg+'40',whiteSpace:'nowrap',display:'inline-block'});
+        }
+        getGui(){return this.el;}
+    }""")
+
+    _badge_ts = JsCode("""
+    class TrangThaiRenderer {
+        init(p) {
+            const c={'Chờ Làm':{bg:'#fee2e2',fg:'#dc2626'},'Đang Làm':{bg:'#fef9c3',fg:'#d97706'},
+                'Hoàn Thành':{bg:'#dcfce7',fg:'#16a34a'},'Đang Kiểm Tra':{bg:'#dbeafe',fg:'#1d4ed8'},
+                'Đã Phê Duyệt':{bg:'#dcfce7',fg:'#15803d'},'Đã Báo Giá':{bg:'#fef3c7',fg:'#b45309'},
+                'Có Đơn':{bg:'#ede9fe',fg:'#7c3aed'},'Chờ Giao':{bg:'#fef9c3',fg:'#a16207'},
+                'Đã Hoàn Thành - Giao Máy':{bg:'#bbf7d0',fg:'#166534'}};
+            const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
+            this.el=document.createElement('span');
+            this.el.innerText=p.value||'';
+            Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
+                borderRadius:'20px',fontWeight:'600',fontSize:'0.82rem',
+                whiteSpace:'nowrap',display:'inline-block'});
+        }
+        getGui(){return this.el;}
+    }""")
+
+    gb_cvc = GridOptionsBuilder.from_dataframe(_df_grid_cvc)
+    gb_cvc.configure_default_column(
+        resizable=True, sortable=True, minWidth=80,
+        filter="agTextColumnFilter", floatingFilter=True,
+        floatingFilterComponentParams={"suppressFilterButton": True},
+    )
+    gb_cvc.configure_column("_task_id", hide=True)
+    gb_cvc.configure_column("STT", maxWidth=60, minWidth=50, filter=False, floatingFilter=False)
+    gb_cvc.configure_column("Tình Trạng", cellRenderer=_badge_tt, minWidth=110)
+    gb_cvc.configure_column("Trạng Thái", cellRenderer=_badge_ts, minWidth=155)
+    gb_cvc.configure_column("Tên Công Ty", minWidth=220, flex=2)
+    gb_cvc.configure_column("Tên Công Việc", minWidth=180, flex=2)
+    gb_cvc.configure_column("Công Việc Con", minWidth=120)
+    gb_cvc.configure_column("Nhân Viên", minWidth=140)
+    gb_cvc.configure_column("Ngày Hoàn Thành", minWidth=130)
+    gb_cvc.configure_column("Loại Máy", minWidth=140)
+    gb_cvc.configure_selection(selection_mode="single", use_checkbox=False)
+    gb_cvc.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38)
+    _go_cvc = gb_cvc.build()
+
+    _resp_cvc = AgGrid(
+        _df_grid_cvc,
+        gridOptions=_go_cvc,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        allow_unsafe_jscode=True,
+        use_container_width=True,
+        fit_columns_on_grid_load=False,
+        theme="alpine",
+        custom_css=aggrid_css,
+        key="aggrid_cvc",
+    )
+    st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con · 👆 Click vào hàng để xem chi tiết")
+
+    _sel_cvc = _resp_cvc.get("selected_rows")
+    if _sel_cvc is not None and len(_sel_cvc) > 0:
+        _sel_id_cvc = str((_sel_cvc.iloc[0] if hasattr(_sel_cvc, "iloc") else _sel_cvc[0]).get("_task_id", ""))
+        _prev_sel_cvc = st.session_state.get("_cvc_prev_sel_id", "")
+        if _sel_id_cvc != _prev_sel_cvc:
+            _match_cvc = df_show_cvc[df_show_cvc["_task_id"].astype(str) == _sel_id_cvc]
+            if not _match_cvc.empty:
+                _ds_tt_dlg_cvc = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+                st.session_state["_pending_dlg"] = (_match_cvc.iloc[0]["_task_dict"], _ds_tt_dlg_cvc)
+                st.session_state["_cvc_prev_sel_id"] = _sel_id_cvc
+                st.rerun(scope="app")
+        st.session_state["_cvc_prev_sel_id"] = _sel_id_cvc
+    else:
+        st.session_state["_cvc_prev_sel_id"] = ""
+
+    cols_excel = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
+                  "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
+                  "Loại Máy", "Tình Trạng"]
+    df_excel = df_show_cvc[cols_excel].copy()
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df_excel.to_excel(writer, index=False, sheet_name="CongViecCon")
+        ws = writer.sheets["CongViecCon"]
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        header_fill = PatternFill("solid", fgColor="F59E0B")
+        thin = Side(style="thin", color="DDDDDD")
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+        for cell in ws[1]:
+            cell.font      = Font(bold=True, color="FFFFFF", size=11)
+            cell.fill      = header_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border    = border
+        _mau_excel = {
+            "Trước hạn": "DCFCE7", "Đúng hạn": "FEF9C3",
+            "Quá hạn":   "FEE2E2", "Hoàn thành": "DBEAFE",
+            "Chưa xong": "F3F4F6",
+        }
+        col_tt_idx = cols_excel.index("Tình Trạng") + 1
+        for row_idx, row_cells in enumerate(ws.iter_rows(min_row=2), start=2):
+            for cell in row_cells:
+                cell.border    = border
+                cell.alignment = Alignment(vertical="center")
+            tt_val = ws.cell(row=row_idx, column=col_tt_idx).value or ""
+            if tt_val in _mau_excel:
+                ws.cell(row=row_idx, column=col_tt_idx).fill = PatternFill("solid", fgColor=_mau_excel[tt_val])
+        for col in ws.columns:
+            max_len = max((len(str(c.value or "")) for c in col), default=8)
+            ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+        ws.row_dimensions[1].height = 30
+    buf.seek(0)
+    ten_file = f"cong_viec_con_{datetime.now().strftime('%d%m%Y_%H%M')}.xlsx"
+    st.download_button(
+        label="📥 Xuất Excel",
+        data=buf,
+        file_name=ten_file,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+# ============================================================
+# FRAGMENT: Theo Dõi Tiến Độ Máy AgGrid
+# ============================================================
+@st.fragment
+def _fragment_tdm_content(df_tdm_all, aggrid_css):
+    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+    from st_aggrid.shared import JsCode
+    import io
+
+    if df_tdm_all.empty:
+        st.info("ℹ️ Chưa có công việc nào.")
+        return
+
+    today_tdm = datetime.today().date()
+    rows_tdm  = []
+
+    for stt_tdm, (_, r) in enumerate(df_tdm_all.iterrows(), start=1):
+        han_str_tdm  = str(r.get("Hạn Hoàn Thành", "") or "")
+        ngay_kt_str  = str(r.get("Ngày Kết Thúc", "") or "")
+        han_date_tdm = None
+        ngay_kt_date = None
+        try:
+            if han_str_tdm:
+                han_date_tdm = datetime.strptime(han_str_tdm[:10], "%Y-%m-%d").date()
+        except Exception:
+            pass
+        try:
+            if ngay_kt_str:
+                ngay_kt_date = datetime.strptime(ngay_kt_str[:10], "%Y-%m-%d").date()
+        except Exception:
+            pass
+
+        if ngay_kt_date and han_date_tdm:
+            if ngay_kt_date < han_date_tdm:
+                tinh_trang_tdm = "Trước hạn"
+            elif ngay_kt_date == han_date_tdm:
+                tinh_trang_tdm = "Đúng hạn"
+            else:
+                tinh_trang_tdm = "Quá hạn"
+        elif ngay_kt_date:
+            tinh_trang_tdm = "Hoàn thành"
+        elif han_date_tdm and today_tdm > han_date_tdm:
+            tinh_trang_tdm = "Quá hạn"
+        elif han_date_tdm and today_tdm == han_date_tdm:
+            tinh_trang_tdm = "Đúng hạn"
+        else:
+            tinh_trang_tdm = "Chưa xong"
+
+        ngay_nhan_hien  = ""
+        ngay_giao_hien  = ""
+        han_hien        = ""
+        try:
+            ngay_tao_str = str(r.get("Ngày Tạo", "") or "")
+            if ngay_tao_str:
+                ngay_nhan_hien = datetime.strptime(ngay_tao_str[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            ngay_nhan_hien = str(r.get("Ngày Tạo", "") or "")
+        try:
+            if han_date_tdm:
+                han_hien = han_date_tdm.strftime("%d/%m/%Y")
+        except Exception:
+            han_hien = han_str_tdm
+        try:
+            if ngay_kt_date:
+                ngay_giao_hien = ngay_kt_date.strftime("%d/%m/%Y")
+        except Exception:
+            ngay_giao_hien = ngay_kt_str
+
+        rows_tdm.append({
+            "STT":              stt_tdm,
+            "Tên Công Ty":      r.get("Công Ty", ""),
+            "Tên Công Việc":    r.get("Tên Công Việc", ""),
+            "Công Suất":        r.get("Công Suất", ""),
+            "Mã Số Máy":        r.get("Mã Số", ""),
+            "Số PO Nội Bộ":     r.get("Số PO Nội Bộ", ""),
+            "Số PO KH/HĐ":      r.get("Số PO KH/HĐ", ""),
+            "Số Báo Giá":       r.get("Số Báo Giá", ""),
+            "Trạng Thái":       r.get("Trạng Thái", ""),
+            "Ngày Nhận Máy":    ngay_nhan_hien,
+            "Hạn Hoàn Thành":   han_hien,
+            "Ngày Giao Máy":    ngay_giao_hien,
+            "_han_raw":         han_date_tdm,
+            "_giao_raw":        ngay_kt_date,
+            "Loại Máy":         r.get("Loại Máy", ""),
+            "Tình Trạng":       tinh_trang_tdm,
+            "_task_id":         r.get("ID", ""),
+            "_task_dict":       r.to_dict(),
+        })
+
+    if not rows_tdm:
+        st.info("ℹ️ Chưa có dữ liệu.")
+        return
+
+    df_tdm = pd.DataFrame(rows_tdm)
+
+    col_tf1, col_tf2, col_tf3 = st.columns(3)
+    with col_tf1:
+        ds_nv_tdm = sorted(df_tdm["Tên Công Ty"].dropna().unique().tolist())
+        loc_ct_tdm = st.multiselect("🏢 Lọc công ty", ds_nv_tdm, key="tdm_loc_ct", placeholder="Tất cả")
+    with col_tf2:
+        ds_tt_tdm = sorted(df_tdm["Tình Trạng"].dropna().unique().tolist())
+        loc_tt_tdm = st.multiselect("📊 Lọc tình trạng", ds_tt_tdm, key="tdm_loc_tt", placeholder="Tất cả")
+    with col_tf3:
+        ds_lm_tdm = sorted(df_tdm["Loại Máy"].dropna().unique().tolist())
+        ds_lm_tdm = [x for x in ds_lm_tdm if x.strip()]
+        loc_lm_tdm = st.multiselect("🔧 Lọc loại máy", ds_lm_tdm, key="tdm_loc_lm", placeholder="Tất cả")
+
+    col_td1, col_td2, col_td3, col_td4 = st.columns(4)
+    with col_td1:
+        tu_ngay_nhan = st.date_input("📅 Nhận máy từ", value=None, format="DD/MM/YYYY", key="tdm_tu_nhan")
+    with col_td2:
+        den_ngay_nhan = st.date_input("📅 Nhận máy đến", value=None, format="DD/MM/YYYY", key="tdm_den_nhan")
+    with col_td3:
+        tu_ngay_giao = st.date_input("📅 Giao máy từ", value=None, format="DD/MM/YYYY", key="tdm_tu_giao")
+    with col_td4:
+        den_ngay_giao = st.date_input("📅 Giao máy đến", value=None, format="DD/MM/YYYY", key="tdm_den_giao")
+
+    df_show_tdm = df_tdm.copy()
+    if loc_ct_tdm:
+        df_show_tdm = df_show_tdm[df_show_tdm["Tên Công Ty"].isin(loc_ct_tdm)]
+    if loc_tt_tdm:
+        df_show_tdm = df_show_tdm[df_show_tdm["Tình Trạng"].isin(loc_tt_tdm)]
+    if loc_lm_tdm:
+        df_show_tdm = df_show_tdm[df_show_tdm["Loại Máy"].isin(loc_lm_tdm)]
+    if tu_ngay_nhan:
+        df_show_tdm = df_show_tdm[df_show_tdm["Ngày Nhận Máy"].apply(
+            lambda v: _parse_date_display(v) is not None and _parse_date_display(v) >= tu_ngay_nhan)]
+    if den_ngay_nhan:
+        df_show_tdm = df_show_tdm[df_show_tdm["Ngày Nhận Máy"].apply(
+            lambda v: _parse_date_display(v) is not None and _parse_date_display(v) <= den_ngay_nhan)]
+    if tu_ngay_giao:
+        df_show_tdm = df_show_tdm[df_show_tdm["_giao_raw"].apply(lambda d: d is not None and d >= tu_ngay_giao)]
+    if den_ngay_giao:
+        df_show_tdm = df_show_tdm[df_show_tdm["_giao_raw"].apply(lambda d: d is not None and d <= den_ngay_giao)]
+
+    total_tdm   = len(df_show_tdm)
+    da_giao     = len(df_show_tdm[df_show_tdm["Ngày Giao Máy"] != ""])
+    qua_han_tdm = len(df_show_tdm[df_show_tdm["Tình Trạng"] == "Quá hạn"])
+    truoc_han_tdm = len(df_show_tdm[df_show_tdm["Tình Trạng"] == "Trước hạn"])
+    kpi_c = st.columns(4)
+    kpi_c[0].metric("🔩 Tổng máy", total_tdm)
+    kpi_c[1].metric("✅ Đã giao", da_giao)
+    kpi_c[2].metric("🔴 Quá hạn", qua_han_tdm)
+    kpi_c[3].metric("🟢 Trước hạn", truoc_han_tdm)
+
+    st.divider()
+
+    _cols_display_tdm = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số Máy",
+                         "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá", "Trạng Thái",
+                         "Ngày Nhận Máy", "Hạn Hoàn Thành", "Ngày Giao Máy",
+                         "Loại Máy", "Tình Trạng"]
+
+    _badge_tt_tdm = JsCode("""
+    class TinhTrangTDMRenderer {
+        init(p) {
+            const c={'Trước hạn':{bg:'#dcfce7',fg:'#16a34a'},'Đúng hạn':{bg:'#fef9c3',fg:'#d97706'},
+                'Quá hạn':{bg:'#fee2e2',fg:'#dc2626'},'Hoàn thành':{bg:'#dbeafe',fg:'#1d4ed8'},
+                'Chưa xong':{bg:'#f3f4f6',fg:'#6b7280'}};
+            const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
+            this.el=document.createElement('span');
+            this.el.innerText=p.value||'';
+            Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
+                borderRadius:'20px',fontWeight:'700',fontSize:'0.82rem',
+                border:'1.5px solid '+s.fg+'40',whiteSpace:'nowrap',display:'inline-block'});
+        }
+        getGui(){return this.el;}
+    }""")
+
+    _badge_ts_tdm = JsCode("""
+    class TrangThaiTDMRenderer {
+        init(p) {
+            const c={'Chờ Làm':{bg:'#fee2e2',fg:'#dc2626'},'Đang Làm':{bg:'#fef9c3',fg:'#d97706'},
+                'Hoàn Thành':{bg:'#dcfce7',fg:'#16a34a'},'Đang Kiểm Tra':{bg:'#dbeafe',fg:'#1d4ed8'},
+                'Đã Phê Duyệt':{bg:'#dcfce7',fg:'#15803d'},'Đã Báo Giá':{bg:'#fef3c7',fg:'#b45309'},
+                'Có Đơn':{bg:'#ede9fe',fg:'#7c3aed'},'Chờ Giao':{bg:'#fef9c3',fg:'#a16207'},
+                'Đã Hoàn Thành - Giao Máy':{bg:'#bbf7d0',fg:'#166534'}};
+            const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
+            this.el=document.createElement('span');
+            this.el.innerText=p.value||'';
+            Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
+                borderRadius:'20px',fontWeight:'600',fontSize:'0.82rem',
+                whiteSpace:'nowrap',display:'inline-block'});
+        }
+        getGui(){return this.el;}
+    }""")
+
+    _df_grid_tdm = df_show_tdm[["_task_id"] + _cols_display_tdm].copy().reset_index(drop=True)
+
+    gb_tdm = GridOptionsBuilder.from_dataframe(_df_grid_tdm)
+    gb_tdm.configure_default_column(
+        resizable=True, sortable=True, minWidth=80,
+        filter="agTextColumnFilter", floatingFilter=True,
+        floatingFilterComponentParams={"suppressFilterButton": True},
+    )
+    gb_tdm.configure_column("_task_id", hide=True)
+    gb_tdm.configure_column("STT", maxWidth=60, minWidth=50, filter=False, floatingFilter=False)
+    gb_tdm.configure_column("Tình Trạng", cellRenderer=_badge_tt_tdm, minWidth=110)
+    gb_tdm.configure_column("Trạng Thái", cellRenderer=_badge_ts_tdm, minWidth=155)
+    gb_tdm.configure_column("Tên Công Ty", minWidth=220, flex=2)
+    gb_tdm.configure_column("Tên Công Việc", minWidth=180, flex=2)
+    gb_tdm.configure_column("Hạn Hoàn Thành", minWidth=130)
+    gb_tdm.configure_column("Ngày Nhận Máy", minWidth=120)
+    gb_tdm.configure_column("Ngày Giao Máy", minWidth=120)
+    gb_tdm.configure_column("Loại Máy", minWidth=140)
+    gb_tdm.configure_column("Mã Số Máy", minWidth=100)
+    gb_tdm.configure_selection(selection_mode="single", use_checkbox=False)
+    gb_tdm.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38)
+    _go_tdm = gb_tdm.build()
+
+    _resp_tdm = AgGrid(
+        _df_grid_tdm,
+        gridOptions=_go_tdm,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        allow_unsafe_jscode=True,
+        use_container_width=True,
+        fit_columns_on_grid_load=False,
+        theme="alpine",
+        custom_css=aggrid_css,
+        key="aggrid_tdm",
+    )
+    st.caption(f"Hiển thị {len(df_show_tdm)} / {total_tdm} máy · 👆 Click vào hàng để xem chi tiết")
+
+    _sel_tdm = _resp_tdm.get("selected_rows")
+    if _sel_tdm is not None and len(_sel_tdm) > 0:
+        _sel_id_tdm = str((_sel_tdm.iloc[0] if hasattr(_sel_tdm, "iloc") else _sel_tdm[0]).get("_task_id", ""))
+        _prev_sel_tdm = st.session_state.get("_tdm_prev_sel_id", "")
+        if _sel_id_tdm != _prev_sel_tdm:
+            _match_tdm = df_show_tdm[df_show_tdm["_task_id"].astype(str) == _sel_id_tdm]
+            if not _match_tdm.empty:
+                _ds_tt_dlg_tdm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+                st.session_state["_pending_dlg"] = (_match_tdm.iloc[0]["_task_dict"], _ds_tt_dlg_tdm)
+                st.session_state["_tdm_prev_sel_id"] = _sel_id_tdm
+                st.rerun(scope="app")
+        st.session_state["_tdm_prev_sel_id"] = _sel_id_tdm
+    else:
+        st.session_state["_tdm_prev_sel_id"] = ""
+
+    cols_excel_tdm = _cols_display_tdm
+    df_excel_tdm = df_show_tdm[cols_excel_tdm].copy()
+    buf_tdm = io.BytesIO()
+    with pd.ExcelWriter(buf_tdm, engine="openpyxl") as writer_tdm:
+        df_excel_tdm.to_excel(writer_tdm, index=False, sheet_name="TheoDoiTienDoMay")
+        ws_tdm = writer_tdm.sheets["TheoDoiTienDoMay"]
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        hdr_fill_tdm = PatternFill("solid", fgColor="3B82F6")
+        thin2 = Side(style="thin", color="DDDDDD")
+        brd2  = Border(left=thin2, right=thin2, top=thin2, bottom=thin2)
+        for cell in ws_tdm[1]:
+            cell.font      = Font(bold=True, color="FFFFFF", size=11)
+            cell.fill      = hdr_fill_tdm
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border    = brd2
+        _mau_excel_tdm = {
+            "Trước hạn": "DCFCE7", "Đúng hạn": "FEF9C3",
+            "Quá hạn":   "FEE2E2", "Hoàn thành": "DBEAFE",
+            "Chưa xong": "F3F4F6",
+        }
+        col_tt_idx_tdm = cols_excel_tdm.index("Tình Trạng") + 1
+        for row_idx, row_cells in enumerate(ws_tdm.iter_rows(min_row=2), start=2):
+            for cell in row_cells:
+                cell.border    = brd2
+                cell.alignment = Alignment(vertical="center")
+            tt_val = ws_tdm.cell(row=row_idx, column=col_tt_idx_tdm).value or ""
+            if tt_val in _mau_excel_tdm:
+                ws_tdm.cell(row=row_idx, column=col_tt_idx_tdm).fill = PatternFill("solid", fgColor=_mau_excel_tdm[tt_val])
+        for col in ws_tdm.columns:
+            max_len = max((len(str(c.value or "")) for c in col), default=8)
+            ws_tdm.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+        ws_tdm.row_dimensions[1].height = 30
+    buf_tdm.seek(0)
+    ten_file_tdm = f"theo_doi_tien_do_may_{datetime.now().strftime('%d%m%Y_%H%M')}.xlsx"
+    st.download_button(
+        label="📥 Xuất Excel",
+        data=buf_tdm,
+        file_name=ten_file_tdm,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="tdm_xuat_excel",
+        use_container_width=False,
+    )
+
+
+# ============================================================
 # GIAO DIỆN ADMIN
 # ============================================================
 def giao_dien_admin():
@@ -5849,292 +6403,7 @@ def giao_dien_admin():
         with st.spinner("Đang tải dữ liệu..."):
             df_all_cvc = lay_danh_sach_cong_viec()
 
-        if df_all_cvc.empty:
-            st.info("ℹ️ Chưa có công việc nào.")
-        else:
-            # Flatten tất cả công việc con ra từng dòng
-            today = datetime.today().date()
-            rows_cvc = []
-            stt = 0
-            for _, task_row in df_all_cvc.iterrows():
-                raw = task_row.get("Công Việc Con", "") or "[]"
-                try:
-                    ds_cv = json.loads(raw) if raw else []
-                except Exception:
-                    ds_cv = []
-                if not isinstance(ds_cv, list) or not ds_cv:
-                    continue
-
-                han_str  = str(task_row.get("Hạn Hoàn Thành", "") or "")
-                han_date = None
-                try:
-                    if han_str:
-                        han_date = datetime.strptime(han_str[:10], "%Y-%m-%d").date()
-                except Exception:
-                    pass
-
-                for cv in ds_cv:
-                    if not isinstance(cv, dict):
-                        continue
-                    done = bool(cv.get("done", False))
-                    if not done:
-                        continue  # Chỉ hiển thị công việc con đã hoàn thành
-                    stt += 1
-                    ten_cv   = cv.get("ten", cv.get("Tên", ""))
-                    nv       = cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))) or ""
-                    ngay_ht  = cv.get("ngay_hoan_thanh", "") or str(task_row.get("Ngày Tạo", ""))[:10]
-
-                    # Tính Tình Trạng (deadline-based)
-                    if done and ngay_ht:
-                        try:
-                            ht_date = datetime.strptime(ngay_ht[:10], "%Y-%m-%d").date()
-                            if han_date:
-                                if ht_date < han_date:
-                                    tinh_trang_td = "Trước hạn"
-                                elif ht_date == han_date:
-                                    tinh_trang_td = "Đúng hạn"
-                                else:
-                                    tinh_trang_td = "Quá hạn"
-                            else:
-                                tinh_trang_td = "Hoàn thành"
-                        except Exception:
-                            tinh_trang_td = "Hoàn thành"
-                    elif done:
-                        tinh_trang_td = "Hoàn thành"
-                    elif han_date and today > han_date:
-                        tinh_trang_td = "Quá hạn"
-                    elif han_date and today == han_date:
-                        tinh_trang_td = "Đúng hạn"
-                    else:
-                        tinh_trang_td = "Chưa xong"
-
-                    # Ngày hoàn thành dạng date object để lọc
-                    ngay_ht_date = None
-                    ngay_ht_hien = ""
-                    if done and ngay_ht:
-                        try:
-                            ngay_ht_date = datetime.strptime(ngay_ht[:10], "%Y-%m-%d").date()
-                            ngay_ht_hien = ngay_ht_date.strftime("%d/%m/%Y")
-                        except Exception:
-                            ngay_ht_hien = "✅ (chưa rõ ngày)"
-                    elif done:
-                        ngay_ht_hien = "✅ (chưa rõ ngày)"
-
-                    rows_cvc.append({
-                        "STT":             stt,
-                        "Tên Công Ty":     task_row.get("Công Ty", ""),
-                        "Tên Công Việc":   task_row.get("Tên Công Việc", ""),
-                        "Công Suất":       task_row.get("Công Suất", ""),
-                        "Mã Số":           task_row.get("Mã Số", ""),
-                        "Công Việc Con":   ten_cv,
-                        "Nhân Viên":       nv,
-                        "Ngày Hoàn Thành": ngay_ht_hien,
-                        "_ngay_ht_raw":    ngay_ht_date,
-                        "Trạng Thái":      task_row.get("Trạng Thái", ""),
-                        "Loại Máy":        task_row.get("Loại Máy", ""),
-                        "Tình Trạng":      tinh_trang_td,
-                        "_task_id":        task_row.get("ID", ""),
-                        "_task_dict":      task_row.to_dict(),
-                    })
-
-            if not rows_cvc:
-                st.info("ℹ️ Chưa có công việc con nào.")
-            else:
-                df_cvc = pd.DataFrame(rows_cvc)
-
-                # ── Bộ lọc hàng 1: nhân viên / công ty / tình trạng ──
-                col_f1, col_f2, col_f3 = st.columns(3)
-                with col_f1:
-                    ds_nv_cvc = sorted(df_cvc["Nhân Viên"].dropna().unique().tolist())
-                    loc_nv_cvc = st.multiselect("👤 Lọc nhân viên", ds_nv_cvc, key="cvc_loc_nv", placeholder="Tất cả")
-                with col_f2:
-                    ds_ct_cvc = sorted(df_cvc["Tên Công Ty"].dropna().unique().tolist())
-                    loc_ct_cvc = st.multiselect("🏢 Lọc công ty", ds_ct_cvc, key="cvc_loc_ct", placeholder="Tất cả")
-                with col_f3:
-                    ds_tt_cvc = sorted(df_cvc["Tình Trạng"].dropna().unique().tolist())
-                    loc_tt_cvc = st.multiselect("📊 Lọc tình trạng", ds_tt_cvc, key="cvc_loc_tt", placeholder="Tất cả")
-
-                # ── Bộ lọc hàng 2: khoảng ngày hoàn thành ──
-                col_d1, col_d2, _ = st.columns(3)
-                with col_d1:
-                    tu_ngay = st.date_input(
-                        "📅 Từ ngày (Ngày Hoàn Thành)",
-                        value=None,
-                        format="DD/MM/YYYY",
-                        key="cvc_tu_ngay",
-                    )
-                with col_d2:
-                    den_ngay = st.date_input(
-                        "📅 Đến ngày",
-                        value=None,
-                        format="DD/MM/YYYY",
-                        key="cvc_den_ngay",
-                    )
-
-                df_show_cvc = df_cvc.copy()
-                if loc_nv_cvc:
-                    df_show_cvc = df_show_cvc[df_show_cvc["Nhân Viên"].isin(loc_nv_cvc)]
-                if loc_ct_cvc:
-                    df_show_cvc = df_show_cvc[df_show_cvc["Tên Công Ty"].isin(loc_ct_cvc)]
-                if loc_tt_cvc:
-                    df_show_cvc = df_show_cvc[df_show_cvc["Tình Trạng"].isin(loc_tt_cvc)]
-                if tu_ngay:
-                    df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(
-                        lambda d: d is not None and d >= tu_ngay)]
-                if den_ngay:
-                    df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(
-                        lambda d: d is not None and d <= den_ngay)]
-
-                # ── KPI nhanh ──
-                total = len(df_show_cvc)
-                done_count  = len(df_show_cvc[df_show_cvc["Ngày Hoàn Thành"] != ""])
-                qua_han     = len(df_show_cvc[df_show_cvc["Tình Trạng"] == "Quá hạn"])
-                truoc_han   = len(df_show_cvc[df_show_cvc["Tình Trạng"] == "Trước hạn"])
-                kpi_cols = st.columns(4)
-                kpi_cols[0].metric("📋 Tổng việc con", total)
-                kpi_cols[1].metric("✅ Hoàn thành", done_count)
-                kpi_cols[2].metric("🔴 Quá hạn", qua_han)
-                kpi_cols[3].metric("🟢 Trước hạn", truoc_han)
-
-                st.divider()
-
-                # ── Bảng AgGrid (click hàng để xem chi tiết) ──
-                from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-                from st_aggrid.shared import JsCode
-
-                cols_show = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
-                             "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
-                             "Loại Máy", "Tình Trạng"]
-                _df_grid_cvc = df_show_cvc[["_task_id"] + cols_show].copy().reset_index(drop=True)
-
-                _badge_tt = JsCode("""
-                class TinhTrangRenderer {
-                    init(p) {
-                        const c={'Trước hạn':{bg:'#dcfce7',fg:'#16a34a'},'Đúng hạn':{bg:'#fef9c3',fg:'#d97706'},
-                            'Quá hạn':{bg:'#fee2e2',fg:'#dc2626'},'Hoàn thành':{bg:'#dbeafe',fg:'#1d4ed8'},
-                            'Chưa xong':{bg:'#f3f4f6',fg:'#6b7280'}};
-                        const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
-                        this.el=document.createElement('span');
-                        this.el.innerText=p.value||'';
-                        Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
-                            borderRadius:'20px',fontWeight:'700',fontSize:'0.82rem',
-                            border:'1.5px solid '+s.fg+'40',whiteSpace:'nowrap',display:'inline-block'});
-                    }
-                    getGui(){return this.el;}
-                }""")
-
-                _badge_ts = JsCode("""
-                class TrangThaiRenderer {
-                    init(p) {
-                        const c={'Chờ Làm':{bg:'#fee2e2',fg:'#dc2626'},'Đang Làm':{bg:'#fef9c3',fg:'#d97706'},
-                            'Hoàn Thành':{bg:'#dcfce7',fg:'#16a34a'},'Đang Kiểm Tra':{bg:'#dbeafe',fg:'#1d4ed8'},
-                            'Đã Phê Duyệt':{bg:'#dcfce7',fg:'#15803d'},'Đã Báo Giá':{bg:'#fef3c7',fg:'#b45309'},
-                            'Có Đơn':{bg:'#ede9fe',fg:'#7c3aed'},'Chờ Giao':{bg:'#fef9c3',fg:'#a16207'},
-                            'Đã Hoàn Thành - Giao Máy':{bg:'#bbf7d0',fg:'#166534'}};
-                        const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
-                        this.el=document.createElement('span');
-                        this.el.innerText=p.value||'';
-                        Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
-                            borderRadius:'20px',fontWeight:'600',fontSize:'0.82rem',
-                            whiteSpace:'nowrap',display:'inline-block'});
-                    }
-                    getGui(){return this.el;}
-                }""")
-
-                gb_cvc = GridOptionsBuilder.from_dataframe(_df_grid_cvc)
-                gb_cvc.configure_default_column(
-                    resizable=True, sortable=True, minWidth=80,
-                    filter="agTextColumnFilter", floatingFilter=True,
-                    floatingFilterComponentParams={"suppressFilterButton": True},
-                )
-                gb_cvc.configure_column("_task_id", hide=True)
-                gb_cvc.configure_column("STT", maxWidth=60, minWidth=50, filter=False, floatingFilter=False)
-                gb_cvc.configure_column("Tình Trạng", cellRenderer=_badge_tt, minWidth=110)
-                gb_cvc.configure_column("Trạng Thái", cellRenderer=_badge_ts, minWidth=155)
-                gb_cvc.configure_column("Tên Công Ty", minWidth=220, flex=2)
-                gb_cvc.configure_column("Tên Công Việc", minWidth=180, flex=2)
-                gb_cvc.configure_column("Công Việc Con", minWidth=120)
-                gb_cvc.configure_column("Nhân Viên", minWidth=140)
-                gb_cvc.configure_column("Ngày Hoàn Thành", minWidth=130)
-                gb_cvc.configure_column("Loại Máy", minWidth=140)
-                gb_cvc.configure_selection(selection_mode="single", use_checkbox=False)
-                gb_cvc.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38)
-                _go_cvc = gb_cvc.build()
-
-                _resp_cvc = AgGrid(
-                    _df_grid_cvc,
-                    gridOptions=_go_cvc,
-                    update_mode=GridUpdateMode.SELECTION_CHANGED,
-                    allow_unsafe_jscode=True,
-                    use_container_width=True,
-                    fit_columns_on_grid_load=False,
-                    theme="alpine",
-                    custom_css=_aggrid_css,
-                    key="aggrid_cvc",
-                )
-                st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con · 👆 Click vào hàng để xem chi tiết")
-
-                _sel_cvc = _resp_cvc.get("selected_rows")
-                if _sel_cvc is not None and len(_sel_cvc) > 0:
-                    _sel_id_cvc = str((_sel_cvc.iloc[0] if hasattr(_sel_cvc, "iloc") else _sel_cvc[0]).get("_task_id", ""))
-                    _prev_sel_cvc = st.session_state.get("_cvc_prev_sel_id", "")
-                    if _sel_id_cvc != _prev_sel_cvc:
-                        _match_cvc = df_show_cvc[df_show_cvc["_task_id"].astype(str) == _sel_id_cvc]
-                        if not _match_cvc.empty:
-                            _ds_tt_dlg_cvc = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-                            st.session_state["_pending_dlg"] = (_match_cvc.iloc[0]["_task_dict"], _ds_tt_dlg_cvc)
-                    st.session_state["_cvc_prev_sel_id"] = _sel_id_cvc
-                else:
-                    st.session_state["_cvc_prev_sel_id"] = ""
-
-                # ── Xuất Excel ──
-                import io
-                cols_excel = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
-                              "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
-                              "Loại Máy", "Tình Trạng"]
-                df_excel = df_show_cvc[cols_excel].copy()
-                buf = io.BytesIO()
-                with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-                    df_excel.to_excel(writer, index=False, sheet_name="CongViecCon")
-                    ws = writer.sheets["CongViecCon"]
-                    # Định dạng header
-                    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-                    header_fill = PatternFill("solid", fgColor="F59E0B")
-                    thin = Side(style="thin", color="DDDDDD")
-                    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-                    for cell in ws[1]:
-                        cell.font      = Font(bold=True, color="FFFFFF", size=11)
-                        cell.fill      = header_fill
-                        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                        cell.border    = border
-                    # Tô màu cột Tình Trạng
-                    _mau_excel = {
-                        "Trước hạn": "DCFCE7", "Đúng hạn": "FEF9C3",
-                        "Quá hạn":   "FEE2E2", "Hoàn thành": "DBEAFE",
-                        "Chưa xong": "F3F4F6",
-                    }
-                    col_tt_idx = cols_excel.index("Tình Trạng") + 1
-                    for row_idx, row_cells in enumerate(ws.iter_rows(min_row=2), start=2):
-                        for cell in row_cells:
-                            cell.border    = border
-                            cell.alignment = Alignment(vertical="center")
-                        tt_val = ws.cell(row=row_idx, column=col_tt_idx).value or ""
-                        if tt_val in _mau_excel:
-                            ws.cell(row=row_idx, column=col_tt_idx).fill = PatternFill("solid", fgColor=_mau_excel[tt_val])
-                    # Tự động độ rộng cột
-                    for col in ws.columns:
-                        max_len = max((len(str(c.value or "")) for c in col), default=8)
-                        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
-                    ws.row_dimensions[1].height = 30
-                buf.seek(0)
-                ten_file = f"cong_viec_con_{datetime.now().strftime('%d%m%Y_%H%M')}.xlsx"
-                st.download_button(
-                    label="📥 Xuất Excel",
-                    data=buf,
-                    file_name=ten_file,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=False,
-                )
+        _fragment_cvc_content(df_all_cvc, _aggrid_css)
 
     # ========================================================
     # Tab 7: Theo Dõi Tiến Độ Máy
@@ -6151,285 +6420,7 @@ def giao_dien_admin():
         with st.spinner("Đang tải dữ liệu..."):
             df_tdm_all = lay_danh_sach_cong_viec()
 
-        if df_tdm_all.empty:
-            st.info("ℹ️ Chưa có công việc nào.")
-        else:
-            today_tdm = datetime.today().date()
-            rows_tdm  = []
-
-            for stt_tdm, (_, r) in enumerate(df_tdm_all.iterrows(), start=1):
-                han_str_tdm  = str(r.get("Hạn Hoàn Thành", "") or "")
-                ngay_kt_str  = str(r.get("Ngày Kết Thúc", "") or "")
-                han_date_tdm = None
-                ngay_kt_date = None
-                try:
-                    if han_str_tdm:
-                        han_date_tdm = datetime.strptime(han_str_tdm[:10], "%Y-%m-%d").date()
-                except Exception:
-                    pass
-                try:
-                    if ngay_kt_str:
-                        ngay_kt_date = datetime.strptime(ngay_kt_str[:10], "%Y-%m-%d").date()
-                except Exception:
-                    pass
-
-                # Tính Tình Trạng
-                if ngay_kt_date and han_date_tdm:
-                    if ngay_kt_date < han_date_tdm:
-                        tinh_trang_tdm = "Trước hạn"
-                    elif ngay_kt_date == han_date_tdm:
-                        tinh_trang_tdm = "Đúng hạn"
-                    else:
-                        tinh_trang_tdm = "Quá hạn"
-                elif ngay_kt_date:
-                    tinh_trang_tdm = "Hoàn thành"
-                elif han_date_tdm and today_tdm > han_date_tdm:
-                    tinh_trang_tdm = "Quá hạn"
-                elif han_date_tdm and today_tdm == han_date_tdm:
-                    tinh_trang_tdm = "Đúng hạn"
-                else:
-                    tinh_trang_tdm = "Chưa xong"
-
-                # Định dạng ngày hiển thị
-                ngay_nhan_hien  = ""
-                ngay_giao_hien  = ""
-                han_hien        = ""
-                try:
-                    ngay_tao_str = str(r.get("Ngày Tạo", "") or "")
-                    if ngay_tao_str:
-                        ngay_nhan_hien = datetime.strptime(ngay_tao_str[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
-                except Exception:
-                    ngay_nhan_hien = str(r.get("Ngày Tạo", "") or "")
-                try:
-                    if han_date_tdm:
-                        han_hien = han_date_tdm.strftime("%d/%m/%Y")
-                except Exception:
-                    han_hien = han_str_tdm
-                try:
-                    if ngay_kt_date:
-                        ngay_giao_hien = ngay_kt_date.strftime("%d/%m/%Y")
-                except Exception:
-                    ngay_giao_hien = ngay_kt_str
-
-                rows_tdm.append({
-                    "STT":              stt_tdm,
-                    "Tên Công Ty":      r.get("Công Ty", ""),
-                    "Tên Công Việc":    r.get("Tên Công Việc", ""),
-                    "Công Suất":        r.get("Công Suất", ""),
-                    "Mã Số Máy":        r.get("Mã Số", ""),
-                    "Số PO Nội Bộ":     r.get("Số PO Nội Bộ", ""),
-                    "Số PO KH/HĐ":      r.get("Số PO KH/HĐ", ""),
-                    "Số Báo Giá":       r.get("Số Báo Giá", ""),
-                    "Trạng Thái":       r.get("Trạng Thái", ""),
-                    "Ngày Nhận Máy":    ngay_nhan_hien,
-                    "Hạn Hoàn Thành":   han_hien,
-                    "Ngày Giao Máy":    ngay_giao_hien,
-                    "_han_raw":         han_date_tdm,
-                    "_giao_raw":        ngay_kt_date,
-                    "Loại Máy":         r.get("Loại Máy", ""),
-                    "Tình Trạng":       tinh_trang_tdm,
-                    "_task_id":         r.get("ID", ""),
-                    "_task_dict":       r.to_dict(),
-                })
-
-            if not rows_tdm:
-                st.info("ℹ️ Chưa có dữ liệu.")
-            else:
-                df_tdm = pd.DataFrame(rows_tdm)
-
-                # ── Bộ lọc hàng 1 ──
-                col_tf1, col_tf2, col_tf3 = st.columns(3)
-                with col_tf1:
-                    ds_nv_tdm = sorted(df_tdm["Tên Công Ty"].dropna().unique().tolist())
-                    loc_ct_tdm = st.multiselect("🏢 Lọc công ty", ds_nv_tdm, key="tdm_loc_ct", placeholder="Tất cả")
-                with col_tf2:
-                    ds_tt_tdm = sorted(df_tdm["Tình Trạng"].dropna().unique().tolist())
-                    loc_tt_tdm = st.multiselect("📊 Lọc tình trạng", ds_tt_tdm, key="tdm_loc_tt", placeholder="Tất cả")
-                with col_tf3:
-                    ds_lm_tdm = sorted(df_tdm["Loại Máy"].dropna().unique().tolist())
-                    ds_lm_tdm = [x for x in ds_lm_tdm if x.strip()]
-                    loc_lm_tdm = st.multiselect("🔧 Lọc loại máy", ds_lm_tdm, key="tdm_loc_lm", placeholder="Tất cả")
-
-                # ── Bộ lọc hàng 2: khoảng ngày nhận / giao ──
-                col_td1, col_td2, col_td3, col_td4 = st.columns(4)
-                with col_td1:
-                    tu_ngay_nhan = st.date_input("📅 Nhận máy từ", value=None, format="DD/MM/YYYY", key="tdm_tu_nhan")
-                with col_td2:
-                    den_ngay_nhan = st.date_input("📅 Nhận máy đến", value=None, format="DD/MM/YYYY", key="tdm_den_nhan")
-                with col_td3:
-                    tu_ngay_giao = st.date_input("📅 Giao máy từ", value=None, format="DD/MM/YYYY", key="tdm_tu_giao")
-                with col_td4:
-                    den_ngay_giao = st.date_input("📅 Giao máy đến", value=None, format="DD/MM/YYYY", key="tdm_den_giao")
-
-                df_show_tdm = df_tdm.copy()
-                if loc_ct_tdm:
-                    df_show_tdm = df_show_tdm[df_show_tdm["Tên Công Ty"].isin(loc_ct_tdm)]
-                if loc_tt_tdm:
-                    df_show_tdm = df_show_tdm[df_show_tdm["Tình Trạng"].isin(loc_tt_tdm)]
-                if loc_lm_tdm:
-                    df_show_tdm = df_show_tdm[df_show_tdm["Loại Máy"].isin(loc_lm_tdm)]
-                if tu_ngay_nhan:
-                    df_show_tdm = df_show_tdm[df_show_tdm["Ngày Nhận Máy"].apply(
-                        lambda v: _parse_date_display(v) is not None and _parse_date_display(v) >= tu_ngay_nhan)]
-                if den_ngay_nhan:
-                    df_show_tdm = df_show_tdm[df_show_tdm["Ngày Nhận Máy"].apply(
-                        lambda v: _parse_date_display(v) is not None and _parse_date_display(v) <= den_ngay_nhan)]
-                if tu_ngay_giao:
-                    df_show_tdm = df_show_tdm[df_show_tdm["_giao_raw"].apply(
-                        lambda d: d is not None and d >= tu_ngay_giao)]
-                if den_ngay_giao:
-                    df_show_tdm = df_show_tdm[df_show_tdm["_giao_raw"].apply(
-                        lambda d: d is not None and d <= den_ngay_giao)]
-
-                # ── KPI nhanh ──
-                total_tdm   = len(df_show_tdm)
-                da_giao     = len(df_show_tdm[df_show_tdm["Ngày Giao Máy"] != ""])
-                qua_han_tdm = len(df_show_tdm[df_show_tdm["Tình Trạng"] == "Quá hạn"])
-                truoc_han_tdm = len(df_show_tdm[df_show_tdm["Tình Trạng"] == "Trước hạn"])
-                kpi_c = st.columns(4)
-                kpi_c[0].metric("🔩 Tổng máy", total_tdm)
-                kpi_c[1].metric("✅ Đã giao", da_giao)
-                kpi_c[2].metric("🔴 Quá hạn", qua_han_tdm)
-                kpi_c[3].metric("🟢 Trước hạn", truoc_han_tdm)
-
-                st.divider()
-
-                # ── Bảng AgGrid ──
-                _cols_display_tdm = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số Máy",
-                                     "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá", "Trạng Thái",
-                                     "Ngày Nhận Máy", "Hạn Hoàn Thành", "Ngày Giao Máy",
-                                     "Loại Máy", "Tình Trạng"]
-
-                from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-                from st_aggrid.shared import JsCode
-
-                _badge_tt_tdm = JsCode("""
-                class TinhTrangTDMRenderer {
-                    init(p) {
-                        const c={'Trước hạn':{bg:'#dcfce7',fg:'#16a34a'},'Đúng hạn':{bg:'#fef9c3',fg:'#d97706'},
-                            'Quá hạn':{bg:'#fee2e2',fg:'#dc2626'},'Hoàn thành':{bg:'#dbeafe',fg:'#1d4ed8'},
-                            'Chưa xong':{bg:'#f3f4f6',fg:'#6b7280'}};
-                        const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
-                        this.el=document.createElement('span');
-                        this.el.innerText=p.value||'';
-                        Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
-                            borderRadius:'20px',fontWeight:'700',fontSize:'0.82rem',
-                            border:'1.5px solid '+s.fg+'40',whiteSpace:'nowrap',display:'inline-block'});
-                    }
-                    getGui(){return this.el;}
-                }""")
-
-                _badge_ts_tdm = JsCode("""
-                class TrangThaiTDMRenderer {
-                    init(p) {
-                        const c={'Chờ Làm':{bg:'#fee2e2',fg:'#dc2626'},'Đang Làm':{bg:'#fef9c3',fg:'#d97706'},
-                            'Hoàn Thành':{bg:'#dcfce7',fg:'#16a34a'},'Đang Kiểm Tra':{bg:'#dbeafe',fg:'#1d4ed8'},
-                            'Đã Phê Duyệt':{bg:'#dcfce7',fg:'#15803d'},'Đã Báo Giá':{bg:'#fef3c7',fg:'#b45309'},
-                            'Có Đơn':{bg:'#ede9fe',fg:'#7c3aed'},'Chờ Giao':{bg:'#fef9c3',fg:'#a16207'},
-                            'Đã Hoàn Thành - Giao Máy':{bg:'#bbf7d0',fg:'#166534'}};
-                        const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
-                        this.el=document.createElement('span');
-                        this.el.innerText=p.value||'';
-                        Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
-                            borderRadius:'20px',fontWeight:'600',fontSize:'0.82rem',
-                            whiteSpace:'nowrap',display:'inline-block'});
-                    }
-                    getGui(){return this.el;}
-                }""")
-
-                _df_grid_tdm = df_show_tdm[["_task_id"] + _cols_display_tdm].copy().reset_index(drop=True)
-
-                gb_tdm = GridOptionsBuilder.from_dataframe(_df_grid_tdm)
-                gb_tdm.configure_default_column(
-                    resizable=True, sortable=True, minWidth=80,
-                    filter="agTextColumnFilter", floatingFilter=True,
-                    floatingFilterComponentParams={"suppressFilterButton": True},
-                )
-                gb_tdm.configure_column("_task_id", hide=True)
-                gb_tdm.configure_column("STT", maxWidth=60, minWidth=50, filter=False, floatingFilter=False)
-                gb_tdm.configure_column("Tình Trạng", cellRenderer=_badge_tt_tdm, minWidth=110)
-                gb_tdm.configure_column("Trạng Thái", cellRenderer=_badge_ts_tdm, minWidth=155)
-                gb_tdm.configure_column("Tên Công Ty", minWidth=220, flex=2)
-                gb_tdm.configure_column("Tên Công Việc", minWidth=180, flex=2)
-                gb_tdm.configure_column("Hạn Hoàn Thành", minWidth=130)
-                gb_tdm.configure_column("Ngày Nhận Máy", minWidth=120)
-                gb_tdm.configure_column("Ngày Giao Máy", minWidth=120)
-                gb_tdm.configure_column("Loại Máy", minWidth=140)
-                gb_tdm.configure_column("Mã Số Máy", minWidth=100)
-                gb_tdm.configure_selection(selection_mode="single", use_checkbox=False)
-                gb_tdm.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38)
-                _go_tdm = gb_tdm.build()
-
-                _resp_tdm = AgGrid(
-                    _df_grid_tdm,
-                    gridOptions=_go_tdm,
-                    update_mode=GridUpdateMode.SELECTION_CHANGED,
-                    allow_unsafe_jscode=True,
-                    use_container_width=True,
-                    fit_columns_on_grid_load=False,
-                    theme="alpine",
-                    custom_css=_aggrid_css,
-                    key="aggrid_tdm",
-                )
-                st.caption(f"Hiển thị {len(df_show_tdm)} / {total_tdm} máy · 👆 Click vào hàng để xem chi tiết")
-
-                _sel_tdm = _resp_tdm.get("selected_rows")
-                if _sel_tdm is not None and len(_sel_tdm) > 0:
-                    _sel_id_tdm = str((_sel_tdm.iloc[0] if hasattr(_sel_tdm, "iloc") else _sel_tdm[0]).get("_task_id", ""))
-                    _prev_sel_tdm = st.session_state.get("_tdm_prev_sel_id", "")
-                    if _sel_id_tdm != _prev_sel_tdm:
-                        _match_tdm = df_show_tdm[df_show_tdm["_task_id"].astype(str) == _sel_id_tdm]
-                        if not _match_tdm.empty:
-                            _ds_tt_dlg_tdm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-                            st.session_state["_pending_dlg"] = (_match_tdm.iloc[0]["_task_dict"], _ds_tt_dlg_tdm)
-                    st.session_state["_tdm_prev_sel_id"] = _sel_id_tdm
-                else:
-                    st.session_state["_tdm_prev_sel_id"] = ""
-
-                # ── Xuất Excel ──
-                import io
-                cols_excel_tdm = _cols_display_tdm
-                df_excel_tdm = df_show_tdm[cols_excel_tdm].copy()
-                buf_tdm = io.BytesIO()
-                with pd.ExcelWriter(buf_tdm, engine="openpyxl") as writer_tdm:
-                    df_excel_tdm.to_excel(writer_tdm, index=False, sheet_name="TheoDoiTienDoMay")
-                    ws_tdm = writer_tdm.sheets["TheoDoiTienDoMay"]
-                    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-                    hdr_fill_tdm = PatternFill("solid", fgColor="3B82F6")
-                    thin2 = Side(style="thin", color="DDDDDD")
-                    brd2  = Border(left=thin2, right=thin2, top=thin2, bottom=thin2)
-                    for cell in ws_tdm[1]:
-                        cell.font      = Font(bold=True, color="FFFFFF", size=11)
-                        cell.fill      = hdr_fill_tdm
-                        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                        cell.border    = brd2
-                    _mau_excel_tdm = {
-                        "Trước hạn": "DCFCE7", "Đúng hạn": "FEF9C3",
-                        "Quá hạn":   "FEE2E2", "Hoàn thành": "DBEAFE",
-                        "Chưa xong": "F3F4F6",
-                    }
-                    col_tt_idx_tdm = cols_excel_tdm.index("Tình Trạng") + 1
-                    for row_idx, row_cells in enumerate(ws_tdm.iter_rows(min_row=2), start=2):
-                        for cell in row_cells:
-                            cell.border    = brd2
-                            cell.alignment = Alignment(vertical="center")
-                        tt_val = ws_tdm.cell(row=row_idx, column=col_tt_idx_tdm).value or ""
-                        if tt_val in _mau_excel_tdm:
-                            ws_tdm.cell(row=row_idx, column=col_tt_idx_tdm).fill = PatternFill("solid", fgColor=_mau_excel_tdm[tt_val])
-                    for col in ws_tdm.columns:
-                        max_len = max((len(str(c.value or "")) for c in col), default=8)
-                        ws_tdm.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
-                    ws_tdm.row_dimensions[1].height = 30
-                buf_tdm.seek(0)
-                ten_file_tdm = f"theo_doi_tien_do_may_{datetime.now().strftime('%d%m%Y_%H%M')}.xlsx"
-                st.download_button(
-                    label="📥 Xuất Excel",
-                    data=buf_tdm,
-                    file_name=ten_file_tdm,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="tdm_xuat_excel",
-                    use_container_width=False,
-                )
+        _fragment_tdm_content(df_tdm_all, _aggrid_css)
 
     # ── Gọi dialog trực tiếp (tránh loop vô hạn do AgGrid giữ selection) ──
     _pdlg = st.session_state.pop("_pending_dlg", None)
