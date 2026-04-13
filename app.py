@@ -6077,10 +6077,15 @@ def giao_dien_admin():
                 _sel_cvc = _resp_cvc.get("selected_rows")
                 if _sel_cvc is not None and len(_sel_cvc) > 0:
                     _sel_id_cvc = str((_sel_cvc.iloc[0] if hasattr(_sel_cvc, "iloc") else _sel_cvc[0]).get("_task_id", ""))
-                    _match_cvc = df_show_cvc[df_show_cvc["_task_id"].astype(str) == _sel_id_cvc]
-                    if not _match_cvc.empty:
-                        _ds_tt_dlg_cvc = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-                        st.session_state["_pending_dlg"] = (_match_cvc.iloc[0]["_task_dict"], _ds_tt_dlg_cvc)
+                    _prev_sel_cvc = st.session_state.get("_cvc_prev_sel_id", "")
+                    if _sel_id_cvc != _prev_sel_cvc:
+                        _match_cvc = df_show_cvc[df_show_cvc["_task_id"].astype(str) == _sel_id_cvc]
+                        if not _match_cvc.empty:
+                            _ds_tt_dlg_cvc = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+                            st.session_state["_pending_dlg"] = (_match_cvc.iloc[0]["_task_dict"], _ds_tt_dlg_cvc)
+                    st.session_state["_cvc_prev_sel_id"] = _sel_id_cvc
+                else:
+                    st.session_state["_cvc_prev_sel_id"] = ""
 
                 # ── Xuất Excel ──
                 import io
@@ -6371,10 +6376,15 @@ def giao_dien_admin():
                 _sel_tdm = _resp_tdm.get("selected_rows")
                 if _sel_tdm is not None and len(_sel_tdm) > 0:
                     _sel_id_tdm = str((_sel_tdm.iloc[0] if hasattr(_sel_tdm, "iloc") else _sel_tdm[0]).get("_task_id", ""))
-                    _match_tdm = df_show_tdm[df_show_tdm["_task_id"].astype(str) == _sel_id_tdm]
-                    if not _match_tdm.empty:
-                        _ds_tt_dlg_tdm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-                        st.session_state["_pending_dlg"] = (_match_tdm.iloc[0]["_task_dict"], _ds_tt_dlg_tdm)
+                    _prev_sel_tdm = st.session_state.get("_tdm_prev_sel_id", "")
+                    if _sel_id_tdm != _prev_sel_tdm:
+                        _match_tdm = df_show_tdm[df_show_tdm["_task_id"].astype(str) == _sel_id_tdm]
+                        if not _match_tdm.empty:
+                            _ds_tt_dlg_tdm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+                            st.session_state["_pending_dlg"] = (_match_tdm.iloc[0]["_task_dict"], _ds_tt_dlg_tdm)
+                    st.session_state["_tdm_prev_sel_id"] = _sel_id_tdm
+                else:
+                    st.session_state["_tdm_prev_sel_id"] = ""
 
                 # ── Xuất Excel ──
                 import io
