@@ -4731,7 +4731,7 @@ def _render_do_luong_inline(task_id, do_key, nhom_list, cvi=0):
                             url_d = urls_label[0]
                             col_img, col_del = st.columns([3, 1], gap="small")
                             with col_img:
-                                _hien_thi_anh_drive(url_d, width=120)
+                                _hien_thi_anh_drive(url_d, use_container_width=True)
                             with col_del:
                                 st.button(
                                     "🗑️", key=f"xoa_do_{task_id}_{cvi}_{lbl_key}_0",
@@ -4755,7 +4755,7 @@ def _render_do_luong_inline(task_id, do_key, nhom_list, cvi=0):
                                     try:
                                         with st.spinner("Đang tải ảnh lên..."):
                                             # Compress mạnh hơn (800px/70) → file nhỏ hơn → upload nhanh hơn
-                                            url_new = tai_anh_len_cloudinary(f_do, max_px=800, quality=70)
+                                            url_new = tai_anh_len_cloudinary(f_do)
                                         st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
                                         cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
                                         st.rerun(scope="fragment")
@@ -4865,7 +4865,7 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                     url_d = urls_label[0]
                     col_img, col_del = st.columns([3, 1], gap="small")
                     with col_img:
-                        _hien_thi_anh_drive(url_d, width=120)
+                        _hien_thi_anh_drive(url_d, use_container_width=True)
                     with col_del:
                         st.button(
                             "🗑️ Xoá", key=f"xoa_do_{task_id}_{lbl_key}_0",
@@ -4966,6 +4966,13 @@ def _task_dialog(hang_dict, ds_tt):
     ten  = hang_dict.get("Tên Công Việc", "")
     cty  = hang_dict.get("Công Ty", "")
     tt   = hang_dict.get("Trạng Thái", "")
+    # Lưu task ID vào URL (dùng JS replaceState để không trigger rerun)
+    st.markdown(
+        f"<script>(function(){{var u=new URL(window.location.href);"
+        f"u.searchParams.set('task','{tid}');"
+        f"history.replaceState({{}},'',u.toString());}})();</script>",
+        unsafe_allow_html=True,
+    )
     # Badge + selectbox trạng thái — fragment riêng để cập nhật ngay khi đổi
     _fragment_trang_thai_dialog(hang_dict, ds_tt)
     # ── Tên công việc có thể chỉnh sửa ──────────────────────────
@@ -6353,8 +6360,8 @@ def giao_dien_admin():
                     st.session_state.pop(f"{_ADM_PREFIX}_checklist", None)
                     st.session_state.pop(f"{_ADM_PREFIX}_cong_viec_con", None)
                     st.session_state.pop(f"{_ADM_PREFIX}_cv_seeded", None)
-                    for _k in ["adm_ten_task", "adm_mo_ta", "adm_cong_suat", "adm_so_cuc",
-                               "adm_ma_so", "adm_so_po_noi_bo", "adm_so_po_kh", "adm_so_bao_gia"]:
+                    # Chỉ xóa tên/mô tả/mã số (unique mỗi task), giữ lại các field còn lại
+                    for _k in ["adm_ten_task", "adm_mo_ta", "adm_ma_so"]:
                         st.session_state.pop(_k, None)
                     st.session_state["_adm_task_success"] = (
                         f"✅ Đã tạo task #{id_moi} thành công! Công ty: **{adm_cong_ty}**"
@@ -6419,6 +6426,7 @@ def giao_dien_admin():
         ds_tt_board = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
         # ── KANBAN BOARD ──────────────────────────────────────────
+        df_board = df_board.sort_values("ID", ascending=False)
         _render_kanban_board(df_board, ds_tt_board, board_key="adm_kb",
                              force_open=bool(adm_q.strip()))
 
@@ -6585,6 +6593,7 @@ def giao_dien_nhan_vien():
             st.info("Chưa có công việc nào trong hệ thống.")
         else:
             # ── KANBAN BOARD ────────────────────────────────────
+            df_cua_toi = df_cua_toi.sort_values("ID", ascending=False)
             _render_kanban_board(df_cua_toi, ds_tt, board_key="nv_kb",
                                  force_open=bool(q_search.strip() or q_cty.strip()))
 
@@ -6671,21 +6680,22 @@ def giao_dien_nhan_vien():
                 ds_trang_thai_nv = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
                 # ── Hàng đầu: Công Ty ──
-                nv_cong_ty = st.selectbox("🏢 Công Ty *", options=["-- Chọn Công Ty --"] + ds_cong_ty_nv, key=f"{_nv_prefix}_ct_{_v}")
+                # Các field sticky (giữ lại sau khi tạo task) dùng key không có version
+                nv_cong_ty = st.selectbox("🏢 Công Ty *", options=["-- Chọn Công Ty --"] + ds_cong_ty_nv, key=f"{_nv_prefix}_ct")
                 # ── Hàng tiếp theo: Người Phê Duyệt ──
                 nv_phe_duyet = st.selectbox(
                     "✅ Người Phê Duyệt",
                     options=["-- Không chọn --"] + ds_nv_nv,
-                    key=f"{_nv_prefix}_pd_{_v}"
+                    key=f"{_nv_prefix}_pd"
                 )
 
                 col_tt2, col_nam2 = st.columns(2)
                 with col_tt2:
-                    nv_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai_nv, key=f"{_nv_prefix}_tt_{_v}")
+                    nv_trang_thai = st.selectbox("📋 Trạng thái", options=ds_trang_thai_nv, key=f"{_nv_prefix}_tt")
                 with col_nam2:
-                    nv_nam = st.text_input("📅 Năm", value=str(datetime.now().year), key=f"{_nv_prefix}_nam_{_v}")
+                    nv_nam = st.text_input("📅 Năm", value=str(datetime.now().year), key=f"{_nv_prefix}_nam")
 
-                nv_deadline = st.date_input("📅 Hạn Hoàn Thành", key=f"{_nv_prefix}_dl_{_v}")
+                nv_deadline = st.date_input("📅 Hạn Hoàn Thành", key=f"{_nv_prefix}_dl")
 
                 col_lm_nv, col_tt_nv = st.columns(2)
                 with col_lm_nv:
@@ -6693,34 +6703,36 @@ def giao_dien_nhan_vien():
                     nv_loai_may = st.selectbox(
                         "🔧 Loại Máy",
                         options=["-- Không chọn --"] + ds_loai_may_nv,
-                        key=f"{_nv_prefix}_loai_may_{_v}",
+                        key=f"{_nv_prefix}_loai_may",
                     )
                 with col_tt_nv:
                     ds_tinh_trang_nv = lay_ten_cac_tinh_trang()
                     nv_tinh_trang = st.selectbox(
                         "🛠️ Tình Trạng",
                         options=["-- Không chọn --"] + ds_tinh_trang_nv,
-                        key=f"{_nv_prefix}_tinh_trang_{_v}",
+                        key=f"{_nv_prefix}_tinh_trang",
                     )
 
                 col_cs_nv, col_sc_nv = st.columns(2)
                 with col_cs_nv:
-                    nv_cong_suat = st.text_input("⚡ Công Suất", placeholder="VD: 5.5kW", key=f"{_nv_prefix}_cong_suat_{_v}")
+                    nv_cong_suat = st.text_input("⚡ Công Suất", placeholder="VD: 5.5kW", key=f"{_nv_prefix}_cong_suat")
                 with col_sc_nv:
-                    nv_so_cuc = st.text_input("🔩 Số Cực", placeholder="VD: 4P", key=f"{_nv_prefix}_so_cuc_{_v}")
+                    nv_so_cuc = st.text_input("🔩 Số Cực", placeholder="VD: 4P", key=f"{_nv_prefix}_so_cuc")
 
                 col_ms_nv, col_po_nv = st.columns(2)
                 with col_ms_nv:
+                    # Mã Số unique mỗi máy → reset theo version
                     nv_ma_so = st.text_input("🏷️ Mã Số", placeholder="VD: ABC-001", key=f"{_nv_prefix}_ma_so_{_v}")
                 with col_po_nv:
-                    nv_so_po_noi_bo = st.text_input("📄 Số PO Nội Bộ", placeholder="VD: PO-2024-001", key=f"{_nv_prefix}_so_po_noi_bo_{_v}")
+                    nv_so_po_noi_bo = st.text_input("📄 Số PO Nội Bộ", placeholder="VD: PO-2024-001", key=f"{_nv_prefix}_so_po_noi_bo")
 
                 col_kh_nv, col_bg_nv = st.columns(2)
                 with col_kh_nv:
-                    nv_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key=f"{_nv_prefix}_so_po_kh_{_v}")
+                    nv_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key=f"{_nv_prefix}_so_po_kh")
                 with col_bg_nv:
-                    nv_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key=f"{_nv_prefix}_so_bao_gia_{_v}")
+                    nv_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key=f"{_nv_prefix}_so_bao_gia")
 
+                # Tên & Mô tả unique mỗi task → reset theo version
                 nv_ten_task = st.text_input("📌 Tên Công Việc *", placeholder="Mô tả ngắn công việc cần làm", key=f"{_nv_prefix}_ten_{_v}")
                 nv_mo_ta    = st.text_area("📝 Mô Tả Chi Tiết", placeholder="Mô tả chi tiết về công việc...", key=f"{_nv_prefix}_mo_ta_{_v}")
 
@@ -7002,8 +7014,13 @@ def inject_css():
     html, body, [class*="css"] {
         font-family: 'Be Vietnam Pro', sans-serif;
     }
+    /* Tắt pull-to-refresh trên Android Chrome để tránh bị reload khi kéo trong dialog */
+    html, body {
+        overscroll-behavior-y: none;
+    }
     .stApp {
         background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 50%, #f0fdf4 100%);
+        overscroll-behavior-y: none;
     }
 
     /* ===== TIÊU ĐỀ CHÍNH ===== */
@@ -7577,6 +7594,30 @@ def inject_css():
         _calObs.observe(document.documentElement,{childList:true,subtree:true});
     })();
     </script>
+    <script>
+    /* Xóa 'task' khỏi URL khi user bấm X đóng dialog (không phải do switch app)
+       Dùng capture phase để chạy TRƯỚC khi Streamlit xử lý click → URL sạch trước rerun */
+    (function() {
+        document.addEventListener('click', function(e) {
+            var t = e.target;
+            for (var i = 0; i < 6; i++) {
+                if (!t) break;
+                var testid = (t.getAttribute && t.getAttribute('data-testid')) || '';
+                var ariaLabel = (t.getAttribute && t.getAttribute('aria-label')) || '';
+                if (testid.toLowerCase().indexOf('dismiss') !== -1 ||
+                    ariaLabel.toLowerCase() === 'close') {
+                    var url = new URL(window.location.href);
+                    if (url.searchParams.has('task')) {
+                        url.searchParams.delete('task');
+                        history.replaceState({}, '', url.toString());
+                    }
+                    return;
+                }
+                t = t.parentElement;
+            }
+        }, true);
+    })();
+    </script>
     """, unsafe_allow_html=True)
 
 
@@ -7809,18 +7850,31 @@ def main():
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Mở task dialog từ thông báo (sau rerun) ───────────────────────────
+    # ── Khôi phục dialog khi session mới (sau khi switch app / Chrome kill tab) ──
+    # Chỉ chạy 1 lần mỗi session (khi _session_init chưa set)
+    if not st.session_state.get("_session_init"):
+        st.session_state["_session_init"] = True
+        _url_task = st.query_params.get("task")
+        if _url_task and not st.session_state.get("_open_task_id_from_tb"):
+            st.session_state["_restore_task_id"] = _url_task
+
+    # ── Mở task dialog từ thông báo hoặc URL restore (sau rerun) ──────────
+    _tid_open = None
     if st.session_state.get("_open_task_id_from_tb"):
-        _tid_tb = st.session_state.pop("_open_task_id_from_tb")
+        _tid_open = st.session_state.pop("_open_task_id_from_tb")
         st.session_state.pop("_open_task_id_from_tb_user", None)
+    elif st.session_state.get("_restore_task_id"):
+        _tid_open = st.session_state.pop("_restore_task_id")
+
+    if _tid_open:
         try:
             _df_all  = lay_danh_sach_cong_viec()
             _ds_tt   = lay_ten_cac_trang_thai()
-            _matched = _df_all[_df_all["ID"].astype(str) == str(_tid_tb)]
+            _matched = _df_all[_df_all["ID"].astype(str) == str(_tid_open)]
             if not _matched.empty:
                 _task_dialog(_matched.iloc[0].to_dict(), _ds_tt)
         except Exception:
-            st.warning(f"Không tìm thấy Task #{_tid_tb}")
+            st.warning(f"Không tìm thấy Task #{_tid_open}")
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
