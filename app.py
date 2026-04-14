@@ -3689,7 +3689,8 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                 key=_up_key_m,
                 label_visibility="collapsed",
             )
-            if st.button("📤 Tải ảnh", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True):
+            if st.button("📤 Tải ảnh", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True,
+                         disabled=not bool(st.session_state.get(_up_key_m))):
                 _files_m = st.session_state.get(_up_key_m) or []
                 if _files_m:
                     with st.spinner(f"Đang tải {len(_files_m)} ảnh lên..."):
@@ -4272,7 +4273,8 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 label_visibility="collapsed",
             )
             if st.button("📤 Tải ảnh", key=f"{key_prefix}_btn_up_cv_{i}",
-                         use_container_width=True):
+                         use_container_width=True,
+                         disabled=not bool(st.session_state.get(_up_key_frag))):
                 _files = st.session_state.get(_up_key_frag) or []
                 if _files:
                     try:
@@ -4351,7 +4353,8 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                                 url = tai_anh_len_cloudinary(f)
                                 st.session_state.setdefault(dk, {}).setdefault(lk, []).append(url)
                             st.button("📤 Tải ảnh", key=f"{key_prefix}_btn_nm_{i}_{_lbl_key}",
-                                      use_container_width=True, on_click=_cb_up_nm)
+                                      use_container_width=True, on_click=_cb_up_nm,
+                                      disabled=not bool(st.session_state.get(_up_k)))
 
     # Thêm thủ công một mục mới
     st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
@@ -4968,8 +4971,6 @@ def _task_dialog(hang_dict, ds_tt):
     ten  = hang_dict.get("Tên Công Việc", "")
     cty  = hang_dict.get("Công Ty", "")
     tt   = hang_dict.get("Trạng Thái", "")
-    # Lưu task đang mở để khôi phục sau khi reload (an toàn, chỉ session_state)
-    st.session_state["_active_task_id"] = str(tid)
     # Badge + selectbox trạng thái — fragment riêng để cập nhật ngay khi đổi
     _fragment_trang_thai_dialog(hang_dict, ds_tt)
     # ── Tên công việc có thể chỉnh sửa ──────────────────────────
@@ -7604,13 +7605,8 @@ def inject_css():
                 _hiddenAt = null;
                 if(elapsed >= THRESHOLD){
                     var token  = localStorage.getItem('_qlcv_token') || '';
-                    var taskId = localStorage.getItem('_qlcv_task')  || '';
                     var base   = window.location.origin + window.location.pathname;
-                    var params = new URLSearchParams();
-                    if(token)  params.set('s',    token);
-                    if(taskId) params.set('task', taskId);
-                    var qs = params.toString();
-                    window.location.href = base + (qs ? '?' + qs : '');
+                    window.location.href = base + (token ? '?s=' + token : '');
                 }
             }
         });
@@ -7771,19 +7767,11 @@ def main():
             giao_dien_dang_nhap()
             return
 
-    # Lưu token + active task vào localStorage để khôi phục sau reload
-    _cur_token  = st.session_state.get("session_token", "")
-    _active_tid = str(st.session_state.get("_active_task_id", ""))
+    # Lưu token vào localStorage để khôi phục session khi reload
+    _cur_token = st.session_state.get("session_token", "")
     if _cur_token:
         st.components.v1.html(
-            f"<script>"
-            f"localStorage.setItem('_qlcv_token','{_cur_token}');"
-            f"if('{_active_tid}'){{"
-            f"  localStorage.setItem('_qlcv_task','{_active_tid}');"
-            f"}}else{{"
-            f"  localStorage.removeItem('_qlcv_task');"
-            f"}}"
-            f"</script>",
+            f"<script>localStorage.setItem('_qlcv_token','{_cur_token}');</script>",
             height=0,
         )
 
@@ -7856,30 +7844,18 @@ def main():
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Khôi phục dialog từ URL sau reload (chỉ chạy 1 lần/session mới) ──
-    if not st.session_state.get("_session_init"):
-        st.session_state["_session_init"] = True
-        _url_task = st.query_params.get("task")
-        if _url_task:
-            st.session_state["_restore_task_id"] = _url_task
-
-    # ── Mở task dialog từ thông báo hoặc URL restore ───────────────────
-    _tid_open = None
+    # ── Mở task dialog từ thông báo (sau rerun) ───────────────────────────
     if st.session_state.get("_open_task_id_from_tb"):
-        _tid_open = st.session_state.pop("_open_task_id_from_tb")
+        _tid_tb = st.session_state.pop("_open_task_id_from_tb")
         st.session_state.pop("_open_task_id_from_tb_user", None)
-    elif st.session_state.get("_restore_task_id"):
-        _tid_open = st.session_state.pop("_restore_task_id")
-
-    if _tid_open:
         try:
             _df_all  = lay_danh_sach_cong_viec()
             _ds_tt   = lay_ten_cac_trang_thai()
-            _matched = _df_all[_df_all["ID"].astype(str) == str(_tid_open)]
+            _matched = _df_all[_df_all["ID"].astype(str) == str(_tid_tb)]
             if not _matched.empty:
                 _task_dialog(_matched.iloc[0].to_dict(), _ds_tt)
         except Exception:
-            st.warning(f"Không tìm thấy Task #{_tid_open}")
+            st.warning(f"Không tìm thấy Task #{_tid_tb}")
 
     # ── Điều hướng giao diện ───────────────────────────────────────────────
     if vai_tro == "admin":
