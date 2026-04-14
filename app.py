@@ -7224,6 +7224,15 @@ def inject_css():
     .stButton > button:active {
         transform: translateY(0px) !important;
     }
+    .stButton > button:disabled,
+    .stButton > button[disabled] {
+        background: #c8c8d4 !important;
+        color: #888 !important;
+        box-shadow: none !important;
+        cursor: not-allowed !important;
+        transform: none !important;
+        opacity: 0.7 !important;
+    }
 
     /* ===== DOWNLOAD BUTTON ===== */
     .stDownloadButton > button {
