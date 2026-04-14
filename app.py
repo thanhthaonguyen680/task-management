@@ -4749,7 +4749,8 @@ def _render_do_luong_inline(task_id, do_key, nhom_list, cvi=0):
                                 accept_multiple_files=False,
                             )
                             if st.button("📤 Tải ảnh", key=f"btn_do_{task_id}_{cvi}_{lbl_key}",
-                                         use_container_width=True):
+                                         use_container_width=True,
+                                         disabled=not bool(st.session_state.get(up_key))):
                                 f_do = st.session_state.get(up_key)
                                 if f_do:
                                     try:
@@ -4884,7 +4885,8 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                         accept_multiple_files=False,
                     )
                     if st.button("📤 Tải ảnh", key=f"btn_do_{task_id}_{lbl_key}",
-                                 use_container_width=True):
+                                 use_container_width=True,
+                                 disabled=not bool(st.session_state.get(up_key))):
                         f_do = st.session_state.get(up_key)
                         if f_do:
                             try:
@@ -4966,13 +4968,8 @@ def _task_dialog(hang_dict, ds_tt):
     ten  = hang_dict.get("Tên Công Việc", "")
     cty  = hang_dict.get("Công Ty", "")
     tt   = hang_dict.get("Trạng Thái", "")
-    # Lưu task ID vào URL (dùng JS replaceState để không trigger rerun)
-    st.markdown(
-        f"<script>(function(){{var u=new URL(window.location.href);"
-        f"u.searchParams.set('task','{tid}');"
-        f"history.replaceState({{}},'',u.toString());}})();</script>",
-        unsafe_allow_html=True,
-    )
+    # Lưu task đang mở để khôi phục sau khi reload (an toàn, chỉ session_state)
+    st.session_state["_active_task_id"] = str(tid)
     # Badge + selectbox trạng thái — fragment riêng để cập nhật ngay khi đổi
     _fragment_trang_thai_dialog(hang_dict, ds_tt)
     # ── Tên công việc có thể chỉnh sửa ──────────────────────────
@@ -7595,27 +7592,28 @@ def inject_css():
     })();
     </script>
     <script>
-    /* Xóa 'task' khỏi URL khi user bấm X đóng dialog (không phải do switch app)
-       Dùng capture phase để chạy TRƯỚC khi Streamlit xử lý click → URL sạch trước rerun */
-    (function() {
-        document.addEventListener('click', function(e) {
-            var t = e.target;
-            for (var i = 0; i < 6; i++) {
-                if (!t) break;
-                var testid = (t.getAttribute && t.getAttribute('data-testid')) || '';
-                var ariaLabel = (t.getAttribute && t.getAttribute('aria-label')) || '';
-                if (testid.toLowerCase().indexOf('dismiss') !== -1 ||
-                    ariaLabel.toLowerCase() === 'close') {
-                    var url = new URL(window.location.href);
-                    if (url.searchParams.has('task')) {
-                        url.searchParams.delete('task');
-                        history.replaceState({}, '', url.toString());
-                    }
-                    return;
+    /* Reload trang sau 3 phút switch app để tránh app bị đơ/freeze */
+    (function(){
+        var THRESHOLD = 180000; // 3 phút
+        var _hiddenAt = null;
+        document.addEventListener('visibilitychange', function(){
+            if(document.visibilityState === 'hidden'){
+                _hiddenAt = Date.now();
+            } else if(document.visibilityState === 'visible' && _hiddenAt !== null){
+                var elapsed = Date.now() - _hiddenAt;
+                _hiddenAt = null;
+                if(elapsed >= THRESHOLD){
+                    var token  = localStorage.getItem('_qlcv_token') || '';
+                    var taskId = localStorage.getItem('_qlcv_task')  || '';
+                    var base   = window.location.origin + window.location.pathname;
+                    var params = new URLSearchParams();
+                    if(token)  params.set('s',    token);
+                    if(taskId) params.set('task', taskId);
+                    var qs = params.toString();
+                    window.location.href = base + (qs ? '?' + qs : '');
                 }
-                t = t.parentElement;
             }
-        }, true);
+        });
     })();
     </script>
     """, unsafe_allow_html=True)
@@ -7773,11 +7771,19 @@ def main():
             giao_dien_dang_nhap()
             return
 
-    # Lưu token vào localStorage để khôi phục session khi mở lại app
-    _cur_token = st.session_state.get("session_token", "")
+    # Lưu token + active task vào localStorage để khôi phục sau reload
+    _cur_token  = st.session_state.get("session_token", "")
+    _active_tid = str(st.session_state.get("_active_task_id", ""))
     if _cur_token:
         st.components.v1.html(
-            f"<script>localStorage.setItem('_qlcv_token','{_cur_token}');</script>",
+            f"<script>"
+            f"localStorage.setItem('_qlcv_token','{_cur_token}');"
+            f"if('{_active_tid}'){{"
+            f"  localStorage.setItem('_qlcv_task','{_active_tid}');"
+            f"}}else{{"
+            f"  localStorage.removeItem('_qlcv_task');"
+            f"}}"
+            f"</script>",
             height=0,
         )
 
@@ -7850,15 +7856,14 @@ def main():
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Khôi phục dialog khi session mới (sau khi switch app / Chrome kill tab) ──
-    # Chỉ chạy 1 lần mỗi session (khi _session_init chưa set)
+    # ── Khôi phục dialog từ URL sau reload (chỉ chạy 1 lần/session mới) ──
     if not st.session_state.get("_session_init"):
         st.session_state["_session_init"] = True
         _url_task = st.query_params.get("task")
-        if _url_task and not st.session_state.get("_open_task_id_from_tb"):
+        if _url_task:
             st.session_state["_restore_task_id"] = _url_task
 
-    # ── Mở task dialog từ thông báo hoặc URL restore (sau rerun) ──────────
+    # ── Mở task dialog từ thông báo hoặc URL restore ───────────────────
     _tid_open = None
     if st.session_state.get("_open_task_id_from_tb"):
         _tid_open = st.session_state.pop("_open_task_id_from_tb")
