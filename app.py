@@ -7021,6 +7021,13 @@ def inject_css():
         overscroll-behavior-y: none;
     }
 
+    /* ===== FIX: AgGrid iframe bị collapse trên Streamlit >= 1.40 ===== */
+    div[data-testid="stCustomComponentV1"] > iframe {
+        height: 620px !important;
+        min-height: 620px !important;
+        display: block !important;
+    }
+
     /* ===== TIÊU ĐỀ CHÍNH ===== */
     .main-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
