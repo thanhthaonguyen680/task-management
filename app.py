@@ -5118,6 +5118,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                 cong_ty   = str(h.get("Công Ty", "") or "")
                 nhan_vien = str(h.get("Nhân Viên", "") or "")
                 ngay_tao  = str(h.get("Ngày Tạo", ""))[:10]
+                mo_ta     = str(h.get("Mô Tả", "") or "").strip()
 
                 is_over = False
                 try:
@@ -5156,6 +5157,9 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                                          help="Xóa công việc này",
                                          use_container_width=True):
                                 _dialog_xac_nhan_xoa(task_id, ten_cv)
+                        if mo_ta:
+                            short_mo_ta = mo_ta[:120] + ("…" if len(mo_ta) > 120 else "")
+                            st.caption(f"📝 {short_mo_ta}")
                         meta = []
                         if cong_ty:   meta.append(f"🏢 {cong_ty}")
                         if nhan_vien: meta.append(f"👤 {nhan_vien}")
