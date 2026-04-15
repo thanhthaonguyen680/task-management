@@ -5370,7 +5370,7 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
     gb_cvc.configure_column("Ngày Hoàn Thành", minWidth=130)
     gb_cvc.configure_column("Loại Máy", minWidth=140)
     gb_cvc.configure_selection(selection_mode="single", use_checkbox=False)
-    gb_cvc.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38)
+    gb_cvc.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38, domLayout="normal")
     _go_cvc = gb_cvc.build()
 
     _resp_cvc = AgGrid(
@@ -5651,7 +5651,7 @@ def _fragment_tdm_content(df_tdm_all, aggrid_css):
     gb_tdm.configure_column("Loại Máy", minWidth=140)
     gb_tdm.configure_column("Mã Số Máy", minWidth=100)
     gb_tdm.configure_selection(selection_mode="single", use_checkbox=False)
-    gb_tdm.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38)
+    gb_tdm.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38, domLayout="normal")
     _go_tdm = gb_tdm.build()
 
     _resp_tdm = AgGrid(
