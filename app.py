@@ -6988,13 +6988,16 @@ def inject_css():
         overscroll-behavior-y: none;
     }
 
-    /* ===== st.dataframe header: orange + bold ===== */
+    /* ===== st.dataframe header: purple + bold ===== */
     [data-testid="stDataFrame"] [class*="headerCell"],
     [data-testid="stDataFrame"] [class*="header-cell"],
     [data-testid="stDataFrame"] th {
-        background-color: #f59e0b !important;
+        background-color: #7c3aed !important;
         color: white !important;
         font-weight: 700 !important;
+        font-size: 0.82rem !important;
+        letter-spacing: 0.02em !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.25) !important;
     }
 
     /* ===== TIÊU ĐỀ CHÍNH ===== */
