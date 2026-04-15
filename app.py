@@ -3915,7 +3915,7 @@ _MAC_DINH_CHECKLIST = [
     {"text": "Thay cánh quạt",             "done": False},
     {"text": "Thay dây nguồn/dây điện",    "done": False},
     {"text": "Thay nắp chụp",              "done": False},
-    {"text": "Đấp cốt",                    "done": False},
+    {"text": "Đắp cốt",                    "done": False},
     {"text": "Gia công mới cốt",           "done": False},
 ]
 
