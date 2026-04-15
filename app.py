@@ -7838,7 +7838,11 @@ def main():
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Trạng thái dialog (đọc trước khi giao diện render) ───────────────
+    # ── Trạng thái dialog ─────────────────────────────────────────────────
+    # _is_fresh_session = True chỉ khi page thực sự reload (session mới hoàn toàn)
+    # Khác với st.rerun() — rerun trong cùng session vẫn giữ session_marker
+    _is_fresh_session = "session_marker" not in st.session_state
+    st.session_state["session_marker"] = True
     _dlg_was_active = st.session_state.get("_dlg_active_flag", False)
     st.session_state["_dlg_active_flag"] = False
 
@@ -7865,11 +7869,13 @@ def main():
     _dlg_qp = st.query_params.get("dlg", "")
     _pdlg   = st.session_state.pop("_pending_dlg", None)
 
+    _dlg_currently_active = st.session_state.get("_dlg_active_flag", False)
+
     if _pdlg:
         # Mở dialog từ click button / row selection
         _task_dialog(_pdlg[0], _pdlg[1])
-    elif _dlg_qp and not _dlg_was_active:
-        # Session mới sau reload/reconnect → khôi phục dialog từ URL
+    elif _dlg_qp and _is_fresh_session:
+        # Session mới (page reload / reconnect sau khi background) → khôi phục dialog
         try:
             _df_r  = lay_danh_sach_cong_viec()
             _row_r = _df_r[_df_r["ID"].astype(str) == _dlg_qp]
@@ -7883,8 +7889,8 @@ def main():
                 del st.query_params["dlg"]
             except Exception:
                 pass
-    elif _dlg_qp and _dlg_was_active and not st.session_state.get("_dlg_active_flag"):
-        # Dialog đóng bằng nút X trong cùng session → xóa query param
+    elif _dlg_qp and not _is_fresh_session and _dlg_was_active and not _dlg_currently_active:
+        # Cùng session, dialog đóng bằng nút X → xóa query param
         try:
             del st.query_params["dlg"]
         except Exception:
