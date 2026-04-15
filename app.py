@@ -5319,8 +5319,38 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
                  "Loại Máy", "Tình Trạng"]
     _df_grid_cvc = df_show_cvc[cols_show].copy().reset_index(drop=True)
 
+    _TT_STYLE = {
+        'Trước hạn': 'background-color:#dcfce7;color:#16a34a;font-weight:700',
+        'Đúng hạn':  'background-color:#fef9c3;color:#d97706;font-weight:700',
+        'Quá hạn':   'background-color:#fee2e2;color:#dc2626;font-weight:700',
+        'Hoàn thành':'background-color:#dbeafe;color:#1d4ed8;font-weight:700',
+        'Chưa xong': 'background-color:#f3f4f6;color:#6b7280;font-weight:700',
+    }
+    _TS_STYLE = {
+        'Chờ Làm':   'background-color:#fee2e2;color:#dc2626;font-weight:600',
+        'Đang Làm':  'background-color:#fef9c3;color:#d97706;font-weight:600',
+        'Hoàn Thành':'background-color:#dcfce7;color:#16a34a;font-weight:600',
+        'Đang Kiểm Tra':'background-color:#dbeafe;color:#1d4ed8;font-weight:600',
+        'Đã Phê Duyệt':  'background-color:#dcfce7;color:#15803d;font-weight:600',
+        'Đã Báo Giá':    'background-color:#fef3c7;color:#b45309;font-weight:600',
+        'Có Đơn':    'background-color:#ede9fe;color:#7c3aed;font-weight:600',
+        'Chờ Giao':  'background-color:#fef9c3;color:#a16207;font-weight:600',
+        'Đã Hoàn Thành - Giao Máy':'background-color:#bbf7d0;color:#166534;font-weight:600',
+    }
+    _styler_cvc = (
+        _df_grid_cvc.style
+        .map(lambda v: _TT_STYLE.get(str(v), ''), subset=['Tình Trạng'])
+        .map(lambda v: _TS_STYLE.get(str(v), ''), subset=['Trạng Thái'])
+        .set_table_styles([{
+            'selector': 'thead th',
+            'props': [('background-color','#f59e0b'),('color','white'),
+                      ('font-weight','bold'),('font-size','0.8rem'),
+                      ('text-transform','uppercase')],
+        }])
+    )
+
     _evt_cvc = st.dataframe(
-        _df_grid_cvc,
+        _styler_cvc,
         use_container_width=True,
         hide_index=True,
         height=600,
@@ -5548,8 +5578,38 @@ def _fragment_tdm_content(df_tdm_all, aggrid_css):
 
     _df_grid_tdm = df_show_tdm[_cols_display_tdm].copy().reset_index(drop=True)
 
+    _TT_STYLE_TDM = {
+        'Trước hạn': 'background-color:#dcfce7;color:#16a34a;font-weight:700',
+        'Đúng hạn':  'background-color:#fef9c3;color:#d97706;font-weight:700',
+        'Quá hạn':   'background-color:#fee2e2;color:#dc2626;font-weight:700',
+        'Hoàn thành':'background-color:#dbeafe;color:#1d4ed8;font-weight:700',
+        'Chưa xong': 'background-color:#f3f4f6;color:#6b7280;font-weight:700',
+    }
+    _TS_STYLE_TDM = {
+        'Chờ Làm':   'background-color:#fee2e2;color:#dc2626;font-weight:600',
+        'Đang Làm':  'background-color:#fef9c3;color:#d97706;font-weight:600',
+        'Hoàn Thành':'background-color:#dcfce7;color:#16a34a;font-weight:600',
+        'Đang Kiểm Tra':'background-color:#dbeafe;color:#1d4ed8;font-weight:600',
+        'Đã Phê Duyệt':  'background-color:#dcfce7;color:#15803d;font-weight:600',
+        'Đã Báo Giá':    'background-color:#fef3c7;color:#b45309;font-weight:600',
+        'Có Đơn':    'background-color:#ede9fe;color:#7c3aed;font-weight:600',
+        'Chờ Giao':  'background-color:#fef9c3;color:#a16207;font-weight:600',
+        'Đã Hoàn Thành - Giao Máy':'background-color:#bbf7d0;color:#166534;font-weight:600',
+    }
+    _styler_tdm = (
+        _df_grid_tdm.style
+        .map(lambda v: _TT_STYLE_TDM.get(str(v), ''), subset=['Tình Trạng'])
+        .map(lambda v: _TS_STYLE_TDM.get(str(v), ''), subset=['Trạng Thái'])
+        .set_table_styles([{
+            'selector': 'thead th',
+            'props': [('background-color','#3b82f6'),('color','white'),
+                      ('font-weight','bold'),('font-size','0.8rem'),
+                      ('text-transform','uppercase')],
+        }])
+    )
+
     _evt_tdm = st.dataframe(
-        _df_grid_tdm,
+        _styler_tdm,
         use_container_width=True,
         hide_index=True,
         height=600,
@@ -6928,11 +6988,13 @@ def inject_css():
         overscroll-behavior-y: none;
     }
 
-    /* ===== FIX: AgGrid iframe bị collapse trên Streamlit >= 1.40 ===== */
-    div[data-testid="stCustomComponentV1"] > iframe {
-        height: 620px !important;
-        min-height: 620px !important;
-        display: block !important;
+    /* ===== st.dataframe header: orange + bold ===== */
+    [data-testid="stDataFrame"] [class*="headerCell"],
+    [data-testid="stDataFrame"] [class*="header-cell"],
+    [data-testid="stDataFrame"] th {
+        background-color: #f59e0b !important;
+        color: white !important;
+        font-weight: 700 !important;
     }
 
     /* ===== TIÊU ĐỀ CHÍNH ===== */
