@@ -5271,34 +5271,36 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
 
     df_cvc = pd.DataFrame(rows_cvc)
 
-    col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1:
-        ds_nv_cvc = sorted(df_cvc["Nhân Viên"].dropna().unique().tolist())
-        loc_nv_cvc = st.multiselect("👤 Lọc nhân viên", ds_nv_cvc, key="cvc_loc_nv", placeholder="Tất cả")
-    with col_f2:
-        ds_ct_cvc = sorted(df_cvc["Tên Công Ty"].dropna().unique().tolist())
-        loc_ct_cvc = st.multiselect("🏢 Lọc công ty", ds_ct_cvc, key="cvc_loc_ct", placeholder="Tất cả")
-    with col_f3:
-        ds_tt_cvc = sorted(df_cvc["Tình Trạng"].dropna().unique().tolist())
-        loc_tt_cvc = st.multiselect("📊 Lọc tình trạng", ds_tt_cvc, key="cvc_loc_tt", placeholder="Tất cả")
+    # ── Bộ lọc theo từng cột ──────────────────────────────────
+    _fc1, _fc2, _fc3, _fc4 = st.columns(4)
+    _f_ms_cvc  = _fc1.text_input("🔢 Mã số",        key="cvc_f_ms",  placeholder="260619...")
+    _f_ct_cvc  = _fc2.text_input("🏢 Công ty",       key="cvc_f_ct",  placeholder="Tên công ty...")
+    _f_nv_cvc  = _fc3.text_input("👤 Nhân viên",     key="cvc_f_nv",  placeholder="Tên nhân viên...")
+    _f_cv_cvc  = _fc4.text_input("🔧 Công việc con", key="cvc_f_cv",  placeholder="Quấn dây, Lắp máy...")
 
-    col_d1, col_d2, _ = st.columns(3)
-    with col_d1:
-        tu_ngay = st.date_input("📅 Từ ngày (Ngày Hoàn Thành)", value=None, format="DD/MM/YYYY", key="cvc_tu_ngay")
-    with col_d2:
-        den_ngay = st.date_input("📅 Đến ngày", value=None, format="DD/MM/YYYY", key="cvc_den_ngay")
+    _fc5, _fc6, _fc7, _fc8 = st.columns(4)
+    _f_tt_cvc  = _fc5.selectbox("📊 Tình trạng", ["Tất cả"] + sorted(df_cvc["Tình Trạng"].dropna().unique().tolist()), key="cvc_f_tt")
+    _f_ts_cvc  = _fc6.selectbox("📋 Trạng thái",  ["Tất cả"] + sorted(df_cvc["Trạng Thái"].dropna().unique().tolist()),  key="cvc_f_ts")
+    _f_tu_cvc  = _fc7.date_input("📅 Hoàn thành từ", value=None, format="DD/MM/YYYY", key="cvc_f_tu")
+    _f_den_cvc = _fc8.date_input("📅 đến ngày",      value=None, format="DD/MM/YYYY", key="cvc_f_den")
 
     df_show_cvc = df_cvc.copy()
-    if loc_nv_cvc:
-        df_show_cvc = df_show_cvc[df_show_cvc["Nhân Viên"].isin(loc_nv_cvc)]
-    if loc_ct_cvc:
-        df_show_cvc = df_show_cvc[df_show_cvc["Tên Công Ty"].isin(loc_ct_cvc)]
-    if loc_tt_cvc:
-        df_show_cvc = df_show_cvc[df_show_cvc["Tình Trạng"].isin(loc_tt_cvc)]
-    if tu_ngay:
-        df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(lambda d: d is not None and d >= tu_ngay)]
-    if den_ngay:
-        df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(lambda d: d is not None and d <= den_ngay)]
+    if _f_ms_cvc:
+        df_show_cvc = df_show_cvc[df_show_cvc["Mã Số"].astype(str).str.contains(_f_ms_cvc, case=False, na=False)]
+    if _f_ct_cvc:
+        df_show_cvc = df_show_cvc[df_show_cvc["Tên Công Ty"].str.contains(_f_ct_cvc, case=False, na=False)]
+    if _f_nv_cvc:
+        df_show_cvc = df_show_cvc[df_show_cvc["Nhân Viên"].str.contains(_f_nv_cvc, case=False, na=False)]
+    if _f_cv_cvc:
+        df_show_cvc = df_show_cvc[df_show_cvc["Công Việc Con"].str.contains(_f_cv_cvc, case=False, na=False)]
+    if _f_tt_cvc != "Tất cả":
+        df_show_cvc = df_show_cvc[df_show_cvc["Tình Trạng"] == _f_tt_cvc]
+    if _f_ts_cvc != "Tất cả":
+        df_show_cvc = df_show_cvc[df_show_cvc["Trạng Thái"] == _f_ts_cvc]
+    if _f_tu_cvc:
+        df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(lambda d: d is not None and d >= _f_tu_cvc)]
+    if _f_den_cvc:
+        df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(lambda d: d is not None and d <= _f_den_cvc)]
 
     total = len(df_show_cvc)
     done_count  = len(df_show_cvc[df_show_cvc["Ngày Hoàn Thành"] != ""])
@@ -5325,21 +5327,33 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
         on_select="rerun",
         selection_mode="single-row",
         key="df_cvc",
+        column_config={
+            "STT":             st.column_config.NumberColumn("STT",            width="small"),
+            "Tên Công Ty":     st.column_config.TextColumn("Tên Công Ty",      width="large"),
+            "Tên Công Việc":   st.column_config.TextColumn("Tên Công Việc",    width="large"),
+            "Công Suất":       st.column_config.TextColumn("Công Suất",        width="small"),
+            "Mã Số":           st.column_config.TextColumn("Mã Số",            width="small"),
+            "Công Việc Con":   st.column_config.TextColumn("Công Việc Con",    width="medium"),
+            "Nhân Viên":       st.column_config.TextColumn("Nhân Viên",        width="medium"),
+            "Ngày Hoàn Thành": st.column_config.TextColumn("Ngày HT",         width="small"),
+            "Trạng Thái":      st.column_config.TextColumn("Trạng Thái",       width="medium"),
+            "Loại Máy":        st.column_config.TextColumn("Loại Máy",         width="medium"),
+            "Tình Trạng":      st.column_config.TextColumn("Tình Trạng",       width="small"),
+        },
     )
     st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con · 👆 Click vào hàng để xem chi tiết")
 
     _sel_rows_cvc = _evt_cvc.selection.rows if hasattr(_evt_cvc, "selection") else []
     if _sel_rows_cvc:
         _sel_idx_cvc = _sel_rows_cvc[0]
-        _sel_id_cvc = str(df_show_cvc.iloc[_sel_idx_cvc]["_task_id"])
-        _prev_sel_cvc = st.session_state.get("_cvc_prev_sel_id", "")
-        if _sel_id_cvc != _prev_sel_cvc:
+        _sel_id_cvc  = str(df_show_cvc.iloc[_sel_idx_cvc]["_task_id"])
+        if _sel_id_cvc != st.session_state.get("_cvc_prev_sel_id", ""):
             _match_cvc = df_show_cvc[df_show_cvc["_task_id"].astype(str) == _sel_id_cvc]
             if not _match_cvc.empty:
-                _ds_tt_dlg_cvc = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-                st.session_state["_pending_dlg"] = (_match_cvc.iloc[0]["_task_dict"], _ds_tt_dlg_cvc)
-                st.session_state["_cvc_prev_sel_id"] = _sel_id_cvc
-                st.rerun(scope="app")
+                st.session_state["_pending_dlg"] = (
+                    _match_cvc.iloc[0]["_task_dict"],
+                    lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH,
+                )
         st.session_state["_cvc_prev_sel_id"] = _sel_id_cvc
     else:
         st.session_state["_cvc_prev_sel_id"] = ""
@@ -5480,55 +5494,50 @@ def _fragment_tdm_content(df_tdm_all, aggrid_css):
 
     df_tdm = pd.DataFrame(rows_tdm)
 
-    col_tf1, col_tf2, col_tf3 = st.columns(3)
-    with col_tf1:
-        ds_nv_tdm = sorted(df_tdm["Tên Công Ty"].dropna().unique().tolist())
-        loc_ct_tdm = st.multiselect("🏢 Lọc công ty", ds_nv_tdm, key="tdm_loc_ct", placeholder="Tất cả")
-    with col_tf2:
-        ds_tt_tdm = sorted(df_tdm["Tình Trạng"].dropna().unique().tolist())
-        loc_tt_tdm = st.multiselect("📊 Lọc tình trạng", ds_tt_tdm, key="tdm_loc_tt", placeholder="Tất cả")
-    with col_tf3:
-        ds_lm_tdm = sorted(df_tdm["Loại Máy"].dropna().unique().tolist())
-        ds_lm_tdm = [x for x in ds_lm_tdm if x.strip()]
-        loc_lm_tdm = st.multiselect("🔧 Lọc loại máy", ds_lm_tdm, key="tdm_loc_lm", placeholder="Tất cả")
+    # ── Bộ lọc theo từng cột ──────────────────────────────────
+    _tf1, _tf2, _tf3, _tf4 = st.columns(4)
+    _f_ms_tdm  = _tf1.text_input("🔢 Mã số máy",  key="tdm_f_ms",  placeholder="260619...")
+    _f_ct_tdm  = _tf2.text_input("🏢 Công ty",     key="tdm_f_ct",  placeholder="Tên công ty...")
+    _f_po_tdm  = _tf3.text_input("📄 Số PO / BG",  key="tdm_f_po",  placeholder="DH00619, BG0277...")
+    _f_lm_tdm  = _tf4.text_input("🔧 Loại máy",    key="tdm_f_lm",  placeholder="Động cơ AC...")
 
-    col_td1, col_td2, col_td3, col_td4 = st.columns(4)
-    with col_td1:
-        tu_ngay_nhan = st.date_input("📅 Nhận máy từ", value=None, format="DD/MM/YYYY", key="tdm_tu_nhan")
-    with col_td2:
-        den_ngay_nhan = st.date_input("📅 Nhận máy đến", value=None, format="DD/MM/YYYY", key="tdm_den_nhan")
-    with col_td3:
-        tu_ngay_giao = st.date_input("📅 Giao máy từ", value=None, format="DD/MM/YYYY", key="tdm_tu_giao")
-    with col_td4:
-        den_ngay_giao = st.date_input("📅 Giao máy đến", value=None, format="DD/MM/YYYY", key="tdm_den_giao")
+    _tf5, _tf6, _tf7, _tf8 = st.columns(4)
+    _f_tt_tdm  = _tf5.selectbox("📊 Tình trạng",  ["Tất cả"] + sorted(df_tdm["Tình Trạng"].dropna().unique().tolist()), key="tdm_f_tt")
+    _f_ts_tdm  = _tf6.selectbox("📋 Trạng thái",  ["Tất cả"] + sorted(df_tdm["Trạng Thái"].dropna().unique().tolist()),  key="tdm_f_ts")
+    _f_tu_tdm  = _tf7.date_input("📅 Nhận máy từ", value=None, format="DD/MM/YYYY", key="tdm_f_tu")
+    _f_den_tdm = _tf8.date_input("📅 Giao máy đến", value=None, format="DD/MM/YYYY", key="tdm_f_den")
 
     df_show_tdm = df_tdm.copy()
-    if loc_ct_tdm:
-        df_show_tdm = df_show_tdm[df_show_tdm["Tên Công Ty"].isin(loc_ct_tdm)]
-    if loc_tt_tdm:
-        df_show_tdm = df_show_tdm[df_show_tdm["Tình Trạng"].isin(loc_tt_tdm)]
-    if loc_lm_tdm:
-        df_show_tdm = df_show_tdm[df_show_tdm["Loại Máy"].isin(loc_lm_tdm)]
-    if tu_ngay_nhan:
-        df_show_tdm = df_show_tdm[df_show_tdm["Ngày Nhận Máy"].apply(
-            lambda v: _parse_date_display(v) is not None and _parse_date_display(v) >= tu_ngay_nhan)]
-    if den_ngay_nhan:
-        df_show_tdm = df_show_tdm[df_show_tdm["Ngày Nhận Máy"].apply(
-            lambda v: _parse_date_display(v) is not None and _parse_date_display(v) <= den_ngay_nhan)]
-    if tu_ngay_giao:
-        df_show_tdm = df_show_tdm[df_show_tdm["_giao_raw"].apply(lambda d: d is not None and d >= tu_ngay_giao)]
-    if den_ngay_giao:
-        df_show_tdm = df_show_tdm[df_show_tdm["_giao_raw"].apply(lambda d: d is not None and d <= den_ngay_giao)]
+    if _f_ms_tdm:
+        df_show_tdm = df_show_tdm[df_show_tdm["Mã Số Máy"].astype(str).str.contains(_f_ms_tdm, case=False, na=False)]
+    if _f_ct_tdm:
+        df_show_tdm = df_show_tdm[df_show_tdm["Tên Công Ty"].str.contains(_f_ct_tdm, case=False, na=False)]
+    if _f_po_tdm:
+        df_show_tdm = df_show_tdm[
+            df_show_tdm["Số PO Nội Bộ"].astype(str).str.contains(_f_po_tdm, case=False, na=False) |
+            df_show_tdm["Số PO KH/HĐ"].astype(str).str.contains(_f_po_tdm, case=False, na=False) |
+            df_show_tdm["Số Báo Giá"].astype(str).str.contains(_f_po_tdm, case=False, na=False)
+        ]
+    if _f_lm_tdm:
+        df_show_tdm = df_show_tdm[df_show_tdm["Loại Máy"].str.contains(_f_lm_tdm, case=False, na=False)]
+    if _f_tt_tdm != "Tất cả":
+        df_show_tdm = df_show_tdm[df_show_tdm["Tình Trạng"] == _f_tt_tdm]
+    if _f_ts_tdm != "Tất cả":
+        df_show_tdm = df_show_tdm[df_show_tdm["Trạng Thái"] == _f_ts_tdm]
+    if _f_tu_tdm:
+        df_show_tdm = df_show_tdm[df_show_tdm["_han_raw"].apply(lambda d: d is not None and d >= _f_tu_tdm)]
+    if _f_den_tdm:
+        df_show_tdm = df_show_tdm[df_show_tdm["_giao_raw"].apply(lambda d: d is not None and d <= _f_den_tdm)]
 
-    total_tdm   = len(df_show_tdm)
-    da_giao     = len(df_show_tdm[df_show_tdm["Ngày Giao Máy"] != ""])
-    qua_han_tdm = len(df_show_tdm[df_show_tdm["Tình Trạng"] == "Quá hạn"])
+    total_tdm     = len(df_show_tdm)
+    da_giao       = len(df_show_tdm[df_show_tdm["Ngày Giao Máy"] != ""])
+    qua_han_tdm   = len(df_show_tdm[df_show_tdm["Tình Trạng"] == "Quá hạn"])
     truoc_han_tdm = len(df_show_tdm[df_show_tdm["Tình Trạng"] == "Trước hạn"])
     kpi_c = st.columns(4)
-    kpi_c[0].metric("🔩 Tổng máy", total_tdm)
-    kpi_c[1].metric("✅ Đã giao", da_giao)
-    kpi_c[2].metric("🔴 Quá hạn", qua_han_tdm)
-    kpi_c[3].metric("🟢 Trước hạn", truoc_han_tdm)
+    kpi_c[0].metric("🔩 Tổng máy",    total_tdm)
+    kpi_c[1].metric("✅ Đã giao",      da_giao)
+    kpi_c[2].metric("🔴 Quá hạn",     qua_han_tdm)
+    kpi_c[3].metric("🟢 Trước hạn",   truoc_han_tdm)
 
     st.divider()
 
@@ -5547,21 +5556,36 @@ def _fragment_tdm_content(df_tdm_all, aggrid_css):
         on_select="rerun",
         selection_mode="single-row",
         key="df_tdm",
+        column_config={
+            "STT":            st.column_config.NumberColumn("STT",           width="small"),
+            "Tên Công Ty":    st.column_config.TextColumn("Tên Công Ty",     width="large"),
+            "Tên Công Việc":  st.column_config.TextColumn("Tên Công Việc",   width="large"),
+            "Công Suất":      st.column_config.TextColumn("Công Suất",       width="small"),
+            "Mã Số Máy":      st.column_config.TextColumn("Mã Số",           width="small"),
+            "Số PO Nội Bộ":   st.column_config.TextColumn("PO Nội Bộ",       width="medium"),
+            "Số PO KH/HĐ":    st.column_config.TextColumn("PO KH/HĐ",        width="medium"),
+            "Số Báo Giá":     st.column_config.TextColumn("Báo Giá",          width="medium"),
+            "Trạng Thái":     st.column_config.TextColumn("Trạng Thái",       width="medium"),
+            "Ngày Nhận Máy":  st.column_config.TextColumn("Ngày Nhận",        width="small"),
+            "Hạn Hoàn Thành": st.column_config.TextColumn("Hạn HT",          width="small"),
+            "Ngày Giao Máy":  st.column_config.TextColumn("Ngày Giao",        width="small"),
+            "Loại Máy":       st.column_config.TextColumn("Loại Máy",         width="medium"),
+            "Tình Trạng":     st.column_config.TextColumn("Tình Trạng",       width="small"),
+        },
     )
     st.caption(f"Hiển thị {len(df_show_tdm)} / {total_tdm} máy · 👆 Click vào hàng để xem chi tiết")
 
     _sel_rows_tdm = _evt_tdm.selection.rows if hasattr(_evt_tdm, "selection") else []
     if _sel_rows_tdm:
         _sel_idx_tdm = _sel_rows_tdm[0]
-        _sel_id_tdm = str(df_show_tdm.iloc[_sel_idx_tdm]["_task_id"])
-        _prev_sel_tdm = st.session_state.get("_tdm_prev_sel_id", "")
-        if _sel_id_tdm != _prev_sel_tdm:
+        _sel_id_tdm  = str(df_show_tdm.iloc[_sel_idx_tdm]["_task_id"])
+        if _sel_id_tdm != st.session_state.get("_tdm_prev_sel_id", ""):
             _match_tdm = df_show_tdm[df_show_tdm["_task_id"].astype(str) == _sel_id_tdm]
             if not _match_tdm.empty:
-                _ds_tt_dlg_tdm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
-                st.session_state["_pending_dlg"] = (_match_tdm.iloc[0]["_task_dict"], _ds_tt_dlg_tdm)
-                st.session_state["_tdm_prev_sel_id"] = _sel_id_tdm
-                st.rerun(scope="app")
+                st.session_state["_pending_dlg"] = (
+                    _match_tdm.iloc[0]["_task_dict"],
+                    lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH,
+                )
         st.session_state["_tdm_prev_sel_id"] = _sel_id_tdm
     else:
         st.session_state["_tdm_prev_sel_id"] = ""
