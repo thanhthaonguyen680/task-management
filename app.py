@@ -5176,7 +5176,6 @@ def _render_detail_expanders(df, ds_tt):
 # ============================================================
 # FRAGMENT: Công Việc Con AgGrid
 # ============================================================
-@st.fragment
 def _fragment_cvc_content(df_all_cvc, aggrid_css):
     from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
     from st_aggrid.shared import JsCode
@@ -5450,7 +5449,6 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
 # ============================================================
 # FRAGMENT: Theo Dõi Tiến Độ Máy AgGrid
 # ============================================================
-@st.fragment
 def _fragment_tdm_content(df_tdm_all, aggrid_css):
     from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
     from st_aggrid.shared import JsCode
