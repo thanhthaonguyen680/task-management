@@ -5177,8 +5177,6 @@ def _render_detail_expanders(df, ds_tt):
 # FRAGMENT: Công Việc Con AgGrid
 # ============================================================
 def _fragment_cvc_content(df_all_cvc, aggrid_css):
-    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-    from st_aggrid.shared import JsCode
     import io
 
     if df_all_cvc.empty:
@@ -5317,79 +5315,23 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
     cols_show = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
                  "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
                  "Loại Máy", "Tình Trạng"]
-    _df_grid_cvc = df_show_cvc[["_task_id"] + cols_show].copy().reset_index(drop=True)
+    _df_grid_cvc = df_show_cvc[cols_show].copy().reset_index(drop=True)
 
-    _badge_tt = JsCode("""
-    class TinhTrangRenderer {
-        init(p) {
-            const c={'Trước hạn':{bg:'#dcfce7',fg:'#16a34a'},'Đúng hạn':{bg:'#fef9c3',fg:'#d97706'},
-                'Quá hạn':{bg:'#fee2e2',fg:'#dc2626'},'Hoàn thành':{bg:'#dbeafe',fg:'#1d4ed8'},
-                'Chưa xong':{bg:'#f3f4f6',fg:'#6b7280'}};
-            const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
-            this.el=document.createElement('span');
-            this.el.innerText=p.value||'';
-            Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
-                borderRadius:'20px',fontWeight:'700',fontSize:'0.82rem',
-                border:'1.5px solid '+s.fg+'40',whiteSpace:'nowrap',display:'inline-block'});
-        }
-        getGui(){return this.el;}
-    }""")
-
-    _badge_ts = JsCode("""
-    class TrangThaiRenderer {
-        init(p) {
-            const c={'Chờ Làm':{bg:'#fee2e2',fg:'#dc2626'},'Đang Làm':{bg:'#fef9c3',fg:'#d97706'},
-                'Hoàn Thành':{bg:'#dcfce7',fg:'#16a34a'},'Đang Kiểm Tra':{bg:'#dbeafe',fg:'#1d4ed8'},
-                'Đã Phê Duyệt':{bg:'#dcfce7',fg:'#15803d'},'Đã Báo Giá':{bg:'#fef3c7',fg:'#b45309'},
-                'Có Đơn':{bg:'#ede9fe',fg:'#7c3aed'},'Chờ Giao':{bg:'#fef9c3',fg:'#a16207'},
-                'Đã Hoàn Thành - Giao Máy':{bg:'#bbf7d0',fg:'#166534'}};
-            const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
-            this.el=document.createElement('span');
-            this.el.innerText=p.value||'';
-            Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
-                borderRadius:'20px',fontWeight:'600',fontSize:'0.82rem',
-                whiteSpace:'nowrap',display:'inline-block'});
-        }
-        getGui(){return this.el;}
-    }""")
-
-    gb_cvc = GridOptionsBuilder.from_dataframe(_df_grid_cvc)
-    gb_cvc.configure_default_column(
-        resizable=True, sortable=True, minWidth=80,
-        filter="agTextColumnFilter", floatingFilter=True,
-        floatingFilterComponentParams={"suppressFilterButton": True},
-    )
-    gb_cvc.configure_column("_task_id", hide=True)
-    gb_cvc.configure_column("STT", maxWidth=60, minWidth=50, filter=False, floatingFilter=False)
-    gb_cvc.configure_column("Tình Trạng", cellRenderer=_badge_tt, minWidth=110)
-    gb_cvc.configure_column("Trạng Thái", cellRenderer=_badge_ts, minWidth=155)
-    gb_cvc.configure_column("Tên Công Ty", minWidth=220, flex=2)
-    gb_cvc.configure_column("Tên Công Việc", minWidth=180, flex=2)
-    gb_cvc.configure_column("Công Việc Con", minWidth=120)
-    gb_cvc.configure_column("Nhân Viên", minWidth=140)
-    gb_cvc.configure_column("Ngày Hoàn Thành", minWidth=130)
-    gb_cvc.configure_column("Loại Máy", minWidth=140)
-    gb_cvc.configure_selection(selection_mode="single", use_checkbox=False)
-    gb_cvc.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38, domLayout="normal")
-    _go_cvc = gb_cvc.build()
-
-    _resp_cvc = AgGrid(
+    _evt_cvc = st.dataframe(
         _df_grid_cvc,
-        gridOptions=_go_cvc,
-        update_mode=GridUpdateMode.SELECTION_CHANGED,
-        allow_unsafe_jscode=True,
         use_container_width=True,
-        fit_columns_on_grid_load=False,
+        hide_index=True,
         height=600,
-        theme="alpine",
-        custom_css=aggrid_css,
-        key="aggrid_cvc",
+        on_select="rerun",
+        selection_mode="single-row",
+        key="df_cvc",
     )
     st.caption(f"Hiển thị {len(df_show_cvc)} / {total} công việc con · 👆 Click vào hàng để xem chi tiết")
 
-    _sel_cvc = _resp_cvc.get("selected_rows")
-    if _sel_cvc is not None and len(_sel_cvc) > 0:
-        _sel_id_cvc = str((_sel_cvc.iloc[0] if hasattr(_sel_cvc, "iloc") else _sel_cvc[0]).get("_task_id", ""))
+    _sel_rows_cvc = _evt_cvc.selection.rows if hasattr(_evt_cvc, "selection") else []
+    if _sel_rows_cvc:
+        _sel_idx_cvc = _sel_rows_cvc[0]
+        _sel_id_cvc = str(df_show_cvc.iloc[_sel_idx_cvc]["_task_id"])
         _prev_sel_cvc = st.session_state.get("_cvc_prev_sel_id", "")
         if _sel_id_cvc != _prev_sel_cvc:
             _match_cvc = df_show_cvc[df_show_cvc["_task_id"].astype(str) == _sel_id_cvc]
@@ -5450,8 +5392,6 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
 # FRAGMENT: Theo Dõi Tiến Độ Máy AgGrid
 # ============================================================
 def _fragment_tdm_content(df_tdm_all, aggrid_css):
-    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-    from st_aggrid.shared import JsCode
     import io
 
     if df_tdm_all.empty:
@@ -5597,80 +5537,23 @@ def _fragment_tdm_content(df_tdm_all, aggrid_css):
                          "Ngày Nhận Máy", "Hạn Hoàn Thành", "Ngày Giao Máy",
                          "Loại Máy", "Tình Trạng"]
 
-    _badge_tt_tdm = JsCode("""
-    class TinhTrangTDMRenderer {
-        init(p) {
-            const c={'Trước hạn':{bg:'#dcfce7',fg:'#16a34a'},'Đúng hạn':{bg:'#fef9c3',fg:'#d97706'},
-                'Quá hạn':{bg:'#fee2e2',fg:'#dc2626'},'Hoàn thành':{bg:'#dbeafe',fg:'#1d4ed8'},
-                'Chưa xong':{bg:'#f3f4f6',fg:'#6b7280'}};
-            const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
-            this.el=document.createElement('span');
-            this.el.innerText=p.value||'';
-            Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
-                borderRadius:'20px',fontWeight:'700',fontSize:'0.82rem',
-                border:'1.5px solid '+s.fg+'40',whiteSpace:'nowrap',display:'inline-block'});
-        }
-        getGui(){return this.el;}
-    }""")
+    _df_grid_tdm = df_show_tdm[_cols_display_tdm].copy().reset_index(drop=True)
 
-    _badge_ts_tdm = JsCode("""
-    class TrangThaiTDMRenderer {
-        init(p) {
-            const c={'Chờ Làm':{bg:'#fee2e2',fg:'#dc2626'},'Đang Làm':{bg:'#fef9c3',fg:'#d97706'},
-                'Hoàn Thành':{bg:'#dcfce7',fg:'#16a34a'},'Đang Kiểm Tra':{bg:'#dbeafe',fg:'#1d4ed8'},
-                'Đã Phê Duyệt':{bg:'#dcfce7',fg:'#15803d'},'Đã Báo Giá':{bg:'#fef3c7',fg:'#b45309'},
-                'Có Đơn':{bg:'#ede9fe',fg:'#7c3aed'},'Chờ Giao':{bg:'#fef9c3',fg:'#a16207'},
-                'Đã Hoàn Thành - Giao Máy':{bg:'#bbf7d0',fg:'#166534'}};
-            const s=c[p.value]||{bg:'#f3f4f6',fg:'#6b7280'};
-            this.el=document.createElement('span');
-            this.el.innerText=p.value||'';
-            Object.assign(this.el.style,{background:s.bg,color:s.fg,padding:'2px 10px',
-                borderRadius:'20px',fontWeight:'600',fontSize:'0.82rem',
-                whiteSpace:'nowrap',display:'inline-block'});
-        }
-        getGui(){return this.el;}
-    }""")
-
-    _df_grid_tdm = df_show_tdm[["_task_id"] + _cols_display_tdm].copy().reset_index(drop=True)
-
-    gb_tdm = GridOptionsBuilder.from_dataframe(_df_grid_tdm)
-    gb_tdm.configure_default_column(
-        resizable=True, sortable=True, minWidth=80,
-        filter="agTextColumnFilter", floatingFilter=True,
-        floatingFilterComponentParams={"suppressFilterButton": True},
-    )
-    gb_tdm.configure_column("_task_id", hide=True)
-    gb_tdm.configure_column("STT", maxWidth=60, minWidth=50, filter=False, floatingFilter=False)
-    gb_tdm.configure_column("Tình Trạng", cellRenderer=_badge_tt_tdm, minWidth=110)
-    gb_tdm.configure_column("Trạng Thái", cellRenderer=_badge_ts_tdm, minWidth=155)
-    gb_tdm.configure_column("Tên Công Ty", minWidth=220, flex=2)
-    gb_tdm.configure_column("Tên Công Việc", minWidth=180, flex=2)
-    gb_tdm.configure_column("Hạn Hoàn Thành", minWidth=130)
-    gb_tdm.configure_column("Ngày Nhận Máy", minWidth=120)
-    gb_tdm.configure_column("Ngày Giao Máy", minWidth=120)
-    gb_tdm.configure_column("Loại Máy", minWidth=140)
-    gb_tdm.configure_column("Mã Số Máy", minWidth=100)
-    gb_tdm.configure_selection(selection_mode="single", use_checkbox=False)
-    gb_tdm.configure_grid_options(rowStyle={"cursor": "pointer"}, rowHeight=38, domLayout="normal")
-    _go_tdm = gb_tdm.build()
-
-    _resp_tdm = AgGrid(
+    _evt_tdm = st.dataframe(
         _df_grid_tdm,
-        gridOptions=_go_tdm,
-        update_mode=GridUpdateMode.SELECTION_CHANGED,
-        allow_unsafe_jscode=True,
         use_container_width=True,
-        fit_columns_on_grid_load=False,
+        hide_index=True,
         height=600,
-        theme="alpine",
-        custom_css=aggrid_css,
-        key="aggrid_tdm",
+        on_select="rerun",
+        selection_mode="single-row",
+        key="df_tdm",
     )
     st.caption(f"Hiển thị {len(df_show_tdm)} / {total_tdm} máy · 👆 Click vào hàng để xem chi tiết")
 
-    _sel_tdm = _resp_tdm.get("selected_rows")
-    if _sel_tdm is not None and len(_sel_tdm) > 0:
-        _sel_id_tdm = str((_sel_tdm.iloc[0] if hasattr(_sel_tdm, "iloc") else _sel_tdm[0]).get("_task_id", ""))
+    _sel_rows_tdm = _evt_tdm.selection.rows if hasattr(_evt_tdm, "selection") else []
+    if _sel_rows_tdm:
+        _sel_idx_tdm = _sel_rows_tdm[0]
+        _sel_id_tdm = str(df_show_tdm.iloc[_sel_idx_tdm]["_task_id"])
         _prev_sel_tdm = st.session_state.get("_tdm_prev_sel_id", "")
         if _sel_id_tdm != _prev_sel_tdm:
             _match_tdm = df_show_tdm[df_show_tdm["_task_id"].astype(str) == _sel_id_tdm]
