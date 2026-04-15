@@ -4967,6 +4967,11 @@ def _dialog_nv_tao_task_xong(message: str):
 @st.dialog("📋 Chi tiết & Chỉnh sửa công việc", width="large")
 def _task_dialog(hang_dict, ds_tt):
     """Dialog to hiển thị chi tiết và chỉnh sửa task."""
+    # Đánh dấu dialog đang mở (để phát hiện đóng bằng X vs reconnect)
+    st.session_state["_dlg_active_flag"] = True
+    _tid_qp = str(hang_dict.get("ID", ""))
+    if _tid_qp:
+        st.query_params["dlg"] = _tid_qp
     tid  = hang_dict.get("ID", "")
     ten  = hang_dict.get("Tên Công Việc", "")
     cty  = hang_dict.get("Công Ty", "")
@@ -6433,10 +6438,7 @@ def giao_dien_admin():
 
         _fragment_tdm_content(df_tdm_all, _aggrid_css)
 
-    # ── Gọi dialog trực tiếp (tránh loop vô hạn do AgGrid giữ selection) ──
-    _pdlg = st.session_state.pop("_pending_dlg", None)
-    if _pdlg:
-        _task_dialog(_pdlg[0], _pdlg[1])
+    # (pending_dlg được xử lý ở main() sau khi hàm này return)
 
 
 def giao_dien_nhan_vien():
@@ -7836,6 +7838,10 @@ def main():
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── Trạng thái dialog (đọc trước khi giao diện render) ───────────────
+    _dlg_was_active = st.session_state.get("_dlg_active_flag", False)
+    st.session_state["_dlg_active_flag"] = False
+
     # ── Mở task dialog từ thông báo (sau rerun) ───────────────────────────
     if st.session_state.get("_open_task_id_from_tb"):
         _tid_tb = st.session_state.pop("_open_task_id_from_tb")
@@ -7854,6 +7860,35 @@ def main():
         giao_dien_admin()
     else:
         giao_dien_nhan_vien()
+
+    # ── Xử lý dialog: pending / khôi phục / phát hiện đóng bằng X ─────────
+    _dlg_qp = st.query_params.get("dlg", "")
+    _pdlg   = st.session_state.pop("_pending_dlg", None)
+
+    if _pdlg:
+        # Mở dialog từ click button / row selection
+        _task_dialog(_pdlg[0], _pdlg[1])
+    elif _dlg_qp and not _dlg_was_active:
+        # Session mới sau reload/reconnect → khôi phục dialog từ URL
+        try:
+            _df_r  = lay_danh_sach_cong_viec()
+            _row_r = _df_r[_df_r["ID"].astype(str) == _dlg_qp]
+            if not _row_r.empty:
+                _task_dialog(_row_r.iloc[0].to_dict(),
+                             lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH)
+            else:
+                del st.query_params["dlg"]
+        except Exception:
+            try:
+                del st.query_params["dlg"]
+            except Exception:
+                pass
+    elif _dlg_qp and _dlg_was_active and not st.session_state.get("_dlg_active_flag"):
+        # Dialog đóng bằng nút X trong cùng session → xóa query param
+        try:
+            del st.query_params["dlg"]
+        except Exception:
+            pass
 
 
 # ============================================================
