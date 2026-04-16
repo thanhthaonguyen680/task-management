@@ -951,9 +951,19 @@ def _lay_df_don_gian(ten_sheet: str, tieu_de: list) -> pd.DataFrame:
     except (ConnectionError, OSError, Exception) as e:
         _xoa_cache_va_thong_bao(e)
         return pd.DataFrame(columns=tieu_de)
+    n = len(tieu_de)
+    # Tự phục hồi header nếu bị xóa nhầm
+    if allvals:
+        first_row = [v.strip() for v in allvals[0][:n]]
+        expected  = [v.strip() for v in tieu_de[:n]]
+        if first_row != expected:
+            try:
+                sheet.insert_row(tieu_de, index=1)
+                allvals = [tieu_de] + allvals
+            except Exception:
+                pass
     if len(allvals) <= 1:
         return pd.DataFrame(columns=tieu_de)
-    n = len(tieu_de)
     headers = [v.strip() for v in allvals[0][:n]]
     rows = [r[:n] for r in allvals[1:] if any(r[:n])]
     return pd.DataFrame(rows, columns=headers)
@@ -979,10 +989,15 @@ def _sua_hang_don_gian(ten_sheet: str, tieu_de: list, record_id: str, ten_cot: s
 
 def _xoa_hang_don_gian(ten_sheet: str, tieu_de: list, record_id: str):
     """Helper chung: tìm hàng theo ID (cột 1) rồi xóa."""
+    if not str(record_id).strip():
+        raise ValueError("ID rỗng — không thể xóa. Vui lòng kiểm tra dữ liệu trong sheet.")
     sheet = _lay_sheet_don_gian(ten_sheet, tieu_de)
     o_tim = sheet.find(str(record_id), in_column=1)
     if o_tim is None:
         raise ValueError(f"Không tìm thấy ID={record_id} trong sheet {ten_sheet}.")
+    # Bảo vệ: không xóa header row
+    if o_tim.row <= 1:
+        raise ValueError(f"ID={record_id} trùng với header — bỏ qua để tránh mất dữ liệu.")
     sheet.delete_rows(o_tim.row)
 
 
@@ -6401,7 +6416,7 @@ def giao_dien_admin():
         ds_tt_board = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
 
         # ── KANBAN BOARD ──────────────────────────────────────────
-        df_board = df_board.sort_values("ID", ascending=False)
+        df_board = df_board.sort_values("Ngày Tạo", ascending=False, na_position="last")
         _render_kanban_board(df_board, ds_tt_board, board_key="adm_kb",
                              force_open=bool(adm_q.strip()))
 
@@ -6565,7 +6580,7 @@ def giao_dien_nhan_vien():
             st.info("Chưa có công việc nào trong hệ thống.")
         else:
             # ── KANBAN BOARD ────────────────────────────────────
-            df_cua_toi = df_cua_toi.sort_values("ID", ascending=False)
+            df_cua_toi = df_cua_toi.sort_values("Ngày Tạo", ascending=False, na_position="last")
             _render_kanban_board(df_cua_toi, ds_tt, board_key="nv_kb",
                                  force_open=bool(q_search.strip() or q_cty.strip()))
 
