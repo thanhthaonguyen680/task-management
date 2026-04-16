@@ -5788,15 +5788,16 @@ def giao_dien_admin():
                 st.info("ℹ️ Chưa có dữ liệu. Hãy thêm ở form bên trên!")
             else:
                 st.markdown(f"**Tổng cộng: {len(df)} mục**")
-                for _, row in df.iterrows():
+                for _i, (_, row) in enumerate(df.iterrows()):
                     rid  = str(row.get("ID", ""))
                     ten  = str(row.get(ten_cot, ""))
+                    _bk  = f"{rid}_{_i}"   # key unique dù ID trùng hoặc rỗng
                     c1, c2, c3 = st.columns([7, 1, 1])
                     c1.markdown(f"**{ten}**")
-                    if sua_func and c2.button("✏️", key=f"btn_edit_{key_prefix}_{rid}", help="Chỉnh sửa"):
+                    if sua_func and c2.button("✏️", key=f"btn_edit_{key_prefix}_{_bk}", help="Chỉnh sửa"):
                         st.session_state[f"editing_{key_prefix}"] = rid
                         st.session_state.pop(f"deleting_{key_prefix}", None)
-                    if xoa_func and c3.button("🗑️", key=f"btn_del_{key_prefix}_{rid}", help="Xóa"):
+                    if xoa_func and c3.button("🗑️", key=f"btn_del_{key_prefix}_{_bk}", help="Xóa"):
                         st.session_state[f"deleting_{key_prefix}"] = rid
                         st.session_state.pop(f"editing_{key_prefix}", None)
                     # Form chỉnh sửa inline
