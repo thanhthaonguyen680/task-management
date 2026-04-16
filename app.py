@@ -1276,7 +1276,7 @@ _TASK_HEADERS = [
     "Link Ảnh", "Người Phê Duyệt", "Checklist", "Công Việc Con", "Công Đoạn",
     "Loại Máy", "Tình Trạng",
     "Công Suất", "Số Cực", "Mã Số", "Số PO Nội Bộ", "Số PO KH/HĐ", "Số Báo Giá",
-    "Ngày Kết Thúc", "Ảnh Đo Lường"
+    "Ngày Kết Thúc", "Ảnh Đo Lường", "Ngày Xóa"
 ]
 
 
@@ -1313,26 +1313,32 @@ def _fetch_tasks_cached() -> pd.DataFrame:
     return df
 
 
-def lay_danh_sach_cong_viec() -> pd.DataFrame:
-    """
-    Lấy toàn bộ danh sách công việc từ sheet 'Tasks'.
-    Wrapper không cache: nếu API lỗi, tự clear connection cũ và retry 1 lần
-    với kết nối mới trước khi trả về empty.
-    """
+def _lay_tat_ca_tasks() -> pd.DataFrame:
+    """Lấy TẤT CẢ task (kể cả đã xóa mềm) — dùng nội bộ."""
     try:
         return _fetch_tasks_cached()
     except Exception as _e:
         import traceback
-        print(f"[lay_danh_sach_cong_viec lần 1 lỗi] {_e}")
-        # Connection cũ bị stale — clear và retry với kết nối mới
+        print(f"[_lay_tat_ca_tasks lần 1 lỗi] {_e}")
         try:
             lay_sheet.clear()
             _lay_bang_tinh.clear()
             _fetch_tasks_cached.clear()
             return _fetch_tasks_cached()
         except Exception as _e2:
-            print(f"[lay_danh_sach_cong_viec lần 2 lỗi] {_e2}\n{traceback.format_exc()}")
-            return pd.DataFrame(columns=_TASK_HEADERS[:11])
+            print(f"[_lay_tat_ca_tasks lần 2 lỗi] {_e2}\n{traceback.format_exc()}")
+            return pd.DataFrame(columns=_TASK_HEADERS)
+
+
+def lay_danh_sach_cong_viec() -> pd.DataFrame:
+    """
+    Lấy danh sách công việc CHƯA bị xóa từ sheet 'Tasks'.
+    Tasks đã xóa mềm (có Ngày Xóa) được lọc ra.
+    """
+    df = _lay_tat_ca_tasks()
+    if "Ngày Xóa" in df.columns:
+        df = df[df["Ngày Xóa"].fillna("").astype(str).str.strip() == ""].copy()
+    return df
 
 
 # Cho phép gọi lay_danh_sach_cong_viec.clear() như trước
@@ -1422,26 +1428,74 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
 
 
 def xoa_cong_viec(task_id: int):
-    """Xóa vĩnh viễn một công việc khỏi sheet Tasks theo ID."""
+    """Xóa mềm — chuyển task vào thùng rác (đặt Ngày Xóa = hôm nay)."""
+    try:
+        ngay_xoa = datetime.now().strftime("%Y-%m-%d")
+        cap_nhat_nhieu_truong_task(int(task_id), {"Ngày Xóa": ngay_xoa})
+    except Exception:
+        pass
+
+
+def lay_cong_viec_da_xoa() -> pd.DataFrame:
+    """Lấy các task đang ở thùng rác (có Ngày Xóa)."""
+    df = _lay_tat_ca_tasks()
+    if "Ngày Xóa" not in df.columns:
+        return pd.DataFrame(columns=_TASK_HEADERS)
+    return df[df["Ngày Xóa"].fillna("").astype(str).str.strip() != ""].copy()
+
+
+def khoi_phuc_cong_viec(task_id: int):
+    """Khôi phục task từ thùng rác (xóa Ngày Xóa)."""
+    cap_nhat_nhieu_truong_task(int(task_id), {"Ngày Xóa": ""})
+
+
+def xoa_vinh_vien_cong_viec(task_id: int):
+    """Xóa vĩnh viễn task khỏi sheet (không thể khôi phục)."""
     try:
         sheet = _lay_sheet_fresh()
         o_tim = sheet.find(str(task_id), in_column=1)
         if o_tim:
             sheet.delete_rows(o_tim.row)
-            lay_danh_sach_cong_viec.clear()
+            _fetch_tasks_cached.clear()
             _ROW_CACHE.pop(int(task_id), None)
+    except Exception:
+        pass
+
+
+def don_dep_thung_rac():
+    """Xóa vĩnh viễn các task đã ở thùng rác > 7 ngày (chạy tự động khi khởi động)."""
+    import datetime as _dt
+    try:
+        df_xoa = lay_cong_viec_da_xoa()
+        if df_xoa.empty:
+            return
+        nguong = _dt.date.today() - _dt.timedelta(days=7)
+        to_delete = []
+        for _, row in df_xoa.iterrows():
+            ngay_xoa_str = str(row.get("Ngày Xóa", "")).strip()
+            if not ngay_xoa_str:
+                continue
+            try:
+                if _dt.date.fromisoformat(ngay_xoa_str[:10]) <= nguong:
+                    to_delete.append(int(row["ID"]))
+            except Exception:
+                pass
+        for tid in to_delete:
+            xoa_vinh_vien_cong_viec(tid)
+        if to_delete:
+            _fetch_tasks_cached.clear()
     except Exception:
         pass
 
 
 @st.dialog("🗑️ Xác nhận xóa công việc")
 def _dialog_xac_nhan_xoa(task_id, ten_cv: str):
-    st.warning(f"Bạn có chắc muốn **xóa vĩnh viễn** công việc:\n\n**{ten_cv}**?", icon="⚠️")
-    st.caption("Hành động này không thể hoàn tác.")
+    st.warning(f"Chuyển công việc vào **Thùng Rác**:\n\n**{ten_cv}**?", icon="🗑️")
+    st.caption("Công việc sẽ tự xóa vĩnh viễn sau **7 ngày** nếu không khôi phục.")
     col_ok, col_cancel = st.columns(2)
     with col_ok:
-        if st.button("🗑️ Xóa", type="primary", use_container_width=True):
-            with st.spinner("Đang xóa..."):
+        if st.button("🗑️ Vào thùng rác", type="primary", use_container_width=True):
+            with st.spinner("Đang xử lý..."):
                 xoa_cong_viec(int(task_id))
             st.session_state["_board_dirty"] = True
             st.rerun()
@@ -1646,6 +1700,7 @@ _COL_MAP_TASK = {
     "Số PO Nội Bộ": 21,  # U
     "Số PO KH/HĐ":  22,  # V
     "Số Báo Giá":   23,  # W
+    "Ngày Xóa":     26,  # Z
 }
 
 
@@ -5725,8 +5780,8 @@ def giao_dien_admin():
     """Giao diện quản lý dành cho Admin — 4 tab ngang: Cài Đặt / Nhân Viên / Tạo Task / Tổng Quan."""
     st.header("🔧 Bảng Điều Khiển Admin")
 
-    tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_board, tab_cvc, tab_tdtdm = st.tabs(
-        ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "🗂️  Bảng Quản Lý", "📋  Công Việc Con", "🔩  Theo Dõi Tiến Độ Máy"]
+    tab_cai_dat, tab_nhan_vien, tab_tao_task, tab_board, tab_cvc, tab_tdtdm, tab_thung_rac = st.tabs(
+        ["⚙️  Cài Đặt", "👥  Nhân Viên", "➕  Tạo Công Việc Mới", "🗂️  Bảng Quản Lý", "📋  Công Việc Con", "🔩  Theo Dõi Tiến Độ Máy", "🗑️  Thùng Rác"]
     )
 
     if st.session_state.pop("_adm_goto_board", False):
@@ -6453,6 +6508,72 @@ def giao_dien_admin():
             df_tdm_all = lay_danh_sach_cong_viec()
 
         _fragment_tdm_content(df_tdm_all, _aggrid_css)
+
+    # ========================================================
+    # Tab 8: Thùng Rác
+    # ========================================================
+    with tab_thung_rac:
+        import datetime as _dt_tr
+        st.subheader("🗑️ Thùng Rác")
+        st.caption("Công việc bị xóa sẽ tự xóa vĩnh viễn sau **7 ngày**. Khôi phục trước khi hết hạn.")
+
+        col_ref_tr, _ = st.columns([1, 4])
+        with col_ref_tr:
+            if st.button("🔄 Làm mới", key="adm_tr_refresh"):
+                _fetch_tasks_cached.clear()
+                st.rerun()
+
+        with st.spinner("Đang tải..."):
+            df_tr = lay_cong_viec_da_xoa()
+
+        if df_tr.empty:
+            st.info("✅ Thùng rác trống.")
+        else:
+            st.markdown(f"**{len(df_tr)} công việc** đang chờ xóa vĩnh viễn:")
+            st.divider()
+            for _, row_tr in df_tr.iterrows():
+                tid_tr  = str(row_tr.get("ID", ""))
+                ten_tr  = str(row_tr.get("Tên Công Việc", "") or "")
+                cty_tr  = str(row_tr.get("Công Ty", "") or "")
+                ngay_xoa_tr = str(row_tr.get("Ngày Xóa", "")).strip()[:10]
+                # Tính số ngày còn lại
+                con_lai = ""
+                try:
+                    ngay_xoa_d = _dt_tr.date.fromisoformat(ngay_xoa_tr)
+                    het_han = ngay_xoa_d + _dt_tr.timedelta(days=7)
+                    so_ngay = (het_han - _dt_tr.date.today()).days
+                    if so_ngay <= 0:
+                        con_lai = "⚠️ Hết hạn hôm nay"
+                    elif so_ngay == 1:
+                        con_lai = "⚠️ Còn 1 ngày"
+                    else:
+                        con_lai = f"🕐 Còn {so_ngay} ngày"
+                except Exception:
+                    pass
+
+                with st.container(border=True):
+                    c_info, c_restore, c_del = st.columns([5, 1, 1])
+                    with c_info:
+                        st.markdown(f"**{ten_tr}**")
+                        meta_tr = []
+                        if cty_tr:      meta_tr.append(f"🏢 {cty_tr}")
+                        if ngay_xoa_tr: meta_tr.append(f"🗑️ Xóa: {ngay_xoa_tr}")
+                        if con_lai:     meta_tr.append(con_lai)
+                        st.caption(" · ".join(meta_tr))
+                    with c_restore:
+                        if st.button("♻️", key=f"tr_restore_{tid_tr}", help="Khôi phục"):
+                            with st.spinner("Đang khôi phục..."):
+                                khoi_phuc_cong_viec(int(tid_tr))
+                            st.success(f"Đã khôi phục: {ten_tr}")
+                            st.rerun()
+                    with c_del:
+                        if st.button("💀", key=f"tr_del_{tid_tr}", help="Xóa vĩnh viễn ngay"):
+                            st.session_state[f"tr_confirm_{tid_tr}"] = True
+                # Xác nhận xóa vĩnh viễn
+                if st.session_state.pop(f"tr_confirm_{tid_tr}", False):
+                    with st.spinner("Đang xóa vĩnh viễn..."):
+                        xoa_vinh_vien_cong_viec(int(tid_tr))
+                    st.rerun()
 
     # (pending_dlg được xử lý ở main() sau khi hàm này return)
 
@@ -7784,6 +7905,14 @@ def main():
             f"<script>localStorage.setItem('_qlcv_token','{_cur_token}');</script>",
             height=0,
         )
+
+    # Dọn thùng rác (chạy 1 lần mỗi session, không block UI)
+    if not st.session_state.get("_da_don_thung_rac"):
+        st.session_state["_da_don_thung_rac"] = True
+        try:
+            don_dep_thung_rac()
+        except Exception:
+            pass
 
     vai_tro   = st.session_state.get("vai_tro", "nhan_vien")
     ho_ten    = st.session_state.get("ho_ten", "")
