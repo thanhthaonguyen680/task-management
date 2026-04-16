@@ -6320,11 +6320,6 @@ def giao_dien_admin():
                 options=ds_cong_ty if ds_cong_ty else ["(Chưa có công ty)"],
                 key="adm_cong_ty",
             )
-            adm_phe_duyet = st.selectbox(
-                "✅ Người Phê Duyệt",
-                options=["-- Không chọn --"] + ds_nhan_vien,
-                key="adm_phe_duyet",
-            )
 
             col_tt_top, col_nam = st.columns(2)
             with col_tt_top:
@@ -6366,6 +6361,12 @@ def giao_dien_admin():
                 adm_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key="adm_so_po_kh")
             with col_bg_adm:
                 adm_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key="adm_so_bao_gia")
+
+            adm_phe_duyet = st.selectbox(
+                "✅ Người Phê Duyệt",
+                options=["-- Không chọn --"] + ds_nhan_vien,
+                key="adm_phe_duyet",
+            )
 
             adm_ten_task = st.text_input("📌 Tên công việc *", placeholder="Ví dụ: Sửa chữa động cơ bơm", key="adm_ten_task")
             adm_mo_ta    = st.text_area("📝 Mô tả chi tiết", placeholder="Nhập mô tả, yêu cầu kỹ thuật...", key="adm_mo_ta")
@@ -6790,12 +6791,6 @@ def giao_dien_nhan_vien():
                 # ── Hàng đầu: Công Ty ──
                 # Các field sticky (giữ lại sau khi tạo task) dùng key không có version
                 nv_cong_ty = st.selectbox("🏢 Công Ty *", options=["-- Chọn Công Ty --"] + ds_cong_ty_nv, key=f"{_nv_prefix}_ct")
-                # ── Hàng tiếp theo: Người Phê Duyệt ──
-                nv_phe_duyet = st.selectbox(
-                    "✅ Người Phê Duyệt",
-                    options=["-- Không chọn --"] + ds_nv_nv,
-                    key=f"{_nv_prefix}_pd"
-                )
 
                 col_tt2, col_nam2 = st.columns(2)
                 with col_tt2:
@@ -6839,6 +6834,12 @@ def giao_dien_nhan_vien():
                     nv_so_po_kh = st.text_input("📋 Số PO KH/HĐ", placeholder="VD: KH-2024-001", key=f"{_nv_prefix}_so_po_kh")
                 with col_bg_nv:
                     nv_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key=f"{_nv_prefix}_so_bao_gia")
+
+                nv_phe_duyet = st.selectbox(
+                    "✅ Người Phê Duyệt",
+                    options=["-- Không chọn --"] + ds_nv_nv,
+                    key=f"{_nv_prefix}_pd"
+                )
 
                 # Tên & Mô tả unique mỗi task → reset theo version
                 nv_ten_task = st.text_input("📌 Tên Công Việc *", placeholder="Mô tả ngắn công việc cần làm", key=f"{_nv_prefix}_ten_{_v}")
