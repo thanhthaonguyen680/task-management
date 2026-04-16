@@ -5795,14 +5795,14 @@ def giao_dien_admin():
                     c1, c2, c3 = st.columns([7, 1, 1])
                     c1.markdown(f"**{ten}**")
                     if sua_func and c2.button("✏️", key=f"btn_edit_{key_prefix}_{_bk}", help="Chỉnh sửa"):
-                        st.session_state[f"editing_{key_prefix}"] = rid
+                        st.session_state[f"editing_{key_prefix}"] = _bk
                         st.session_state.pop(f"deleting_{key_prefix}", None)
                     if xoa_func and c3.button("🗑️", key=f"btn_del_{key_prefix}_{_bk}", help="Xóa"):
-                        st.session_state[f"deleting_{key_prefix}"] = rid
+                        st.session_state[f"deleting_{key_prefix}"] = _bk
                         st.session_state.pop(f"editing_{key_prefix}", None)
                     # Form chỉnh sửa inline
-                    if sua_func and st.session_state.get(f"editing_{key_prefix}") == rid:
-                        with st.form(f"form_edit_{key_prefix}_{rid}"):
+                    if sua_func and st.session_state.get(f"editing_{key_prefix}") == _bk:
+                        with st.form(f"form_edit_{key_prefix}_{_bk}"):
                             ten_moi = st.text_input("Tên mới *", value=ten)
                             c_save, c_cancel = st.columns(2)
                             saved    = c_save.form_submit_button("💾 Lưu", type="primary", use_container_width=True)
@@ -5822,10 +5822,10 @@ def giao_dien_admin():
                             st.session_state.pop(f"editing_{key_prefix}", None)
                             st.rerun()
                     # Xác nhận xóa
-                    if xoa_func and st.session_state.get(f"deleting_{key_prefix}") == rid:
+                    if xoa_func and st.session_state.get(f"deleting_{key_prefix}") == _bk:
                         st.warning(f"⚠️ Xác nhận xóa **{ten}**?")
                         c_ok, c_no = st.columns(2)
-                        if c_ok.button("✅ Xác nhận xóa", key=f"ok_del_{key_prefix}_{rid}", use_container_width=True):
+                        if c_ok.button("✅ Xác nhận xóa", key=f"ok_del_{key_prefix}_{_bk}", use_container_width=True):
                             try:
                                 with st.spinner("Đang xóa..."):
                                     xoa_func(rid)
@@ -5833,7 +5833,7 @@ def giao_dien_admin():
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"🔌 Lỗi: {e}")
-                        if c_no.button("❌ Huỷ", key=f"no_del_{key_prefix}_{rid}", use_container_width=True):
+                        if c_no.button("❌ Huỷ", key=f"no_del_{key_prefix}_{_bk}", use_container_width=True):
                             st.session_state.pop(f"deleting_{key_prefix}", None)
                             st.rerun()
 
