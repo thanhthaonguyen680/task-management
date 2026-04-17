@@ -682,9 +682,10 @@ def _lay_drive_session():
 def _compress_image(content: bytes, mime: str, max_px: int = 1200, quality: int = 82) -> bytes:
     """Giảm kích thước ảnh xuống max_px cạnh dài, giữ tỉ lệ. Bỏ qua nếu đã nhỏ."""
     try:
-        from PIL import Image
+        from PIL import Image, ImageOps
         import io as _io
         img = Image.open(_io.BytesIO(content))
+        img = ImageOps.exif_transpose(img)
         w, h = img.size
         if max(w, h) > max_px:
             ratio = max_px / max(w, h)
@@ -3860,7 +3861,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
 
     # PDF
     tt_pdf = st.session_state.get(f"tt_select_{task_id}", trang_thai)
-    if tt_pdf == "Đã Hoàn Thành - Giao Máy" or "Hoàn Thành" in tt_pdf:
+    if tt_pdf == "Đã Hoàn Thành - Giao Máy" or "Hoàn Thành" in tt_pdf or tt_pdf == "Chờ Giao":
         st.divider()
         if st.button("📊 Tạo Biên Bản Excel", key=f"xl_{task_id}", use_container_width=True):
             with st.spinner("Đang tạo Excel..."):
