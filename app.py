@@ -3464,7 +3464,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
 
     st.divider()
 
-    # ── Người Phê Duyệt (có thể chỉnh) ───────────────────────
+    # ── Người Phê Duyệt ───────────────────────────────────────
     _pd_cur = hang.get("Người Phê Duyệt", "") or ""
     _ds_pd  = ["-- Không chọn --"] + lay_danh_sach_nhan_vien()
     _pd_idx = _ds_pd.index(_pd_cur) if _pd_cur in _ds_pd else 0
@@ -3473,22 +3473,23 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
     if _pd_luu != _pd_cur:
         with st.spinner("Đang lưu..."):
             cap_nhat_nhieu_truong_task(task_id, {"Người Phê Duyệt": _pd_luu})
+            lay_danh_sach_cong_viec.clear()
+        st.rerun()
 
-    # ── Checkbox gửi phê duyệt (thủ công) ────────────────────
     _dang_kiem_tra = (trang_thai == "Đang Kiểm Tra")
     _gui_pd = st.checkbox(
-        "📋 Gửi cho Người Phê Duyệt",
+        "Gửi cho Người Phê Duyệt",
         value=_dang_kiem_tra,
         key=f"gui_pd_{task_id}",
     )
     if _gui_pd and not _dang_kiem_tra:
-        with st.spinner("Đang gửi phê duyệt..."):
+        with st.spinner("Đang gửi..."):
             cap_nhat_trang_thai(task_id, "Đang Kiểm Tra")
             lay_danh_sach_cong_viec.clear()
         st.toast("✅ Đã gửi → Đang Kiểm Tra")
         st.rerun()
     elif not _gui_pd and _dang_kiem_tra:
-        with st.spinner("Đang hủy gửi phê duyệt..."):
+        with st.spinner("Đang hủy..."):
             cap_nhat_trang_thai(task_id, "Đang Làm")
             lay_danh_sach_cong_viec.clear()
         st.toast("↩️ Đã hủy → Đang Làm")
