@@ -5139,6 +5139,10 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
     today = datetime.now().date()
     COLS  = 4  # card per row
 
+    # Loại bỏ task trùng ID (giữ dòng đầu tiên) để tránh duplicate key
+    if not df.empty and "ID" in df.columns:
+        df = df.drop_duplicates(subset=["ID"], keep="first")
+
     # Áp dụng override trạng thái từ session_state (để board cập nhật ngay sau khi đổi)
     _overrides = st.session_state.get("_tt_overrides", {})
     if _overrides and not df.empty:
