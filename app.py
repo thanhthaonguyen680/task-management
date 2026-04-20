@@ -5248,7 +5248,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                             short = ten_cv[:40] + ("…" if len(ten_cv) > 40 else "")
                             st.markdown(f"**{short}**")
                         with _col_del:
-                            if st.button("✕", key=f"kdel_{task_id}",
+                            if st.button("✕", key=f"kdel_{board_key}_{task_id}",
                                          help="Xóa công việc này",
                                          use_container_width=True):
                                 _dialog_xac_nhan_xoa(task_id, ten_cv)
@@ -5264,7 +5264,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                         if cvt:       meta.append(f"🔹 {cvt}")
                         if meta:
                             st.caption(" · ".join(meta))
-                        if st.button("📂 Xem & chỉnh sửa", key=f"kopen_{task_id}", use_container_width=True):
+                        if st.button("📂 Xem & chỉnh sửa", key=f"kopen_{board_key}_{task_id}", use_container_width=True):
                             _task_dialog(h.to_dict(), ds_tt)
 
 
