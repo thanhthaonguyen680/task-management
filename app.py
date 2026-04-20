@@ -6730,9 +6730,10 @@ def giao_dien_nhan_vien():
         with st.spinner("Đang tải..."):
             df_pd_all = lay_danh_sach_cong_viec()
 
-        # Lọc: tất cả công việc ở trạng thái "Đang Kiểm Tra"
+        # Lọc: trạng thái "Đang Kiểm Tra" VÀ có Người Phê Duyệt
         df_pd = df_pd_all[
-            df_pd_all["Trạng Thái"].fillna("") == "Đang Kiểm Tra"
+            (df_pd_all["Trạng Thái"].fillna("") == "Đang Kiểm Tra") &
+            (df_pd_all["Người Phê Duyệt"].fillna("").str.strip() != "")
         ].copy()
 
         ds_tt_pd = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
