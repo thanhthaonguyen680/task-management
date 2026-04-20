@@ -3482,9 +3482,10 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
         key=f"gui_pd_{task_id}",
     )
     if _gui_pd and trang_thai != "Đang Kiểm Tra":
-        with st.spinner("Đang gửi..."):
-            cap_nhat_trang_thai(task_id, "Đang Kiểm Tra")
+        def _bg_gui_pd(_tid):
+            cap_nhat_trang_thai(_tid, "Đang Kiểm Tra")
             lay_danh_sach_cong_viec.clear()
+        threading.Thread(target=_bg_gui_pd, args=(task_id,), daemon=True).start()
         st.toast("✅ Đã gửi → Đang Kiểm Tra")
 
     st.divider()
