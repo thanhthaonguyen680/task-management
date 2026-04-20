@@ -3476,23 +3476,16 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
             lay_danh_sach_cong_viec.clear()
         st.rerun()
 
-    _dang_kiem_tra = (trang_thai == "Đang Kiểm Tra")
     _gui_pd = st.checkbox(
         "Gửi cho Người Phê Duyệt",
-        value=_dang_kiem_tra,
+        value=False,
         key=f"gui_pd_{task_id}",
     )
-    if _gui_pd and not _dang_kiem_tra:
+    if _gui_pd and trang_thai != "Đang Kiểm Tra":
         with st.spinner("Đang gửi..."):
             cap_nhat_trang_thai(task_id, "Đang Kiểm Tra")
             lay_danh_sach_cong_viec.clear()
         st.toast("✅ Đã gửi → Đang Kiểm Tra")
-        st.rerun()
-    elif not _gui_pd and _dang_kiem_tra:
-        with st.spinner("Đang hủy..."):
-            cap_nhat_trang_thai(task_id, "Đang Làm")
-            lay_danh_sach_cong_viec.clear()
-        st.toast("↩️ Đã hủy → Đang Làm")
         st.rerun()
 
     st.divider()
