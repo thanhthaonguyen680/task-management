@@ -6386,12 +6386,6 @@ def giao_dien_admin():
             with col_bg_adm:
                 adm_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key="adm_so_bao_gia")
 
-            adm_phe_duyet = st.selectbox(
-                "✅ Người Phê Duyệt",
-                options=["-- Không chọn --"] + ds_nhan_vien,
-                key="adm_phe_duyet",
-            )
-
             adm_ten_task = st.text_input("📌 Tên công việc *", placeholder="Ví dụ: Sửa chữa động cơ bơm", key="adm_ten_task")
             adm_mo_ta    = st.text_area("📝 Mô tả chi tiết", placeholder="Nhập mô tả, yêu cầu kỹ thuật...", key="adm_mo_ta")
 
@@ -6407,7 +6401,7 @@ def giao_dien_admin():
                 elif not ds_cong_ty:
                     st.error("⛔ Vui lòng thêm ít nhất một công ty trước!")
                 else:
-                    phe_duyet_luu = adm_phe_duyet if adm_phe_duyet != "-- Không chọn --" else ""
+                    phe_duyet_luu = ""
                     with st.spinner("Đang lưu lên Google Sheets..."):
                         id_moi = them_cong_viec(
                             adm_ten_task.strip(), adm_mo_ta.strip(), adm_nguoi_giao,
@@ -6859,12 +6853,6 @@ def giao_dien_nhan_vien():
                 with col_bg_nv:
                     nv_so_bao_gia = st.text_input("💰 Số Báo Giá", placeholder="VD: BG-2024-001", key=f"{_nv_prefix}_so_bao_gia")
 
-                nv_phe_duyet = st.selectbox(
-                    "✅ Người Phê Duyệt",
-                    options=["-- Không chọn --"] + ds_nv_nv,
-                    key=f"{_nv_prefix}_pd"
-                )
-
                 # Tên & Mô tả unique mỗi task → reset theo version
                 nv_ten_task = st.text_input("📌 Tên Công Việc *", placeholder="Mô tả ngắn công việc cần làm", key=f"{_nv_prefix}_ten_{_v}")
                 nv_mo_ta    = st.text_area("📝 Mô Tả Chi Tiết", placeholder="Mô tả chi tiết về công việc...", key=f"{_nv_prefix}_mo_ta_{_v}")
@@ -6888,7 +6876,7 @@ def giao_dien_nhan_vien():
                     elif not nv_ten_task.strip():
                         st.error("❌ Vui lòng nhập Tên Công Việc!")
                     else:
-                        phe_duyet_nv = nv_phe_duyet if nv_phe_duyet != "-- Không chọn --" else ""
+                        phe_duyet_nv = ""
                         with st.spinner("Đang lưu task mới..."):
                             _id_moi = them_cong_viec(
                                 ten_task        = nv_ten_task.strip(),
