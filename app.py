@@ -3468,24 +3468,25 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
     _pd_cur = hang.get("Người Phê Duyệt", "") or ""
     _ds_pd  = ["-- Không chọn --"] + lay_danh_sach_nhan_vien()
     _pd_idx = _ds_pd.index(_pd_cur) if _pd_cur in _ds_pd else 0
+    # Chỉ hiển thị dropdown, KHÔNG lưu Sheets khi thay đổi
     _pd_new = st.selectbox("👤 Người Phê Duyệt", _ds_pd, index=_pd_idx, key=f"edit_pd_{task_id}")
-    _pd_luu = _pd_new if _pd_new != "-- Không chọn --" else ""
-    if _pd_luu != _pd_cur:
-        with st.spinner("Đang lưu..."):
-            cap_nhat_nhieu_truong_task(task_id, {"Người Phê Duyệt": _pd_luu})
-            lay_danh_sach_cong_viec.clear()
-        st.rerun()
+    _pd_chon = _pd_new if _pd_new != "-- Không chọn --" else ""
 
     _gui_pd = st.checkbox(
         "Gửi cho Người Phê Duyệt",
         value=False,
         key=f"gui_pd_{task_id}",
     )
-    if _gui_pd and trang_thai != "Đang Kiểm Tra":
-        def _bg_gui_pd(_tid):
+    if _gui_pd:
+        def _bg_gui_pd(_tid, _pd):
+            updates = {}
+            if _pd:
+                updates["Người Phê Duyệt"] = _pd
+            if updates:
+                cap_nhat_nhieu_truong_task(_tid, updates)
             cap_nhat_trang_thai(_tid, "Đang Kiểm Tra")
             lay_danh_sach_cong_viec.clear()
-        threading.Thread(target=_bg_gui_pd, args=(task_id,), daemon=True).start()
+        threading.Thread(target=_bg_gui_pd, args=(task_id, _pd_chon), daemon=True).start()
         st.toast("✅ Đã gửi → Đang Kiểm Tra")
 
     st.divider()
