@@ -3486,7 +3486,6 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
             cap_nhat_trang_thai(task_id, "Đang Kiểm Tra")
             lay_danh_sach_cong_viec.clear()
         st.toast("✅ Đã gửi → Đang Kiểm Tra")
-        st.rerun()
 
     st.divider()
 
