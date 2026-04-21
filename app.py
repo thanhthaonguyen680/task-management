@@ -3753,7 +3753,11 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
         # ── Hình / Video cho công việc con ────────────────────
         _cv_media = cv.get("anh", [])
         _exp_lbl = f"📎 Hình/Video ({len(_cv_media)})" if _cv_media else "📎 Thêm hình/video"
-        with st.expander(_exp_lbl, expanded=False):
+        _exp_open_key = f"exp_cv_m_open_{task_id}_{_cvi}"
+        if _exp_open_key not in st.session_state:
+            st.session_state[_exp_open_key] = False
+        with st.expander(_exp_lbl, expanded=st.session_state[_exp_open_key]):
+            st.session_state[_exp_open_key] = True  # giữ mở khi đang trong expander
             if _cv_media:
                 _cols_m = st.columns(min(len(_cv_media), 3))
                 for _mi, _url_m in enumerate(_cv_media):
@@ -3765,7 +3769,21 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                         st.button("🗑️ Xoá", key=f"del_cv_m_{task_id}_{_cvi}_{_mi}",
                                   use_container_width=True,
                                   on_click=_cb_del_cv_media, args=(_cvi, _url_m))
-            _up_key_m = f"up_cv_m_{task_id}_{_cvi}"
+                # Nút tải ZIP (chỉ ảnh, bỏ qua video)
+                _only_anh = [u for u in _cv_media if "/view" not in u]
+                if _only_anh:
+                    if st.button("⬇️ Tải tất cả ảnh (ZIP)", key=f"btn_zip_cvm_{task_id}_{_cvi}", use_container_width=True):
+                        with st.spinner(f"Đang tải {len(_only_anh)} ảnh..."):
+                            _zip_data = _tao_zip_anh(_only_anh, ten_file=f"task_{task_id}_cv{_cvi+1}")
+                        st.download_button(
+                            "💾 Tải xuống ZIP",
+                            data=_zip_data,
+                            file_name=f"task_{task_id}_cv{_cvi+1}.zip",
+                            mime="application/zip",
+                            key=f"dl_zip_cvm_{task_id}_{_cvi}",
+                            use_container_width=True,
+                        )
+            _up_key_m = f"up_cv_m_{task_id}_{_cvi}_{st.session_state.get(f'up_cv_m_v_{task_id}_{_cvi}', 0)}"
             st.file_uploader(
                 "Chọn hình hoặc video",
                 type=["jpg", "jpeg", "png", "mp4", "mov", "avi"],
@@ -3788,6 +3806,9 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                                 _urls = list(_ex.map(_tai_media_len_drive, _files_m))
                             _cvl[_cvi].setdefault("anh", []).extend(_urls)
                     _save_cv_to_sheet(task_id, _cv_key)
+                    # Reset uploader bằng cách tăng version
+                    _vk = f"up_cv_m_v_{task_id}_{_cvi}"
+                    st.session_state[_vk] = st.session_state.get(_vk, 0) + 1
                     st.rerun(scope="fragment")
                 else:
                     st.warning("Chưa chọn file!")
@@ -4499,6 +4520,28 @@ def _cb_upload_anh_nt(task_id, anh_key, up_key):
     st.session_state[f"_nt_msg_{task_id}"] = f"✅ Đã upload {len(new_urls)} ảnh!"
 
 
+def _tao_zip_anh(ds_url: list, ten_file: str = "anh") -> bytes:
+    """Fetch tất cả ảnh từ Drive rồi đóng gói thành ZIP, trả bytes."""
+    import zipfile, io as _io, re as _re, concurrent.futures as _cf
+    def _fetch(idx_url):
+        idx, url = idx_url
+        m = _re.search(r"[?&]id=([^&]+)", url)
+        if m:
+            try:
+                return idx, _lay_bytes_anh_drive(m.group(1))
+            except Exception:
+                pass
+        return idx, None
+    with _cf.ThreadPoolExecutor(max_workers=6) as ex:
+        results = list(ex.map(_fetch, enumerate(ds_url)))
+    buf = _io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for idx, data in results:
+            if data:
+                zf.writestr(f"{ten_file}_{idx+1:03d}.jpg", data)
+    return buf.getvalue()
+
+
 def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
     """Upload ảnh nghiệm thu — explicit button + spinner để hiện ảnh ngay."""
     up_key = f"up_anh_nt_{task_id}"
@@ -4515,6 +4558,18 @@ def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
                     use_container_width=True,
                     on_click=_cb_xoa_anh_nt, args=(task_id, anh_key, url_a),
                 )
+        # Nút tải ZIP
+        if st.button("⬇️ Tải tất cả ảnh (ZIP)", key=f"btn_zip_nt_{task_id}", use_container_width=True):
+            with st.spinner(f"Đang tải {len(ds_anh)} ảnh..."):
+                _zip_bytes = _tao_zip_anh(ds_anh, ten_file=f"task_{task_id}_anh")
+            st.download_button(
+                "💾 Tải xuống ZIP",
+                data=_zip_bytes,
+                file_name=f"task_{task_id}_anh.zip",
+                mime="application/zip",
+                key=f"dl_zip_nt_{task_id}",
+                use_container_width=True,
+            )
     else:
         st.caption("Chưa có ảnh nghiệm thu.")
 
