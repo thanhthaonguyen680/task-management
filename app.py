@@ -3472,12 +3472,13 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
     _pd_new = st.selectbox("👤 Người Phê Duyệt", _ds_pd, index=_pd_idx, key=f"edit_pd_{task_id}")
     _pd_chon = _pd_new if _pd_new != "-- Không chọn --" else ""
 
+    _dang_kiem_tra = (trang_thai == "Đang Kiểm Tra")
     _gui_pd = st.checkbox(
         "Gửi cho Người Phê Duyệt",
-        value=False,
+        value=_dang_kiem_tra,
         key=f"gui_pd_{task_id}",
     )
-    if _gui_pd:
+    if _gui_pd and not _dang_kiem_tra:
         def _bg_gui_pd(_tid, _pd):
             updates = {}
             if _pd:
