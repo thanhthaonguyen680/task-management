@@ -3468,27 +3468,39 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
     _pd_cur = hang.get("Người Phê Duyệt", "") or ""
     _ds_pd  = ["-- Không chọn --"] + lay_danh_sach_nhan_vien()
     _pd_idx = _ds_pd.index(_pd_cur) if _pd_cur in _ds_pd else 0
-    # Chỉ hiển thị dropdown, KHÔNG lưu Sheets khi thay đổi
-    _pd_new = st.selectbox("👤 Người Phê Duyệt", _ds_pd, index=_pd_idx, key=f"edit_pd_{task_id}")
+
+    def _luu_nguoi_pd():
+        _val = st.session_state.get(f"edit_pd_{task_id}", "-- Không chọn --")
+        _luu = _val if _val != "-- Không chọn --" else ""
+        cap_nhat_nhieu_truong_task(task_id, {"Người Phê Duyệt": _luu})
+        lay_danh_sach_cong_viec.clear()
+
+    _pd_new = st.selectbox(
+        "👤 Người Phê Duyệt", _ds_pd, index=_pd_idx,
+        key=f"edit_pd_{task_id}",
+        on_change=_luu_nguoi_pd,
+    )
     _pd_chon = _pd_new if _pd_new != "-- Không chọn --" else ""
 
     _dang_kiem_tra = (trang_thai == "Đang Kiểm Tra")
-    _gui_pd = st.checkbox(
+    _co_nguoi_pd   = bool(_pd_chon)
+
+    def _on_gui_pd_change():
+        _checked = st.session_state.get(f"gui_pd_{task_id}", False)
+        if _checked:
+            cap_nhat_nhieu_truong_task(task_id, {"Người Phê Duyệt": _pd_chon})
+            cap_nhat_trang_thai(task_id, "Đang Kiểm Tra")
+        else:
+            cap_nhat_trang_thai(task_id, "Đang Thực Hiện")
+        lay_danh_sach_cong_viec.clear()
+
+    st.checkbox(
         "Gửi cho Người Phê Duyệt",
         value=_dang_kiem_tra,
+        disabled=not _co_nguoi_pd,
         key=f"gui_pd_{task_id}",
+        on_change=_on_gui_pd_change,
     )
-    if _gui_pd and not _dang_kiem_tra:
-        def _bg_gui_pd(_tid, _pd):
-            updates = {}
-            if _pd:
-                updates["Người Phê Duyệt"] = _pd
-            if updates:
-                cap_nhat_nhieu_truong_task(_tid, updates)
-            cap_nhat_trang_thai(_tid, "Đang Kiểm Tra")
-            lay_danh_sach_cong_viec.clear()
-        threading.Thread(target=_bg_gui_pd, args=(task_id, _pd_chon), daemon=True).start()
-        st.toast("✅ Đã gửi → Đang Kiểm Tra")
 
     st.divider()
 
@@ -6700,6 +6712,20 @@ def giao_dien_nhan_vien():
         </script>
         """, height=0)
 
+    # ---- Khôi phục tab Việc Cần Phê Duyệt sau khi dialog đóng ----
+    if st.session_state.pop("_restore_tab_nv", None) == "phe_duyet":
+        components.html("""
+        <script>
+        setTimeout(function() {
+            // Tab "Việc Cần Phê Duyệt" là tab cuối cùng (index 2) trong nhóm tab NV
+            var tabs = window.parent.document.querySelectorAll('button[role="tab"]');
+            if (tabs.length > 0) {
+                tabs[tabs.length - 1].click();
+            }
+        }, 150);
+        </script>
+        """, height=0)
+
     # ---- Tabs ----
     tab_cong_viec, tab_tao_task, tab_phe_duyet = st.tabs([
         "🗂️ Bảng Quản Lý Công Việc",
@@ -6830,6 +6856,7 @@ def giao_dien_nhan_vien():
                 </div>"""
                 st.markdown(card_html, unsafe_allow_html=True)
                 if st.button("📂 Xem & Phê Duyệt", key=f"pd_open_{task_id}", use_container_width=False):
+                    st.session_state["_restore_tab_nv"] = "phe_duyet"
                     _task_dialog(h.to_dict(), ds_tt_pd)
 
     # ========================================================
