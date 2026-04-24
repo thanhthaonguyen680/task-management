@@ -6119,6 +6119,62 @@ def giao_dien_admin():
             xoa_func=xoa_cong_doan_item,
         )
 
+        st.divider()
+        st.markdown("#### 🔄 Đồng bộ Công Đoạn vào các Task cũ")
+        st.caption("Thêm các công đoạn còn thiếu vào **tất cả task** (giữ nguyên dữ liệu đã có, chỉ bổ sung mục mới).")
+        if st.button("⚡ Đồng bộ ngay", key="adm_apply_cd_bulk", type="primary"):
+            _ds_cd = lay_ten_cac_cong_doan()
+            if not _ds_cd:
+                st.warning("Chưa có công đoạn nào. Hãy thêm công đoạn trước.")
+            else:
+                with st.spinner("Đang đồng bộ..."):
+                    try:
+                        df_all = lay_danh_sach_cong_viec()
+                        sheet  = _lay_sheet_fresh()
+                        _col_a = sheet.col_values(1)
+                        _batch = []   # danh sách range để batch_update 1 lần
+
+                        for _, row in df_all.iterrows():
+                            _cv_raw = str(row.get("Công Việc Con", "") or "").strip()
+                            try:
+                                _hien_co = json.loads(_cv_raw) if _cv_raw else []
+                                if not isinstance(_hien_co, list):
+                                    _hien_co = []
+                            except Exception:
+                                _hien_co = []
+
+                            _ten_hien_co = {item.get("ten", "") for item in _hien_co}
+                            _them_moi = [
+                                {"ten": cd, "nhan_vien": "", "done": False}
+                                for cd in _ds_cd if cd not in _ten_hien_co
+                            ]
+                            if not _them_moi:
+                                continue
+
+                            _cv_merged = _hien_co + _them_moi
+                            _cv_json   = json.dumps(_cv_merged, ensure_ascii=False)
+
+                            _tid = str(row.get("ID", ""))
+                            try:
+                                r_idx = _col_a.index(_tid) + 1
+                            except ValueError:
+                                continue
+
+                            _batch.append({
+                                "range": f"N{r_idx}",
+                                "values": [[_cv_json]],
+                            })
+
+                        if _batch:
+                            # 1 API call duy nhất thay vì N calls
+                            sheet.batch_update(_batch)
+                            lay_danh_sach_cong_viec.clear()
+                            st.success(f"✅ Đã đồng bộ {len(_batch)} task (thêm công đoạn còn thiếu).")
+                        else:
+                            st.info("Tất cả task đã có đầy đủ công đoạn.")
+                    except Exception as e:
+                        st.error(f"Lỗi: {e}")
+
     # ══════════════════════════════════════════════
     # TAB 2 — NHÂN VIÊN
     # ══════════════════════════════════════════════
