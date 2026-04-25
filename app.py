@@ -3193,34 +3193,47 @@ def _fragment_trang_thai_dialog(hang: dict, ds_trang_thai: list):
         f'{tt_cur}</span></div>',
         unsafe_allow_html=True,
     )
-    _idx = ds_trang_thai.index(st.session_state[_saved_key]) if st.session_state[_saved_key] in ds_trang_thai else 0
-    tt_moi = st.selectbox(
+    # Chỉ lấy index khi trạng thái hiện tại có trong danh sách;
+    # nếu không có → giữ nguyên _saved_key, KHÔNG để index=0 tự chọn sai
+    _saved_val = st.session_state[_saved_key]
+    if _saved_val in ds_trang_thai:
+        _idx = ds_trang_thai.index(_saved_val)
+    else:
+        # Trạng thái task không có trong danh sách → thêm tạm vào đầu để không mất dữ liệu
+        ds_trang_thai = [_saved_val] + ds_trang_thai
+        _idx = 0
+
+    def _on_tt_change():
+        _new = st.session_state.get(f"tt_select_dlg_{task_id}")
+        _old = st.session_state.get(_saved_key)
+        if _new and _new != _old:
+            _ten_task  = hang.get("Tên Công Việc", "")
+            _nguoi_doi = st.session_state.get("ho_ten", "")
+            _ct        = hang.get("Công Ty", "")
+            _tb_tt = (
+                f"🔄 **{_nguoi_doi}** đã chuyển công việc **{_ten_task}**"
+                + (f" ({_ct})" if _ct else "")
+                + f" từ **{_old}** → **{_new}**"
+            )
+            st.session_state[_saved_key] = _new
+            if "_tt_overrides" not in st.session_state:
+                st.session_state["_tt_overrides"] = {}
+            st.session_state["_tt_overrides"][task_id] = _new
+            def _bg_doi_tt(_tid, _tt, _msg, _tid2):
+                cap_nhat_trang_thai(_tid, _tt)
+                lay_danh_sach_cong_viec.clear()
+                them_thong_bao_tat_ca(_msg, task_id=_tid2, loai="trang_thai", tru_nguoi="")
+            threading.Thread(target=_bg_doi_tt, args=(task_id, _new, _tb_tt, task_id), daemon=True).start()
+            st.toast(f"✅ Đã chuyển → **{_new}**")
+
+    st.selectbox(
         "Chọn trạng thái",
         options=ds_trang_thai,
         index=_idx,
         key=f"tt_select_dlg_{task_id}",
         label_visibility="collapsed",
+        on_change=_on_tt_change,
     )
-    if tt_moi != st.session_state[_saved_key]:
-        _ten_task  = hang.get("Tên Công Việc", "")
-        _nguoi_doi = st.session_state.get("ho_ten", "")
-        _ct        = hang.get("Công Ty", "")
-        _tb_tt = (
-            f"🔄 **{_nguoi_doi}** đã chuyển công việc **{_ten_task}**"
-            + (f" ({_ct})" if _ct else "")
-            + f" từ **{st.session_state[_saved_key]}** → **{tt_moi}**"
-        )
-        st.session_state[_saved_key] = tt_moi
-        # Lưu override vào session_state để board cập nhật ngay khi đóng dialog
-        if "_tt_overrides" not in st.session_state:
-            st.session_state["_tt_overrides"] = {}
-        st.session_state["_tt_overrides"][task_id] = tt_moi
-        def _bg_doi_tt(_tid, _tt, _msg, _tid2):
-            cap_nhat_trang_thai(_tid, _tt)
-            lay_danh_sach_cong_viec.clear()
-            them_thong_bao_tat_ca(_msg, task_id=_tid2, loai="trang_thai", tru_nguoi="")
-        threading.Thread(target=_bg_doi_tt, args=(task_id, tt_moi, _tb_tt, task_id), daemon=True).start()
-        st.toast(f"✅ Đã chuyển → **{tt_moi}**")
 
 
 # ============================================================
@@ -3324,30 +3337,40 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
             f'{tt_hien_thi}</span></div>',
             unsafe_allow_html=True,
         )
-        idx_hien_tai = ds_trang_thai.index(trang_thai) if trang_thai in ds_trang_thai else 0
-        tt_moi = st.selectbox(
+        if trang_thai in ds_trang_thai:
+            idx_hien_tai   = ds_trang_thai.index(trang_thai)
+            _ds_tt_display = ds_trang_thai
+        else:
+            _ds_tt_display = [trang_thai] + ds_trang_thai
+            idx_hien_tai   = 0
+
+        def _on_tt_nv_change():
+            _new = st.session_state.get(f"tt_select_{task_id}")
+            if _new and _new != trang_thai:
+                _ten_task  = hang.get("Tên Công Việc", "")
+                _nguoi_doi = st.session_state.get("ho_ten", "")
+                _ct        = hang.get("Công Ty", "")
+                _tb_tt = (
+                    f"🔄 **{_nguoi_doi}** đã chuyển công việc "
+                    f"**{_ten_task}**"
+                    + (f" ({_ct})" if _ct else "")
+                    + f" từ **{trang_thai}** → **{_new}**"
+                )
+                def _bg_doi_tt(_tid, _tt, _msg, _tid2):
+                    cap_nhat_trang_thai(_tid, _tt)
+                    lay_danh_sach_cong_viec.clear()
+                    them_thong_bao_tat_ca(_msg, task_id=_tid2, loai="trang_thai", tru_nguoi="")
+                threading.Thread(target=_bg_doi_tt, args=(task_id, _new, _tb_tt, task_id), daemon=True).start()
+                st.toast(f"✅ Đã chuyển → **{_new}**")
+
+        st.selectbox(
             "Chọn trạng thái",
-            options=ds_trang_thai,
+            options=_ds_tt_display,
             index=idx_hien_tai,
             key=f"tt_select_{task_id}",
             label_visibility="collapsed",
+            on_change=_on_tt_nv_change,
         )
-        if tt_moi != trang_thai:
-            _ten_task  = hang.get("Tên Công Việc", "")
-            _nguoi_doi = st.session_state.get("ho_ten", "")
-            _ct        = hang.get("Công Ty", "")
-            _tb_tt = (
-                f"🔄 **{_nguoi_doi}** đã chuyển công việc "
-                f"**{_ten_task}**"
-                + (f" ({_ct})" if _ct else "")
-                + f" từ **{trang_thai}** → **{tt_moi}**"
-            )
-            def _bg_doi_tt(_tid, _tt, _msg, _tid2):
-                cap_nhat_trang_thai(_tid, _tt)
-                lay_danh_sach_cong_viec.clear()
-                them_thong_bao_tat_ca(_msg, task_id=_tid2, loai="trang_thai", tru_nguoi="")
-            threading.Thread(target=_bg_doi_tt, args=(task_id, tt_moi, _tb_tt, task_id), daemon=True).start()
-            st.toast(f"✅ Đã chuyển → **{tt_moi}**")
 
     st.markdown("---")
     # Công ty, Công số, Năm, Hạn, Ngày tạo
@@ -6319,7 +6342,7 @@ def giao_dien_admin():
                     lay_danh_sach_cong_viec.clear()
                     st.rerun()
 
-                ds_tt_adm = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
+                ds_tt_adm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
 
                 # ── Task chính ──────────────────────────────────────────
                 df_task_chinh = df_all_tasks[
@@ -6450,7 +6473,7 @@ def giao_dien_admin():
             _ADM_PREFIX   = "adm"
             ds_cong_ty    = lay_ten_cac_cong_ty()
             ds_nhan_vien  = lay_danh_sach_nhan_vien()
-            ds_trang_thai = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
+            ds_trang_thai = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
 
             if not ds_cong_ty:
                 st.warning("⚠️ Chưa có công ty nào! Hãy thêm ở tab **⚙️ Cài Đặt** trước.")
@@ -6603,7 +6626,7 @@ def giao_dien_admin():
             if loc_nam_b != "Tất cả":
                 df_board = df_board[df_board["Năm"].astype(str) == loc_nam_b]
 
-        ds_tt_board = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
+        ds_tt_board = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
 
         # ── KANBAN BOARD ──────────────────────────────────────────
         df_board = df_board.sort_values("Ngày Tạo", ascending=False, na_position="last")
@@ -6844,7 +6867,7 @@ def giao_dien_nhan_vien():
         if loc_nam_nv != "Tất cả":
             df_cua_toi = df_cua_toi[df_cua_toi["Năm"].astype(str) == loc_nam_nv]
 
-        ds_tt = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
+        ds_tt = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
 
         if df_cua_toi.empty:
             st.info("Chưa có công việc nào trong hệ thống.")
@@ -6936,7 +6959,7 @@ def giao_dien_nhan_vien():
                 _v = st.session_state[_ver_key]
 
                 ds_nv_nv         = lay_danh_sach_nhan_vien()
-                ds_trang_thai_nv = lay_ten_cac_trang_thai() or ["Chờ Làm", "Đang Làm", "Hoàn Thành"]
+                ds_trang_thai_nv = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
 
                 # ── Hàng đầu: Công Ty ──
                 # Các field sticky (giữ lại sau khi tạo task) dùng key không có version
