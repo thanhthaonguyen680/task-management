@@ -3219,12 +3219,12 @@ def _fragment_trang_thai_dialog(hang: dict, ds_trang_thai: list):
             if "_tt_overrides" not in st.session_state:
                 st.session_state["_tt_overrides"] = {}
             st.session_state["_tt_overrides"][task_id] = _new
+            st.session_state[f"_tt_toast_{task_id}"] = _new
             def _bg_doi_tt(_tid, _tt, _msg, _tid2):
                 cap_nhat_trang_thai(_tid, _tt)
                 lay_danh_sach_cong_viec.clear()
                 them_thong_bao_tat_ca(_msg, task_id=_tid2, loai="trang_thai", tru_nguoi="")
             threading.Thread(target=_bg_doi_tt, args=(task_id, _new, _tb_tt, task_id), daemon=True).start()
-            st.toast(f"✅ Đã chuyển → **{_new}**")
 
     st.selectbox(
         "Chọn trạng thái",
@@ -3234,6 +3234,9 @@ def _fragment_trang_thai_dialog(hang: dict, ds_trang_thai: list):
         label_visibility="collapsed",
         on_change=_on_tt_change,
     )
+    _toast_val = st.session_state.pop(f"_tt_toast_{task_id}", None)
+    if _toast_val:
+        st.toast(f"✅ Đã chuyển → **{_toast_val}**")
 
 
 # ============================================================
@@ -3356,12 +3359,12 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                     + (f" ({_ct})" if _ct else "")
                     + f" từ **{trang_thai}** → **{_new}**"
                 )
+                st.session_state[f"_tt_toast_nv_{task_id}"] = _new
                 def _bg_doi_tt(_tid, _tt, _msg, _tid2):
                     cap_nhat_trang_thai(_tid, _tt)
                     lay_danh_sach_cong_viec.clear()
                     them_thong_bao_tat_ca(_msg, task_id=_tid2, loai="trang_thai", tru_nguoi="")
                 threading.Thread(target=_bg_doi_tt, args=(task_id, _new, _tb_tt, task_id), daemon=True).start()
-                st.toast(f"✅ Đã chuyển → **{_new}**")
 
         st.selectbox(
             "Chọn trạng thái",
@@ -3371,6 +3374,9 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
             label_visibility="collapsed",
             on_change=_on_tt_nv_change,
         )
+        _toast_nv = st.session_state.pop(f"_tt_toast_nv_{task_id}", None)
+        if _toast_nv:
+            st.toast(f"✅ Đã chuyển → **{_toast_nv}**")
 
     st.markdown("---")
     # Công ty, Công số, Năm, Hạn, Ngày tạo
