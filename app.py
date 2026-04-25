@@ -3490,9 +3490,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
         if _checked:
             cap_nhat_nhieu_truong_task(task_id, {"Người Phê Duyệt": _pd_chon})
             cap_nhat_trang_thai(task_id, "Đang Kiểm Tra")
-        else:
-            cap_nhat_trang_thai(task_id, "Đang Thực Hiện")
-        lay_danh_sach_cong_viec.clear()
+            lay_danh_sach_cong_viec.clear()
 
     st.checkbox(
         "Gửi cho Người Phê Duyệt",
