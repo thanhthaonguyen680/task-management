@@ -6196,6 +6196,44 @@ def giao_dien_admin():
                     except Exception as e:
                         st.error(f"Lỗi: {e}")
 
+        st.divider()
+        st.markdown("#### 🔁 Đổi trạng thái hàng loạt")
+        st.caption("Đổi tất cả task đang mang trạng thái cũ không hợp lệ sang trạng thái mới.")
+        _col_mig1, _col_mig2, _col_mig3 = st.columns([2, 2, 1])
+        with _col_mig1:
+            _mig_cu = st.text_input("Trạng thái cũ cần đổi", value="Đang Làm", key="adm_mig_cu")
+        with _col_mig2:
+            _ds_tt_mig = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+            _mig_moi_idx = _ds_tt_mig.index("Đang Kiểm Tra") if "Đang Kiểm Tra" in _ds_tt_mig else 0
+            _mig_moi = st.selectbox("Đổi sang", _ds_tt_mig, index=_mig_moi_idx, key="adm_mig_moi")
+        with _col_mig3:
+            st.markdown("<br>", unsafe_allow_html=True)
+            _btn_mig = st.button("⚡ Đổi ngay", key="adm_mig_btn", type="primary", use_container_width=True)
+        if _btn_mig and _mig_cu.strip():
+            with st.spinner(f"Đang đổi '{_mig_cu}' → '{_mig_moi}'..."):
+                try:
+                    df_all = lay_danh_sach_cong_viec()
+                    df_can_doi = df_all[df_all["Trạng Thái"].fillna("") == _mig_cu.strip()]
+                    if df_can_doi.empty:
+                        st.info(f"Không tìm thấy task nào có trạng thái '{_mig_cu}'.")
+                    else:
+                        sheet  = _lay_sheet_fresh()
+                        _col_a = sheet.col_values(1)
+                        _batch_mig = []
+                        for _, row in df_can_doi.iterrows():
+                            _tid = str(row.get("ID", ""))
+                            try:
+                                r_idx = _col_a.index(_tid) + 1
+                            except ValueError:
+                                continue
+                            _batch_mig.append({"range": f"H{r_idx}", "values": [[_mig_moi]]})
+                        if _batch_mig:
+                            sheet.batch_update(_batch_mig)
+                            lay_danh_sach_cong_viec.clear()
+                            st.success(f"✅ Đã đổi {len(_batch_mig)} task: '{_mig_cu}' → '{_mig_moi}'.")
+                except Exception as e:
+                    st.error(f"Lỗi: {e}")
+
     # ══════════════════════════════════════════════
     # TAB 2 — NHÂN VIÊN
     # ══════════════════════════════════════════════
