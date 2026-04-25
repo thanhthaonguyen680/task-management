@@ -227,22 +227,28 @@ img[data-lb] { cursor:zoom-in !important; }
 <div id="__lb_ov" onclick="if(event.target===this)window.__lbClose()">
   <img id="__lb_img_el" src="" onclick="event.stopPropagation()">
   <div id="__lb_ctrl">
-    <button class="lb-btn" onclick="window.__lbZoom(1.25)" title="Phóng to">+</button>
-    <button class="lb-btn" onclick="window.__lbZoom(0.8)"  title="Thu nhỏ">−</button>
-    <button class="lb-btn" onclick="window.__lbReset()"    title="Đặt lại">↺</button>
-    <button class="lb-btn" onclick="window.__lbClose()"    title="Đóng">✕</button>
+    <button class="lb-btn" onclick="window.__lbZoom(1.25)"  title="Phóng to">+</button>
+    <button class="lb-btn" onclick="window.__lbZoom(0.8)"   title="Thu nhỏ">−</button>
+    <button class="lb-btn" onclick="window.__lbRotate(-90)" title="Xoay trái">⟲</button>
+    <button class="lb-btn" onclick="window.__lbRotate(90)"  title="Xoay phải">⟳</button>
+    <button class="lb-btn" onclick="window.__lbReset()"     title="Đặt lại">↺</button>
+    <button class="lb-btn" onclick="window.__lbClose()"     title="Đóng">✕</button>
   </div>
   <div id="__lb_cap"></div>
 </div>
 <script>
 (function(){
-  var _sc = 1;
+  var _sc = 1, _rot = 0;
+  function _apply() {
+    var img = document.getElementById('__lb_img_el');
+    if (img) img.style.transform = 'scale(' + _sc + ') rotate(' + _rot + 'deg)';
+  }
   window.__lbOpen = function(src, cap) {
     var ov  = document.getElementById('__lb_ov');
     var img = document.getElementById('__lb_img_el');
     var capEl = document.getElementById('__lb_cap');
     if (!ov || !img) return;
-    img.src = src; _sc = 1; img.style.transform = 'scale(1)';
+    img.src = src; _sc = 1; _rot = 0; _apply();
     if (capEl) capEl.textContent = cap || '';
     ov.classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -254,13 +260,15 @@ img[data-lb] { cursor:zoom-in !important; }
   };
   window.__lbZoom = function(f) {
     _sc = Math.max(0.2, Math.min(_sc * f, 10));
-    var img = document.getElementById('__lb_img_el');
-    if (img) img.style.transform = 'scale(' + _sc + ')';
+    _apply();
+  };
+  window.__lbRotate = function(deg) {
+    _rot = (_rot + deg + 360) % 360;
+    _apply();
   };
   window.__lbReset = function() {
-    _sc = 1;
-    var img = document.getElementById('__lb_img_el');
-    if (img) img.style.transform = 'scale(1)';
+    _sc = 1; _rot = 0;
+    _apply();
   };
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') window.__lbClose();
