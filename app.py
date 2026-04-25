@@ -198,6 +198,83 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ── Lightbox overlay — click ảnh để xem full size + zoom ──────────────────────
+st.markdown("""
+<style>
+#__lb_ov {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,.92); z-index:999999;
+    flex-direction:column; align-items:center; justify-content:center;
+}
+#__lb_ov.open { display:flex; }
+#__lb_img_el {
+    max-width:90vw; max-height:80vh; object-fit:contain;
+    border-radius:6px; box-shadow:0 8px 40px rgba(0,0,0,.7);
+    transition:transform .15s; transform-origin:center;
+    user-select:none; cursor:default;
+}
+#__lb_ctrl { display:flex; gap:12px; margin-top:14px; }
+.lb-btn {
+    background:rgba(255,255,255,.18); border:none; color:#fff;
+    font-size:20px; width:44px; height:44px; border-radius:50%;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:background .15s;
+}
+.lb-btn:hover { background:rgba(255,255,255,.38); }
+#__lb_cap { color:#bbb; font-size:13px; margin-top:10px; }
+img[data-lb] { cursor:zoom-in !important; }
+</style>
+<div id="__lb_ov" onclick="if(event.target===this)window.__lbClose()">
+  <img id="__lb_img_el" src="" onclick="event.stopPropagation()">
+  <div id="__lb_ctrl">
+    <button class="lb-btn" onclick="window.__lbZoom(1.25)" title="Phóng to">+</button>
+    <button class="lb-btn" onclick="window.__lbZoom(0.8)"  title="Thu nhỏ">−</button>
+    <button class="lb-btn" onclick="window.__lbReset()"    title="Đặt lại">↺</button>
+    <button class="lb-btn" onclick="window.__lbClose()"    title="Đóng">✕</button>
+  </div>
+  <div id="__lb_cap"></div>
+</div>
+<script>
+(function(){
+  var _sc = 1;
+  window.__lbOpen = function(src, cap) {
+    var ov  = document.getElementById('__lb_ov');
+    var img = document.getElementById('__lb_img_el');
+    var capEl = document.getElementById('__lb_cap');
+    if (!ov || !img) return;
+    img.src = src; _sc = 1; img.style.transform = 'scale(1)';
+    if (capEl) capEl.textContent = cap || '';
+    ov.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  };
+  window.__lbClose = function() {
+    var ov = document.getElementById('__lb_ov');
+    if (ov) ov.classList.remove('open');
+    document.body.style.overflow = '';
+  };
+  window.__lbZoom = function(f) {
+    _sc = Math.max(0.2, Math.min(_sc * f, 10));
+    var img = document.getElementById('__lb_img_el');
+    if (img) img.style.transform = 'scale(' + _sc + ')';
+  };
+  window.__lbReset = function() {
+    _sc = 1;
+    var img = document.getElementById('__lb_img_el');
+    if (img) img.style.transform = 'scale(1)';
+  };
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') window.__lbClose();
+  });
+  document.addEventListener('wheel', function(e) {
+    var ov = document.getElementById('__lb_ov');
+    if (!ov || !ov.classList.contains('open')) return;
+    e.preventDefault();
+    window.__lbZoom(e.deltaY < 0 ? 1.1 : 0.909);
+  }, {passive: false, capture: true});
+})();
+</script>
+""", unsafe_allow_html=True)
+
 # JS inject CSS vào tất cả frames có thể truy cập
 import streamlit.components.v1 as components
 components.html(
@@ -768,13 +845,30 @@ def _lay_bytes_anh_drive(file_id: str) -> bytes:
 
 
 def _hien_thi_anh_drive(url: str, **kwargs):
-    """Hiển thị ảnh Drive: fetch bytes qua service account thay vì URL trực tiếp."""
-    import re
+    """Hiển thị ảnh Drive: fetch bytes qua service account, click để xem full size."""
+    import re, base64
+    caption      = kwargs.get("caption", "")
+    width_full   = kwargs.get("use_container_width", False)
+    img_style    = (
+        "width:100%;border-radius:4px;cursor:zoom-in;"
+        if width_full else
+        "max-width:100%;border-radius:4px;cursor:zoom-in;"
+    )
     m = re.search(r"[?&]id=([^&]+)", url)
     if m:
         try:
             data = _lay_bytes_anh_drive(m.group(1))
-            st.image(data, **kwargs)
+            mime = "image/png" if data[:4] == b'\x89PNG' else "image/jpeg"
+            b64  = base64.b64encode(data).decode()
+            cap_js = (caption or "").replace("\\", "\\\\").replace("'", "\\'")
+            st.markdown(
+                f'<img src="data:{mime};base64,{b64}" '
+                f'style="{img_style}" data-lb="1" '
+                f'onclick="window.__lbOpen(this.src,\'{cap_js}\')">',
+                unsafe_allow_html=True,
+            )
+            if caption:
+                st.caption(caption)
             return
         except Exception:
             pass
@@ -5334,7 +5428,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                         if is_over:
                             st.error("⚠️ Quá hạn", icon="🔴")
                         if anh_lst:
-                            st.image(anh_lst[0], use_container_width=True)
+                            _hien_thi_anh_drive(anh_lst[0], use_container_width=True)
                         # Tên + nút xóa cùng hàng
                         _col_ten, _col_del = st.columns([5, 1], gap="small")
                         with _col_ten:
