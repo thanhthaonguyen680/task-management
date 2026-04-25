@@ -6583,6 +6583,13 @@ def giao_dien_admin():
                     st.error("⛔ Vui lòng nhập tên công việc!")
                 elif not ds_cong_ty:
                     st.error("⛔ Vui lòng thêm ít nhất một công ty trước!")
+                elif adm_ma_so.strip() and not lay_danh_sach_cong_viec()[
+                        lay_danh_sach_cong_viec()["Mã Số"].fillna("").str.strip() == adm_ma_so.strip()
+                    ].empty:
+                    _trung = lay_danh_sach_cong_viec()[
+                        lay_danh_sach_cong_viec()["Mã Số"].fillna("").str.strip() == adm_ma_so.strip()
+                    ].iloc[0]
+                    st.error(f"⛔ Mã Số **{adm_ma_so.strip()}** đã tồn tại ở Task #{_trung.get('ID','')} — {_trung.get('Tên Công Việc','')} ({_trung.get('Công Ty','')})")
                 else:
                     phe_duyet_luu = ""
                     with st.spinner("Đang lưu lên Google Sheets..."):
@@ -7074,6 +7081,13 @@ def giao_dien_nhan_vien():
                         st.error("❌ Vui lòng chọn Công Ty!")
                     elif not nv_ten_task.strip():
                         st.error("❌ Vui lòng nhập Tên Công Việc!")
+                    elif nv_ma_so.strip() and not lay_danh_sach_cong_viec()[
+                            lay_danh_sach_cong_viec()["Mã Số"].fillna("").str.strip() == nv_ma_so.strip()
+                        ].empty:
+                        _trung = lay_danh_sach_cong_viec()[
+                            lay_danh_sach_cong_viec()["Mã Số"].fillna("").str.strip() == nv_ma_so.strip()
+                        ].iloc[0]
+                        st.error(f"⛔ Mã Số **{nv_ma_so.strip()}** đã tồn tại ở Task #{_trung.get('ID','')} — {_trung.get('Tên Task','')}")
                     else:
                         phe_duyet_nv = ""
                         with st.spinner("Đang lưu task mới..."):
