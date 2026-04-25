@@ -236,77 +236,6 @@ img[data-lb] { cursor:zoom-in !important; }
   </div>
   <div id="__lb_cap"></div>
 </div>
-<script>
-(function(){
-  var _sc = 1, _rot = 0;
-  function _apply() {
-    var img = document.getElementById('__lb_img_el');
-    if (img) img.style.transform = 'scale(' + _sc + ') rotate(' + _rot + 'deg)';
-  }
-  window.__lbOpen = function(src, cap) {
-    var ov  = document.getElementById('__lb_ov');
-    var img = document.getElementById('__lb_img_el');
-    var capEl = document.getElementById('__lb_cap');
-    if (!ov || !img) return;
-    img.src = src; _sc = 1; _rot = 0; _apply();
-    if (capEl) capEl.textContent = cap || '';
-    ov.classList.add('open');
-    document.body.style.overflow = 'hidden';
-  };
-  window.__lbClose = function() {
-    var ov = document.getElementById('__lb_ov');
-    if (ov) ov.classList.remove('open');
-    document.body.style.overflow = '';
-  };
-  window.__lbZoom = function(f) {
-    _sc = Math.max(0.2, Math.min(_sc * f, 10));
-    _apply();
-  };
-  window.__lbRotate = function(deg) {
-    _rot = (_rot + deg + 360) % 360;
-    _apply();
-  };
-  window.__lbReset = function() {
-    _sc = 1; _rot = 0;
-    _apply();
-  };
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') window.__lbClose();
-  });
-  // Desktop: scroll zoom
-  document.addEventListener('wheel', function(e) {
-    var ov = document.getElementById('__lb_ov');
-    if (!ov || !ov.classList.contains('open')) return;
-    e.preventDefault();
-    window.__lbZoom(e.deltaY < 0 ? 1.1 : 0.909);
-  }, {passive: false, capture: true});
-  // Mobile: pinch-to-zoom
-  var _pt = 0;
-  document.addEventListener('touchstart', function(e) {
-    var ov = document.getElementById('__lb_ov');
-    if (!ov || !ov.classList.contains('open')) return;
-    if (e.touches.length === 2) {
-      _pt = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-    }
-  }, {passive: true});
-  document.addEventListener('touchmove', function(e) {
-    var ov = document.getElementById('__lb_ov');
-    if (!ov || !ov.classList.contains('open')) return;
-    if (e.touches.length === 2 && _pt > 0) {
-      e.preventDefault();
-      var ct = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      window.__lbZoom(ct / _pt);
-      _pt = ct;
-    }
-  }, {passive: false});
-})();
-</script>
 """, unsafe_allow_html=True)
 
 # JS inject CSS vào tất cả frames có thể truy cập
@@ -644,6 +573,72 @@ components.html(
     }
 
     frames.forEach(function(doc) { observeDoc(doc); });
+
+    // ── Lightbox JS — inject vào parent window vì st.markdown() strip <script> ──
+    (function() {
+      try {
+        var W = window.parent || window;
+        if (W.__lbReady) return;  // đã inject rồi
+        W.__lbReady = true;
+        var _sc = 1, _rot = 0;
+        function _apply() {
+          var D = W.document;
+          var img = D.getElementById('__lb_img_el');
+          if (img) img.style.transform = 'scale('+_sc+') rotate('+_rot+'deg)';
+        }
+        W.__lbOpen = function(src, cap) {
+          var D = W.document;
+          var ov = D.getElementById('__lb_ov');
+          var img = D.getElementById('__lb_img_el');
+          var capEl = D.getElementById('__lb_cap');
+          if (!ov || !img) return;
+          img.src = src; _sc = 1; _rot = 0; _apply();
+          if (capEl) capEl.textContent = cap || '';
+          ov.classList.add('open');
+          D.body.style.overflow = 'hidden';
+        };
+        W.__lbClose = function() {
+          var D = W.document;
+          var ov = D.getElementById('__lb_ov');
+          if (ov) ov.classList.remove('open');
+          D.body.style.overflow = '';
+        };
+        W.__lbZoom = function(f) {
+          _sc = Math.max(0.2, Math.min(_sc * f, 10)); _apply();
+        };
+        W.__lbRotate = function(deg) {
+          _rot = (_rot + deg + 360) % 360; _apply();
+        };
+        W.__lbReset = function() {
+          _sc = 1; _rot = 0; _apply();
+        };
+        W.document.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape') W.__lbClose();
+        });
+        W.document.addEventListener('wheel', function(e) {
+          var ov = W.document.getElementById('__lb_ov');
+          if (!ov || !ov.classList.contains('open')) return;
+          e.preventDefault();
+          W.__lbZoom(e.deltaY < 0 ? 1.1 : 0.909);
+        }, {passive: false, capture: true});
+        var _pt = 0;
+        W.document.addEventListener('touchstart', function(e) {
+          var ov = W.document.getElementById('__lb_ov');
+          if (!ov || !ov.classList.contains('open')) return;
+          if (e.touches.length === 2)
+            _pt = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+        }, {passive: true});
+        W.document.addEventListener('touchmove', function(e) {
+          var ov = W.document.getElementById('__lb_ov');
+          if (!ov || !ov.classList.contains('open')) return;
+          if (e.touches.length === 2 && _pt > 0) {
+            e.preventDefault();
+            var ct = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+            W.__lbZoom(ct / _pt); _pt = ct;
+          }
+        }, {passive: false});
+      } catch(e) {}
+    })();
 
     // Chạy lại sau 1s và 3s phòng element load chậm
     [1000, 3000, 6000].forEach(function(delay) {
