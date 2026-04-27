@@ -2549,6 +2549,16 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     anh_do_luong = doc_anh_do_luong(
         str(thong_tin_task.get("Ảnh Đo Lường", "") or ""))
 
+    # Lookup địa chỉ khách hàng từ danh sách công ty
+    _dia_chi_kh = ""
+    try:
+        _df_ct = lay_danh_sach_cong_ty()
+        _match = _df_ct[_df_ct["Tên Công Ty"].str.strip() == khach_hang.strip()]
+        if not _match.empty:
+            _dia_chi_kh = str(_match.iloc[0].get("Địa Chỉ", "") or "")
+    except Exception:
+        pass
+
     try:
         dt = datetime.strptime(ngay_tao_str[:10], "%Y-%m-%d")
         ngay_en = dt.strftime("%d %B %Y")
@@ -2707,7 +2717,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     for en_lbl, vi_lbl, val in [
         ("Engine",   "Động cơ",    ten_dong_co),
         ("Customer", "Khách hàng", khach_hang),
-        ("Address",  "Địa chỉ",   ""),
+        ("Address",  "Địa chỉ",   _dia_chi_kh),
     ]:
         # A:B merged = label, C:F merged = value
         ws.merge_cells(f"A{row}:B{row}")
@@ -3032,11 +3042,11 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         ws.merge_cells(f"B{row+1}:C{row+1}")
         _sc(row + 1, 2,
             "Management document / Tài liệu quản lý: QT-NT-029-1A",
-            size=10, border=brd_all, h_align="left")
+            size=12, border=brd_all, h_align="left")
         _brd_merge(row + 1, 2, 3, brd_all)
         ws.merge_cells(f"D{row+1}:E{row+1}")
         _sc(row + 1, 4, "Edition date / Ngày ban hành: 24/04/2025",
-            size=10, border=brd_all, h_align="left")
+            size=12, border=brd_all, h_align="left")
         _brd_merge(row + 1, 4, 5, brd_all)
         _sc(row + 1, 6, f"Page / Trang: {page_lbl}", size=12, border=brd_all, h_align="left")
         ws.row_dimensions[row].height     = 26
@@ -3190,8 +3200,23 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             _h_scale = 1.4 if n == 2 else 1.0
             img_row_h_pt = img_h_mm * 2.835 * _h_scale
 
+            # Kiểm tra trước: có ảnh nào trong bảng này không?
+            _has_any_img = any(_img_cache.get(k) is not None for k in storage_keys)
+            _no_brd    = Border()
+            _white_fill = PatternFill("solid", fgColor="FFFFFF")
+
+            def _blank_row(r, c_from, c_to):
+                """Xoá viền + trắng hoàn toàn cho một hàng."""
+                for _c in range(c_from, c_to + 1):
+                    _cell = ws.cell(row=r, column=_c)
+                    _cell.border = _no_brd
+                    _cell.fill   = _white_fill
+                    _cell.value  = None
+
             # -- Tiêu đề bảng (xanh đậm) --
+            _title_row = None
             if ten_en:
+                _title_row = row
                 ws.merge_cells(f"A{row}:F{row}")
                 title_txt = f"{ten_en} / {ten_vi}" if ten_vi else ten_en
                 tc = ws.cell(row=row, column=1, value=title_txt)
@@ -3205,6 +3230,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                 row += 1
 
             # -- Nhãn cột (xanh nhạt) --
+            _label_row = row
             for lbl, (c1, c2) in zip(display_labels, ranges):
                 if c1 != c2:
                     ws.merge_cells(
@@ -3221,17 +3247,26 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
             row += 1
 
             # -- Hàng ảnh --
+            _img_row = row
             ws.row_dimensions[row].height = img_row_h_pt
             for key, (c1, c2) in zip(storage_keys, ranges):
-                cell_ref = f"{get_column_letter(c1)}{row}"
                 if c1 != c2:
                     ws.merge_cells(
                         f"{get_column_letter(c1)}{row}:"
                         f"{get_column_letter(c2)}{row}")
-                ws.cell(row=row, column=c1).border = brd_thick
-                _brd_merge(row, c1, c2, brd_thick)
 
                 img_bio = _img_cache.get(key)
+                if img_bio is not None:
+                    # Có ảnh → vẽ viền bình thường
+                    ws.cell(row=row, column=c1).border = brd_thick
+                    _brd_merge(row, c1, c2, brd_thick)
+                else:
+                    # Không có ảnh → ẩn ô (bỏ viền + fill trắng)
+                    for _c in range(c1, c2 + 1):
+                        _cell = ws.cell(row=row, column=_c)
+                        _cell.border = _no_brd
+                        _cell.fill   = _white_fill
+
                 if img_bio is not None:
                     try:
                         img_bio.seek(0)
@@ -3249,7 +3284,17 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                         ws.add_image(xl_img)
                     except Exception:
                         pass
-            _apply_outer_thick(_tbl_start, row)   # khung đậm bên ngoài toàn bảng
+
+            # Nếu toàn bộ bảng không có ảnh → ẩn luôn tiêu đề + nhãn
+            if not _has_any_img:
+                if _title_row:
+                    _blank_row(_title_row, 1, 6)
+                    ws.row_dimensions[_title_row].height = 0
+                _blank_row(_label_row, 1, 6)
+                ws.row_dimensions[_label_row].height = 0
+                ws.row_dimensions[_img_row].height = 0
+            else:
+                _apply_outer_thick(_tbl_start, row)   # khung đậm bên ngoài toàn bảng
             row += 1
             ws.row_dimensions[row].height = 5   # khoảng trắng nhỏ giữa các bảng
             row += 1  # trống giữa các bảng
