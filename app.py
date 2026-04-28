@@ -3207,11 +3207,18 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
 
             def _blank_row(r, c_from, c_to):
                 """Xoá viền + trắng hoàn toàn cho một hàng."""
+                # Unmerge bất kỳ merged range nào nằm trong hàng này trước
+                for _mr in list(ws.merged_cells.ranges):
+                    if _mr.min_row <= r <= _mr.max_row and _mr.min_col >= c_from and _mr.max_col <= c_to:
+                        ws.unmerge_cells(str(_mr))
                 for _c in range(c_from, c_to + 1):
                     _cell = ws.cell(row=r, column=_c)
                     _cell.border = _no_brd
                     _cell.fill   = _white_fill
-                    _cell.value  = None
+                    try:
+                        _cell.value = None
+                    except AttributeError:
+                        pass
 
             # -- Tiêu đề bảng (xanh đậm) --
             _title_row = None
