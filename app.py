@@ -7042,9 +7042,10 @@ def giao_dien_nhan_vien():
         """, height=0)
 
     # ---- Tabs ----
-    tab_cong_viec, tab_tao_task, tab_phe_duyet = st.tabs([
+    tab_cong_viec, tab_tao_task, tab_viec_cua_toi, tab_phe_duyet = st.tabs([
         "🗂️ Bảng Quản Lý Công Việc",
         "➕ Tạo Công Việc Mới",
+        "📌 Việc Của Tôi",
         "✅ Việc Cần Phê Duyệt"
     ])
 
@@ -7116,7 +7117,80 @@ def giao_dien_nhan_vien():
                                  force_open=bool(q_search.strip() or q_cty.strip()))
 
     # ========================================================
-    # Tab 2: Việc Cần Phê Duyệt
+    # Tab 3: Việc Của Tôi (công việc con được giao)
+    # ========================================================
+    with tab_viec_cua_toi:
+        col_btn_vct, col_sq_vct = st.columns([1, 4])
+        with col_btn_vct:
+            if st.button("🔄 Làm mới", key="nv_refresh_vct"):
+                lay_danh_sach_cong_viec.clear()
+                st.session_state.pop("_last_nv_load", None)
+                st.rerun()
+        with col_sq_vct:
+            q_search_vct = st.text_input(
+                "🔍",
+                placeholder="Tìm kiếm tên công việc...",
+                key="nv_vct_search_q",
+                label_visibility="collapsed",
+            )
+
+        q_cty_vct = st.text_input(
+            "🏢",
+            placeholder="Tìm kiếm theo công ty...",
+            key="nv_vct_search_cty",
+            label_visibility="collapsed",
+        )
+
+        with st.spinner("Đang tải công việc..."):
+            df_vct_all = lay_danh_sach_cong_viec()
+
+        # Lọc: task có ít nhất 1 công việc con được giao cho ten_nhan_vien
+        def _co_cv_cua_toi(row_cv):
+            raw = str(row_cv.get("Công Việc Con", "") or "[]")
+            try:
+                items = json.loads(raw)
+            except Exception:
+                return False
+            return any(
+                isinstance(it, dict) and
+                str(it.get("nhan_vien") or it.get("Nhân Viên") or "").strip() == ten_nhan_vien.strip()
+                for it in items
+            )
+
+        df_vct = df_vct_all[df_vct_all.apply(_co_cv_cua_toi, axis=1)].copy()
+
+        if q_search_vct.strip():
+            df_vct = df_vct[
+                df_vct["Tên Công Việc"].fillna("").str.lower().str.contains(q_search_vct.strip().lower())
+            ]
+        if q_cty_vct.strip():
+            df_vct = df_vct[
+                df_vct["Công Ty"].fillna("").str.lower().str.contains(q_cty_vct.strip().lower())
+            ]
+
+        ds_nam_vct = sorted(
+            [str(y) for y in df_vct["Năm"].dropna().unique() if str(y).strip() != ""],
+            reverse=True,
+        ) if "Năm" in df_vct.columns and not df_vct.empty else []
+        loc_nam_vct = st.selectbox(
+            "📅 Lọc theo năm",
+            options=["Tất cả"] + ds_nam_vct,
+            key="nv_vct_loc_nam",
+        ) if ds_nam_vct else "Tất cả"
+        if loc_nam_vct != "Tất cả":
+            df_vct = df_vct[df_vct["Năm"].astype(str) == loc_nam_vct]
+
+        ds_tt_vct = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+
+        if df_vct.empty:
+            st.info("ℹ️ Không có công việc nào có công việc con được giao cho bạn.")
+        else:
+            df_vct = df_vct.sort_values("Ngày Tạo", ascending=False, na_position="last")
+            _render_kanban_board(df_vct, ds_tt_vct, board_key="nv_vct_kb",
+                                 force_open=bool(q_search_vct.strip() or q_cty_vct.strip()))
+
+    # ========================================================
+    # Tab 4: Việc Cần Phê Duyệt
     # ========================================================
     with tab_phe_duyet:
         col_btn_pd, _ = st.columns([1, 4])
