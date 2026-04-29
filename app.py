@@ -2982,6 +2982,17 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
                         os.unlink(tmp)
                     except Exception:
                         pass
+    # ── Lọc chỉ giữ trang có ít nhất 1 ảnh + tính lại tổng trang ──
+    _active_pages = [
+        (_, img_h, tables)
+        for _, img_h, tables in IMAGE_PAGES
+        if any(
+            _img_cache.get(k) is not None
+            for _, _, _, skeys in tables
+            for k in skeys
+        )
+    ]
+    _total_pages = 2 + len(_active_pages)  # 1=BBNT, 2=terminal, 3..N=ảnh
 
     def _col_ranges(n: int) -> list:
         if n == 3:
@@ -2991,11 +3002,11 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         step = NCOLS // n
         return [(i * step + 1, (i + 1) * step) for i in range(n)]
 
-    ws.row_breaks.append(Break(id=row - 1))   # ── page break: page 1/9 → 2/9 (tại row 45)
-    row += 1  # blank row 46 = đầu trang 2
+    ws.row_breaks.append(Break(id=row - 1))   # ── page break: page 1 → 2
+    row += 1  # blank row = đầu trang 2
 
     # ═══════════════════════════════════════════════════════════
-    # TRANG 2/8 — BẢNG SỐ LIỆU ĐO LƯỜNG (manual entry)
+    # TRANG 2 — BẢNG SỐ LIỆU ĐO LƯỜNG (manual entry)
     # ═══════════════════════════════════════════════════════════
 
     def _apply_outer_thick(r_start, r_end):
@@ -3055,8 +3066,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         _apply_outer_thick(row, row + 1)          # viền ngoài dày cho mini header
         row += 3
 
-    # NT mini header for page 2/8
-    _nt_mini_header("2/8")
+    # NT mini header for page 2
+    _nt_mini_header(f"2/{_total_pages}")
 
     LIGHT_BLUE = "DAEEF3"
 
@@ -3188,7 +3199,8 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         row += 1
     ws.row_breaks.append(Break(id=row - 1))   # ── page break: page 2 → 3
 
-    for page_str, img_h_mm, tables in IMAGE_PAGES:
+    for _pi, (_, img_h_mm, tables) in enumerate(_active_pages):
+        page_str = f"{_pi + 3}/{_total_pages}"
         # ── Header NT mini (2 hàng) ──────────────────────────────
         _nt_mini_header(page_str)
 
