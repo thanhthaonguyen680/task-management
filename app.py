@@ -6522,24 +6522,39 @@ def giao_dien_admin():
             </style>
             """, unsafe_allow_html=True)
 
-            # ── Buildindex: task chính + subtask per employee ──────────
+            # ── Build index subtask một lần cho toàn bộ nhân viên ────
+            # subtask_index: {ho_ten_lower -> [(hang_dict, ds_cv_full, [(i, cv)])]}
+            # task_chinh_count: {ho_ten_lower -> int}
+            _subtask_index: dict = {}   # ho_ten_lower → list[(hang_dict, ds_cv, my_sub)]
+            _task_ct_count: dict = {}   # ho_ten_lower → int
+            if not df_all_tasks.empty:
+                # Đếm task chính vectorized
+                for _ht in df_all_tasks["Nhân Viên"].fillna("").str.strip().str.lower().unique():
+                    _task_ct_count[_ht] = int((df_all_tasks["Nhân Viên"].fillna("").str.strip().str.lower() == _ht).sum())
+
+                # Parse JSON một lần, build subtask index
+                for _, _row in df_all_tasks.iterrows():
+                    _raw = _row.get("Công Việc Con", "") or "[]"
+                    try:
+                        _ds_cv = json.loads(_raw)
+                    except Exception:
+                        _ds_cv = []
+                    if not isinstance(_ds_cv, list):
+                        continue
+                    # Group CV con theo nhân viên được giao
+                    _by_nv: dict = {}
+                    for _i, _cv in enumerate(_ds_cv):
+                        if not isinstance(_cv, dict):
+                            continue
+                        _nv_key = ((_cv.get("nguoi") or _cv.get("nhan_vien") or _cv.get("Nhân Viên") or "")).strip().lower()
+                        if _nv_key:
+                            _by_nv.setdefault(_nv_key, []).append((_i, _cv))
+                    for _nv_key, _my_sub in _by_nv.items():
+                        _subtask_index.setdefault(_nv_key, []).append((_row.to_dict(), _ds_cv, _my_sub))
+
             def _dem_task_cua(ho_ten: str):
-                """Đếm task chính & subtask của một nhân viên."""
-                task_chinh = 0
-                subtask = 0
-                if not df_all_tasks.empty:
-                    task_chinh = len(df_all_tasks[df_all_tasks["Nhân Viên"] == ho_ten])
-                    for _, row in df_all_tasks.iterrows():
-                        try:
-                            ds_cv = json.loads(row.get("Công Việc Con", "") or "[]")
-                        except Exception:
-                            ds_cv = []
-                        for cv in ds_cv:
-                            if isinstance(cv, dict):
-                                nv_cv = cv.get("nhan_vien", cv.get("Nhân Viên", ""))
-                                if nv_cv == ho_ten:
-                                    subtask += 1
-                return task_chinh, subtask
+                _k = ho_ten.strip().lower()
+                return _task_ct_count.get(_k, 0), sum(len(m) for _, _, m in _subtask_index.get(_k, []))
 
             st.markdown(f"**Tổng cộng: {len(df_nv_users)} nhân viên**")
             st.markdown("---")
@@ -6594,22 +6609,8 @@ def giao_dien_admin():
                     if loc_ct:
                         df_task_chinh = df_task_chinh[df_task_chinh["Công Ty"].isin(loc_ct)]
 
-                # ── Subtask được giao ───────────────────────────────────
-                tasks_co_subtask = []
-                if not df_all_tasks.empty:
-                    for _, row in df_all_tasks.iterrows():
-                        raw = row.get("Công Việc Con", "") or "[]"
-                        try:
-                            ds_cv = json.loads(raw)
-                        except Exception:
-                            ds_cv = []
-                        my_subtasks = [
-                            (i, cv) for i, cv in enumerate(ds_cv)
-                            if isinstance(cv, dict)
-                            and (cv.get("nguoi") or cv.get("nhan_vien") or "").strip().lower() == adm_xem_nv.lower()
-                        ]
-                        if my_subtasks:
-                            tasks_co_subtask.append((row.to_dict(), ds_cv, my_subtasks))
+                # ── Subtask được giao — lấy từ index đã build ─────────
+                tasks_co_subtask = _subtask_index.get(adm_xem_nv.strip().lower(), [])
 
                 # ── Tách việc đang làm / đã hoàn thành theo subtask ───
                 tasks_dang_lam = []   # task có ít nhất 1 CV con chưa xong
