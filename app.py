@@ -6662,7 +6662,49 @@ def giao_dien_admin():
                     _render_cv_con_tab(tasks_dang_lam, show_done=False)
 
                 with tab_st_d:
-                    _render_cv_con_tab(tasks_da_xong, show_done=True)
+                    # ── Bộ lọc tháng/năm ──────────────────────────────
+                    # Gom tất cả ngay_hoan_thanh có trong tasks_da_xong
+                    _thang_nam_set = set()
+                    for _hd, _, _msub in tasks_da_xong:
+                        for _, _cv in _msub:
+                            _nht = str(_cv.get("ngay_hoan_thanh") or "").strip()
+                            if len(_nht) >= 7:   # "YYYY-MM..."
+                                _thang_nam_set.add(_nht[:7])   # "YYYY-MM"
+                    _thang_nam_sorted = sorted(_thang_nam_set, reverse=True)
+
+                    if _thang_nam_sorted:
+                        # Hiển thị dạng "Tháng MM/YYYY"
+                        def _fmt_ym(ym):
+                            try:
+                                y, m = ym.split("-")
+                                return f"Tháng {int(m):02d}/{y}"
+                            except Exception:
+                                return ym
+                        _ym_options = ["Tất cả"] + [_fmt_ym(ym) for ym in _thang_nam_sorted]
+                        _ym_map = {"Tất cả": None, **{_fmt_ym(ym): ym for ym in _thang_nam_sorted}}
+                        _loc_ym = st.selectbox(
+                            "📅 Lọc theo tháng hoàn thành",
+                            options=_ym_options,
+                            key=f"adm_nv_loc_ym_{adm_xem_nv}",
+                        )
+                        _filter_ym = _ym_map.get(_loc_ym)
+
+                        # Lọc tasks_da_xong theo tháng được chọn
+                        if _filter_ym:
+                            _tasks_filtered = []
+                            for _hd, _dcvf, _msub in tasks_da_xong:
+                                _msub_f = [
+                                    (_i, _cv) for _i, _cv in _msub
+                                    if str(_cv.get("ngay_hoan_thanh") or "").startswith(_filter_ym)
+                                ]
+                                if _msub_f:
+                                    _tasks_filtered.append((_hd, _dcvf, _msub_f))
+                        else:
+                            _tasks_filtered = tasks_da_xong
+                    else:
+                        _tasks_filtered = tasks_da_xong
+
+                    _render_cv_con_tab(_tasks_filtered, show_done=True)
 
             else:
                 # ── DANH SÁCH CARD NHÂN VIÊN ───────────────────────────
