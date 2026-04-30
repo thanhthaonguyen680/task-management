@@ -6609,62 +6609,60 @@ def giao_dien_admin():
                         if my_subtasks:
                             tasks_co_subtask.append((row.to_dict(), ds_cv, my_subtasks))
 
-                # ── Tabs task chính / việc con ──────────────────────────
+                # ── Tách việc đang làm / đã hoàn thành theo subtask ───
+                tasks_dang_lam = []   # task có ít nhất 1 CV con chưa xong
+                tasks_da_xong  = []   # task có ít nhất 1 CV con đã xong
+                for hang_dict, ds_cv_full, my_subtasks in tasks_co_subtask:
+                    undone = [(i, cv) for i, cv in my_subtasks if not cv.get("done", False)]
+                    done   = [(i, cv) for i, cv in my_subtasks if cv.get("done", False)]
+                    if undone:
+                        tasks_dang_lam.append((hang_dict, ds_cv_full, undone))
+                    if done:
+                        tasks_da_xong.append((hang_dict, ds_cv_full, done))
+
+                n_dang_lam = sum(len(m) for _, _, m in tasks_dang_lam)
+                n_da_xong  = sum(len(m) for _, _, m in tasks_da_xong)
+
+                # ── Tabs việc đang làm / đã hoàn thành ────────────────
                 tab_tc_d, tab_st_d = st.tabs([
-                    f"📌 Công Việc Chính ({len(df_task_chinh)})",
-                    f"🔹 Việc Con ({sum(len(m) for _, _, m in tasks_co_subtask)})",
+                    f"⏳ Việc Đang Làm ({n_dang_lam})",
+                    f"✅ Việc Đã Hoàn Thành ({n_da_xong})",
                 ])
 
+                def _render_cv_con_tab(tasks_list, show_done: bool):
+                    if not tasks_list:
+                        msg = "Không có việc nào đã hoàn thành." if show_done else "Không có việc nào đang làm."
+                        st.info(msg)
+                        return
+                    n_cv = sum(len(m) for _, _, m in tasks_list)
+                    st.caption(f"**{n_cv} việc con** trong **{len(tasks_list)} task**")
+                    for hang_dict, _, my_sub in tasks_list:
+                        tid    = hang_dict["ID"]
+                        tt     = hang_dict.get("Trạng Thái", "")
+                        icon   = _ICON_TT_NV.get(tt, "⚪")
+                        cty    = hang_dict.get("Công Ty", "")
+                        ten    = hang_dict.get("Tên Công Việc", "")
+                        nv_chu = hang_dict.get("Nhân Viên", "")
+                        dl     = hang_dict.get("Hạn Hoàn Thành", "") or hang_dict.get("Deadline", "")
+                        with st.expander(
+                            f"{icon} [{cty}] {ten}  —  {tt}",
+                            expanded=not show_done
+                        ):
+                            st.markdown(f"**🏢 Công Ty:** {cty}  |  **👤** {nv_chu}  |  **📅** {dl}")
+                            for _, cv in my_sub:
+                                ten_cv_sub = cv.get("ten", cv.get("Tên", "—"))
+                                ngay_ht    = cv.get("ngay_hoan_thanh", "")
+                                if show_done:
+                                    st.markdown(f"✅ ~~{ten_cv_sub}~~" + (f" &nbsp;`Hoàn thành: {ngay_ht}`" if ngay_ht else ""))
+                                else:
+                                    dl_sub = cv.get("deadline", cv.get("Deadline", ""))
+                                    st.markdown(f"⏳ **{ten_cv_sub}**" + (f" &nbsp;`Hạn: {dl_sub}`" if dl_sub else ""))
+
                 with tab_tc_d:
-                    if df_task_chinh.empty:
-                        st.info("Nhân viên này chưa được giao công việc chính nào.")
-                    else:
-                        for _, hang in df_task_chinh.iterrows():
-                            task_id    = hang["ID"]
-                            trang_thai = hang.get("Trạng Thái", "Chờ Làm")
-                            icon_tt    = _ICON_TT_NV.get(trang_thai, "⚪")
-                            ten_cv     = hang.get("Tên Công Việc", "")
-                            cong_ty    = hang.get("Công Ty", "")
-                            _force_expand = st.session_state.get(f"expand_{task_id}", False)
-                            with st.expander(
-                                f"{icon_tt} [{cong_ty}]  {ten_cv}  —  {trang_thai}",
-                                expanded=(trang_thai in ["Chờ Làm", "Đang Làm"]) or _force_expand
-                            ):
-                                if _force_expand:
-                                    del st.session_state[f"expand_{task_id}"]
-                                _fragment_chi_tiet_task(hang.to_dict(), ds_tt_adm)
+                    _render_cv_con_tab(tasks_dang_lam, show_done=False)
 
                 with tab_st_d:
-                    if not tasks_co_subtask:
-                        st.info("Nhân viên này chưa được giao công việc con nào.")
-                    else:
-                        st.caption(f"**{sum(len(m) for _,_,m in tasks_co_subtask)} việc con** trong **{len(tasks_co_subtask)} task**")
-                        for hang_dict, ds_cv_full, my_subtasks in tasks_co_subtask:
-                            tid    = hang_dict["ID"]
-                            tt     = hang_dict.get("Trạng Thái", "")
-                            icon   = _ICON_TT_NV.get(tt, "⚪")
-                            cty    = hang_dict.get("Công Ty", "")
-                            ten    = hang_dict.get("Tên Công Việc", "")
-                            nv_chu = hang_dict.get("Nhân Viên", "")
-                            dl     = hang_dict.get("Hạn Hoàn Thành", "") or hang_dict.get("Deadline", "")
-                            mo_ta  = hang_dict.get("Mô Tả", "") or ""
-                            all_done = all(cv.get("done", False) for _, cv in my_subtasks)
-                            badge    = " ✅" if all_done else ""
-                            with st.expander(
-                                f"{icon} [{cty}] {ten}  —  {tt}{badge}",
-                                expanded=not all_done
-                            ):
-                                st.markdown(f"**🏢 Công Ty:** {cty}  |  **👤** {nv_chu}  |  **📅** {dl}")
-                                if mo_ta:
-                                    st.markdown(f"**📝 Mô Tả:** {mo_ta}")
-                                for idx_cv, cv in my_subtasks:
-                                    ten_cv_sub = cv.get("ten", cv.get("Tên", "—"))
-                                    done_sub   = cv.get("done", False)
-                                    dl_sub     = cv.get("deadline", cv.get("Deadline", "—"))
-                                    if done_sub:
-                                        st.markdown(f"✅ ~~{ten_cv_sub}~~ &nbsp; `{dl_sub}`")
-                                    else:
-                                        st.markdown(f"⏳ **{ten_cv_sub}** &nbsp; `{dl_sub}`")
+                    _render_cv_con_tab(tasks_da_xong, show_done=True)
 
             else:
                 # ── DANH SÁCH CARD NHÂN VIÊN ───────────────────────────
