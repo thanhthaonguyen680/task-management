@@ -6568,10 +6568,12 @@ def giao_dien_admin():
 
                 st.divider()
 
-                # Nút làm mới
-                if st.button("🔄 Làm mới dữ liệu", key="adm_nv_detail_refresh"):
-                    lay_danh_sach_cong_viec.clear()
-                    st.rerun()
+                # Nút làm mới + xuất Excel
+                _col_rf, _col_xl = st.columns([1, 1])
+                with _col_rf:
+                    if st.button("🔄 Làm mới dữ liệu", key="adm_nv_detail_refresh"):
+                        lay_danh_sach_cong_viec.clear()
+                        st.rerun()
 
                 ds_tt_adm = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
 
@@ -6622,6 +6624,95 @@ def giao_dien_admin():
 
                 n_dang_lam = sum(len(m) for _, _, m in tasks_dang_lam)
                 n_da_xong  = sum(len(m) for _, _, m in tasks_da_xong)
+
+                # ── Nút xuất Excel ─────────────────────────────────────
+                with _col_xl:
+                    def _xuat_excel_nv(ten_nv, dl_lam, dl_xong):
+                        import io as _io
+                        from openpyxl import Workbook as _WB
+                        from openpyxl.styles import (Font as _F, PatternFill as _PF,
+                                                      Alignment as _AL, Border as _BD, Side as _SD)
+                        _wb = _WB(); _ws = _wb.active; _ws.title = "Công Việc NV"
+                        _thin = _SD(style="thin", color="000000")
+                        _brd  = _BD(left=_thin, right=_thin, top=_thin, bottom=_thin)
+                        _hdr_fill = _PF("solid", fgColor="4472C4")
+                        _done_fill = _PF("solid", fgColor="E2EFDA")
+                        _todo_fill = _PF("solid", fgColor="FFF2CC")
+                        _al_c = _AL(horizontal="center", vertical="center", wrap_text=True)
+                        _al_l = _AL(horizontal="left",   vertical="center", wrap_text=True)
+
+                        # Tiêu đề
+                        _ws.merge_cells("A1:F1")
+                        _tc = _ws.cell(1, 1, f"Báo cáo công việc: {ten_nv}")
+                        _tc.font = _F(bold=True, size=14, name="Times New Roman")
+                        _tc.alignment = _al_c
+                        _ws.row_dimensions[1].height = 26
+
+                        # Header cột
+                        headers = ["STT", "Tên Task (Mã số)", "Công Ty", "Công Việc Con",
+                                   "Trạng Thái Task", "Ngày Hoàn Thành"]
+                        for ci, h in enumerate(headers, 1):
+                            _c = _ws.cell(2, ci, h)
+                            _c.font = _F(bold=True, size=11, color="FFFFFF", name="Times New Roman")
+                            _c.fill = _hdr_fill
+                            _c.alignment = _al_c
+                            _c.border = _brd
+                        _ws.row_dimensions[2].height = 22
+
+                        _row = 3
+
+                        def _write_section(title, tasks_list, fill, is_done):
+                            nonlocal _row
+                            # Section header
+                            _ws.merge_cells(f"A{_row}:F{_row}")
+                            _sc2 = _ws.cell(_row, 1, title)
+                            _sc2.font = _F(bold=True, size=12, name="Times New Roman")
+                            _sc2.fill = fill
+                            _sc2.alignment = _al_l
+                            _ws.row_dimensions[_row].height = 20
+                            _row += 1
+                            stt = 1
+                            for hd, _, msub in tasks_list:
+                                ten_t  = str(hd.get("Tên Công Việc") or "")
+                                ma_so  = str(hd.get("Mã Số") or "")
+                                cty    = str(hd.get("Công Ty") or "")
+                                tt     = str(hd.get("Trạng Thái") or "")
+                                lbl    = f"{ten_t} ({ma_so})" if ma_so else ten_t
+                                for _, cv in msub:
+                                    ten_cv = str(cv.get("ten") or cv.get("Tên") or "")
+                                    ngay   = str(cv.get("ngay_hoan_thanh") or "") if is_done else ""
+                                    vals   = [stt, lbl, cty, ten_cv, tt, ngay]
+                                    for ci, v in enumerate(vals, 1):
+                                        _c2 = _ws.cell(_row, ci, v)
+                                        _c2.font = _F(size=11, name="Times New Roman")
+                                        _c2.alignment = _al_l if ci > 1 else _al_c
+                                        _c2.border = _brd
+                                    _ws.row_dimensions[_row].height = 18
+                                    _row += 1
+                                    stt += 1
+
+                        _todo_sec_fill = _PF("solid", fgColor="FFE699")
+                        _done_sec_fill = _PF("solid", fgColor="A9D18E")
+                        _write_section(f"⏳ VIỆC ĐANG LÀM ({sum(len(m) for _,_,m in dl_lam)})",
+                                       dl_lam, _todo_sec_fill, False)
+                        _write_section(f"✅ VIỆC ĐÃ HOÀN THÀNH ({sum(len(m) for _,_,m in dl_xong)})",
+                                       dl_xong, _done_sec_fill, True)
+
+                        # Column widths
+                        for ci, w in enumerate([6, 38, 28, 32, 22, 18], 1):
+                            _ws.column_dimensions[chr(64+ci)].width = w
+
+                        _buf = _io.BytesIO(); _wb.save(_buf); _buf.seek(0)
+                        return _buf.read()
+
+                    _xl_bytes = _xuat_excel_nv(adm_xem_nv, tasks_dang_lam, tasks_da_xong)
+                    st.download_button(
+                        "📥 Xuất Excel",
+                        data=_xl_bytes,
+                        file_name=f"cong_viec_{adm_xem_nv.replace(' ', '_')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
 
                 # ── Tabs việc đang làm / đã hoàn thành ────────────────
                 tab_tc_d, tab_st_d = st.tabs([
