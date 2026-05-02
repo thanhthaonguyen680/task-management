@@ -5664,6 +5664,10 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
     _f_tu_cvc  = _fc7.date_input("📅 Hoàn thành từ", value=None, format="DD/MM/YYYY", key="cvc_f_tu")
     _f_den_cvc = _fc8.date_input("📅 đến ngày",      value=None, format="DD/MM/YYYY", key="cvc_f_den")
 
+    _fc9, _fc10, _fc11, _fc12 = st.columns(4)
+    _ttm_opts = ["Tất cả"] + sorted([x for x in df_cvc["Tình Trạng Máy"].dropna().unique().tolist() if x])
+    _f_ttm_cvc = _fc9.selectbox("🖥️ Tình Trạng Máy", _ttm_opts, key="cvc_f_ttm")
+
     df_show_cvc = df_cvc.copy()
     if _f_ms_cvc:
         df_show_cvc = df_show_cvc[df_show_cvc["Mã Số"].astype(str).str.contains(_f_ms_cvc, case=False, na=False)]
@@ -5681,6 +5685,8 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
         df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(lambda d: d is not None and d >= _f_tu_cvc)]
     if _f_den_cvc:
         df_show_cvc = df_show_cvc[df_show_cvc["_ngay_ht_raw"].apply(lambda d: d is not None and d <= _f_den_cvc)]
+    if _f_ttm_cvc != "Tất cả":
+        df_show_cvc = df_show_cvc[df_show_cvc["Tình Trạng Máy"] == _f_ttm_cvc]
 
     total = len(df_show_cvc)
     done_count  = len(df_show_cvc[df_show_cvc["Ngày Hoàn Thành"] != ""])
