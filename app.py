@@ -5555,6 +5555,7 @@ def _render_detail_expanders(df, ds_tt):
 # ============================================================
 # FRAGMENT: Công Việc Con AgGrid
 # ============================================================
+@st.fragment
 def _fragment_cvc_content(df_all_cvc, aggrid_css):
     import io
 
@@ -5771,6 +5772,8 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
                     _match_cvc.iloc[0]["_task_dict"],
                     lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH,
                 )
+                st.session_state["_cvc_prev_sel_id"] = _sel_id_cvc
+                st.rerun(scope="app")
         st.session_state["_cvc_prev_sel_id"] = _sel_id_cvc
     else:
         st.session_state["_cvc_prev_sel_id"] = ""
