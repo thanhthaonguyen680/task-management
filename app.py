@@ -5628,20 +5628,21 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
                 ngay_ht_hien = "✅ (chưa rõ ngày)"
 
             rows_cvc.append({
-                "STT":             stt,
-                "Tên Công Ty":     task_row.get("Công Ty", ""),
-                "Tên Công Việc":   task_row.get("Tên Công Việc", ""),
-                "Công Suất":       task_row.get("Công Suất", ""),
-                "Mã Số":           task_row.get("Mã Số", ""),
-                "Công Việc Con":   ten_cv,
-                "Nhân Viên":       nv,
-                "Ngày Hoàn Thành": ngay_ht_hien,
-                "_ngay_ht_raw":    ngay_ht_date,
-                "Trạng Thái":      task_row.get("Trạng Thái", ""),
-                "Loại Máy":        task_row.get("Loại Máy", ""),
-                "Tình Trạng":      tinh_trang_td,
-                "_task_id":        task_row.get("ID", ""),
-                "_task_dict":      task_row.to_dict(),
+                "STT":               stt,
+                "Tên Công Ty":       task_row.get("Công Ty", ""),
+                "Tên Công Việc":     task_row.get("Tên Công Việc", ""),
+                "Công Suất":         task_row.get("Công Suất", ""),
+                "Mã Số":             task_row.get("Mã Số", ""),
+                "Công Việc Con":     ten_cv,
+                "Nhân Viên":         nv,
+                "Ngày Hoàn Thành":   ngay_ht_hien,
+                "_ngay_ht_raw":      ngay_ht_date,
+                "Trạng Thái":        task_row.get("Trạng Thái", ""),
+                "Loại Máy":          task_row.get("Loại Máy", ""),
+                "Tình Trạng Máy":    str(task_row.get("Tình Trạng", "") or ""),
+                "Tình Trạng":        tinh_trang_td,
+                "_task_id":          task_row.get("ID", ""),
+                "_task_dict":        task_row.to_dict(),
             })
 
     if not rows_cvc:
@@ -5695,7 +5696,7 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
 
     cols_show = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
                  "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
-                 "Loại Máy", "Tình Trạng"]
+                 "Loại Máy", "Tình Trạng Máy", "Tình Trạng"]
     _df_grid_cvc = df_show_cvc[cols_show].copy().reset_index(drop=True)
 
     _TT_STYLE = {
@@ -5747,6 +5748,7 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
             "Ngày Hoàn Thành": st.column_config.TextColumn("Ngày HT",         width="small"),
             "Trạng Thái":      st.column_config.TextColumn("Trạng Thái",       width="medium"),
             "Loại Máy":        st.column_config.TextColumn("Loại Máy",         width="medium"),
+            "Tình Trạng Máy":  st.column_config.TextColumn("Tình Trạng Máy",  width="small"),
             "Tình Trạng":      st.column_config.TextColumn("Tình Trạng",       width="small"),
         },
     )
@@ -5769,7 +5771,7 @@ def _fragment_cvc_content(df_all_cvc, aggrid_css):
 
     cols_excel = ["STT", "Tên Công Ty", "Tên Công Việc", "Công Suất", "Mã Số",
                   "Công Việc Con", "Nhân Viên", "Ngày Hoàn Thành", "Trạng Thái",
-                  "Loại Máy", "Tình Trạng"]
+                  "Loại Máy", "Tình Trạng Máy", "Tình Trạng"]
     df_excel = df_show_cvc[cols_excel].copy()
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
