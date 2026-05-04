@@ -6254,6 +6254,19 @@ def giao_dien_admin():
             elif df_ct.empty:
                 st.info("ℹ️ Chưa có công ty nào. Hãy thêm ở form bên trên!")
             else:
+                _ct_filter = st.text_input(
+                    "🔍 Tìm công ty...", key="ct_filter_input",
+                    placeholder="Nhập tên, địa chỉ, mã KH hoặc mã số thuế...",
+                    label_visibility="collapsed",
+                )
+                if _ct_filter.strip():
+                    _f = _ct_filter.strip().lower()
+                    df_ct = df_ct[
+                        df_ct["Tên Công Ty"].fillna("").str.lower().str.contains(_f, na=False) |
+                        df_ct["Địa Chỉ"].fillna("").str.lower().str.contains(_f, na=False) |
+                        df_ct["Mã Khách Hàng"].fillna("").str.lower().str.contains(_f, na=False) |
+                        df_ct["Mã Số Thuế"].fillna("").str.lower().str.contains(_f, na=False)
+                    ]
                 st.markdown(f"**Tổng cộng: {len(df_ct)} công ty**")
                 for _, row_ct in df_ct.iterrows():
                     rid_ct  = str(row_ct.get("ID", ""))
