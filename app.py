@@ -4251,6 +4251,31 @@ _MAC_DINH_CHECKLIST = [
     {"text": "Gia công mới cốt",           "done": False},
 ]
 
+# ── Checklist đặc biệt theo Loại Máy ──────────────────────
+_LOAI_MAY_DONG_CO_DC = "Động cơ DC"
+
+def _la_dong_co_dc(loai_may: str) -> bool:
+    """So sánh không phân biệt hoa thường."""
+    return loai_may.strip().lower() == _LOAI_MAY_DONG_CO_DC.lower()
+
+_DC_STATOR_SC_ITEMS = [
+    "Quấn CT chính", "Quấn KT phụ", "Quấn cuộn dây bù",
+    "Thay PT 100", "Thay PTC", "Header",
+]
+_DC_ROTOR_BD_ITEMS = ["Vớt láng cổ gót", "Cân bằng động"]
+_DC_ROTOR_SC_ITEMS = ["Quấn cuộn dây", "Thay mới cổ góp"]
+_DC_CO_KHI_ITEMS = [
+    "Sửa chữa nắp DE", "Sửa chữa nắp NDC", "Sửa chữa trục",
+    "SC trục NDE", "Thay gá đỡ chổi than", "Bắn cát gây than", "Sơn mới motor",
+]
+
+# Công việc con mặc định cho Động cơ DC
+_DC_CVC_ITEMS = [
+    "Nhận máy", "Lên Đơn", "Tháo Máy",
+    "Stator", "Rotor", "Cơ Khí",
+    "Lắp Máy", "Giao Máy",
+]
+
 # Màu nền theo trạng thái (cho board)
 _STATUS_BG = {
     "Đang Kiểm Tra":              "#00b4d8",
@@ -4280,6 +4305,131 @@ _STATUS_HEADER_COLOR = {
     "Đang Làm":                   ("#7a5c00", "#fff8dc"),
     "Hoàn Thành":                 ("#004d40", "#e0f2f1"),
 }
+
+
+# ── Checklist form đặc biệt cho Động cơ DC ────────────────
+def _render_checklist_dc(prefix: str):
+    """Checklist Động Cơ DC — inline edit giống _fragment_checklist, có section header."""
+    _dc_key = f"{prefix}_dc_items"
+    _dc_inp = f"{prefix}_dc_inp_v"
+
+    # Pre-seed tất cả items vào session_state (chỉ lần đầu)
+    if _dc_key not in st.session_state:
+        st.session_state[_dc_key] = [
+            {"text": "[Stator - Bảo dưỡng] Bảo dưỡng Stator", "done": False},
+            *[{"text": f"[Stator - Sửa chữa] {t}", "done": False} for t in _DC_STATOR_SC_ITEMS],
+            *[{"text": f"[Rotor - Bảo dưỡng] {t}", "done": False} for t in _DC_ROTOR_BD_ITEMS],
+            *[{"text": f"[Rotor - Sửa chữa] {t}", "done": False} for t in _DC_ROTOR_SC_ITEMS],
+            *[{"text": f"[Cơ Khí] {t}", "done": False} for t in _DC_CO_KHI_ITEMS],
+        ]
+        st.session_state[_dc_inp] = 0
+
+    st.markdown("**☑️ Checklist Động Cơ DC**")
+
+    mk = f"dci{prefix}"
+    st.markdown(f"""<style>
+    [data-testid="stHorizontalBlock"]:has(.{mk}) {{
+        flex-wrap: nowrap !important; align-items: center !important; gap: 4px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) > [data-testid="stColumn"]:first-child {{
+        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important; overflow: visible !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) > [data-testid="stColumn"]:nth-child(2) {{
+        flex: 1 1 0% !important; min-width: 0 !important; overflow: hidden !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) > [data-testid="stColumn"]:last-child {{
+        flex: 0 0 36px !important; min-width: 36px !important; max-width: 36px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stTextInput"] input {{
+        border: 1.5px solid transparent !important; background: transparent !important;
+        box-shadow: none !important; padding: 3px 6px !important;
+        font-size: 0.93rem !important; color: #1e1b4b !important; min-height: 32px !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stTextInput"] input:focus {{
+        border-color: #7c3aed !important; background: white !important;
+        border-radius: 6px !important; box-shadow: 0 0 0 2px rgba(124,58,237,0.12) !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stTextInput"] > div {{
+        border: none !important; box-shadow: none !important; background: transparent !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stColumn"]:last-child button {{
+        background: transparent !important; border: none !important;
+        box-shadow: none !important; color: #ef4444 !important;
+        font-size: 1.1rem !important; padding: 2px 4px !important; min-height: 32px !important; transform: none !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stColumn"]:last-child button:hover {{
+        background: #fee2e2 !important; border-radius: 6px !important; transform: none !important;
+    }}
+    [data-testid="stHorizontalBlock"]:has(.{mk}) [data-testid="stCheckbox"] {{ margin: 0 !important; }}
+    </style>""", unsafe_allow_html=True)
+
+    items = st.session_state[_dc_key]
+
+    def _dc_save(i):
+        val = st.session_state.get(f"{prefix}_dc_txt_{i}", "").strip()
+        if val:
+            st.session_state[_dc_key][i]["text"] = val
+
+    def _dc_ck(i):
+        st.session_state[_dc_key][i]["done"] = st.session_state.get(f"{prefix}_dc_ck_{i}", False)
+
+    def _dc_del(i):
+        if i < len(st.session_state[_dc_key]):
+            st.session_state[_dc_key].pop(i)
+        for k in list(st.session_state.keys()):
+            if k.startswith(f"{prefix}_dc_txt_"):
+                del st.session_state[k]
+
+    def _dc_add():
+        val = st.session_state.get(f"{prefix}_dc_inp_{st.session_state[_dc_inp]}", "").strip()
+        if val:
+            st.session_state[_dc_key].append({"text": val, "done": False})
+            st.session_state[_dc_inp] += 1
+
+    # Render từng item
+    _prev_section = None
+    _SECTION_LABELS = {
+        "[Stator - Bảo dưỡng]": "⚡ Stator — Bảo dưỡng",
+        "[Stator - Sửa chữa]":  "⚡ Stator — Sửa chữa",
+        "[Rotor - Bảo dưỡng]":  "🔄 Rotor — Bảo dưỡng",
+        "[Rotor - Sửa chữa]":   "🔄 Rotor — Sửa chữa",
+        "[Cơ Khí]":              "🔩 Cơ Khí",
+    }
+    for i, item in enumerate(items):
+        txt = item.get("text", "") or f"Mục {i+1}"
+        done_val = bool(item.get("done", False))
+
+        # Tự động hiện section header nếu text bắt đầu bằng tag section
+        _sec = next((s for s in _SECTION_LABELS if txt.startswith(s)), None)
+        if _sec and _sec != _prev_section:
+            st.markdown(f"<div style='font-size:0.8rem;font-weight:600;color:#6b7280;margin:10px 0 2px 0'>{_SECTION_LABELS[_sec]}</div>", unsafe_allow_html=True)
+            _prev_section = _sec
+
+        _c1, _c2, _c3 = st.columns([0.6, 8.5, 0.7], gap="small")
+        with _c1:
+            st.markdown(f"<span class='{mk}' style='display:none'></span>", unsafe_allow_html=True)
+            st.checkbox("", value=done_val, key=f"{prefix}_dc_ck_{i}",
+                        label_visibility="collapsed", on_change=_dc_ck, args=(i,))
+        with _c2:
+            st.text_input("", value=txt, key=f"{prefix}_dc_txt_{i}",
+                          label_visibility="collapsed", on_change=_dc_save, args=(i,))
+        with _c3:
+            st.button("🗑️", key=f"{prefix}_dc_del_{i}", use_container_width=True,
+                      on_click=_dc_del, args=(i,))
+
+    st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
+    _ci, _cb = st.columns([5, 2])
+    with _ci:
+        st.text_input("", placeholder="Nhập mục checklist mới...",
+                      key=f"{prefix}_dc_inp_{st.session_state[_dc_inp]}",
+                      label_visibility="collapsed")
+    with _cb:
+        st.button("＋ Thêm", key=f"{prefix}_dc_add", use_container_width=True, on_click=_dc_add)
+
+
+def _collect_dc_checklist(prefix: str) -> list:
+    """Thu thập tất cả items DC (không lọc done) để lưu vào checklist task."""
+    return [dict(item) for item in st.session_state.get(f"{prefix}_dc_items", [])]
 
 
 @st.fragment
@@ -4413,18 +4563,20 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
 
 
 
-@st.fragment
-def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool = True):
+def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool = True, loai_may: str = ""):
     cv_key      = f"{key_prefix}_cong_viec_con"
     cv_inp_v    = f"{key_prefix}_cv_inp_v"
-    cv_seeded   = f"{key_prefix}_cv_seeded"
+    last_lm_key = f"{key_prefix}_last_loai_may"
 
-    # Lần đầu: seed tất cả công đoạn sẵn vào danh sách
-    if cv_seeded not in st.session_state:
-        ds_cd = lay_ten_cac_cong_doan()
-        st.session_state[cv_key]    = [{"ten": cd, "nhan_vien": "", "done": False} for cd in ds_cd]
-        st.session_state[cv_inp_v]  = 0
-        st.session_state[cv_seeded] = True
+    # slug nhúng vào key widget → khi loại máy đổi, key mới hoàn toàn, Streamlit dùng value param
+    _is_dc    = _la_dong_co_dc(loai_may)
+    _lm_slug  = "dc" if _is_dc else "def"
+    _desired_list = _DC_CVC_ITEMS if _is_dc else lay_ten_cac_cong_doan()
+
+    if st.session_state.get(last_lm_key) != loai_may or cv_key not in st.session_state:
+        st.session_state[cv_key]      = [{"ten": cd, "nhan_vien": "", "done": False} for cd in _desired_list]
+        st.session_state[cv_inp_v]    = 0
+        st.session_state[last_lm_key] = loai_may
     else:
         if cv_key   not in st.session_state: st.session_state[cv_key]   = []
         if cv_inp_v not in st.session_state: st.session_state[cv_inp_v] = 0
@@ -4515,16 +4667,16 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
     items_cv = st.session_state[cv_key]
 
     def _save_cv_ten(i):
-        val = st.session_state.get(f"{key_prefix}_cv_txt_{i}", "").strip()
+        val = st.session_state.get(f"{key_prefix}_cv_txt_{_lm_slug}_{i}", "").strip()
         if val:
             st.session_state[cv_key][i]["ten"] = val
 
     def _save_cv_nv(i):
-        val = st.session_state.get(f"{key_prefix}_cv_nv_sel_{i}", "-- Không chọn --")
+        val = st.session_state.get(f"{key_prefix}_cv_nv_sel_{_lm_slug}_{i}", "-- Không chọn --")
         st.session_state[cv_key][i]["nhan_vien"] = "" if val == "-- Không chọn --" else val
 
     def _save_cv_done(i):
-        val = st.session_state.get(f"{key_prefix}_cv_ck_{i}", False)
+        val = st.session_state.get(f"{key_prefix}_cv_ck_{_lm_slug}_{i}", False)
         st.session_state[cv_key][i]["done"] = val
         if val:
             st.session_state[cv_key][i]["ngay_hoan_thanh"] = datetime.now().strftime("%Y-%m-%d")
@@ -4535,7 +4687,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
         if i < len(st.session_state[cv_key]):
             st.session_state[cv_key].pop(i)
         for k in list(st.session_state.keys()):
-            if k.startswith(f"{key_prefix}_cv_txt_") or k.startswith(f"{key_prefix}_cv_nv_sel_"):
+            if k.startswith(f"{key_prefix}_cv_txt_{_lm_slug}_") or k.startswith(f"{key_prefix}_cv_nv_sel_{_lm_slug}_"):
                 del st.session_state[k]
 
     for i, cv in enumerate(items_cv):
@@ -4550,26 +4702,26 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
             st.markdown(f"<span class='{mk_cv}' style='display:none'></span>", unsafe_allow_html=True)
             st.checkbox(
                 "", value=done_val,
-                key=f"{key_prefix}_cv_ck_{i}",
+                key=f"{key_prefix}_cv_ck_{_lm_slug}_{i}",
                 label_visibility="collapsed",
                 on_change=_save_cv_done, args=(i,),
             )
         with col_txt:
             st.text_input(
                 "", value=ten,
-                key=f"{key_prefix}_cv_txt_{i}",
+                key=f"{key_prefix}_cv_txt_{_lm_slug}_{i}",
                 label_visibility="collapsed",
                 on_change=_save_cv_ten, args=(i,),
             )
         with col_del:
-            st.button("🗑️", key=f"{key_prefix}_cv_del_{i}", use_container_width=True,
+            st.button("🗑️", key=f"{key_prefix}_cv_del_{_lm_slug}_{i}", use_container_width=True,
                       on_click=_cb_cv_del, args=(i,))
         # Hàng 2: selectbox nhân viên full width
         st.markdown(f"<div class='cv-nv-frag-{key_prefix}'>", unsafe_allow_html=True)
         st.selectbox(
             "👤 Nhân viên thực hiện", options=nv_opts,
             index=nv_idx,
-            key=f"{key_prefix}_cv_nv_sel_{i}",
+            key=f"{key_prefix}_cv_nv_sel_{_lm_slug}_{i}",
             on_change=_save_cv_nv, args=(i,),
         )
         st.markdown("</div>", unsafe_allow_html=True)
@@ -6869,10 +7021,17 @@ def giao_dien_admin():
 
             col_lm_adm, col_tt_adm = st.columns(2)
             with col_lm_adm:
+                def _adm_on_loai_may_change():
+                    _p = "adm"
+                    st.session_state.pop(f"{_p}_last_loai_may", None)
+                    for _k in list(st.session_state.keys()):
+                        if _k.startswith(f"{_p}_cv_txt_") or _k.startswith(f"{_p}_cv_nv_sel_"):
+                            del st.session_state[_k]
                 adm_loai_may = st.selectbox(
                     "🔧 Loại Máy",
                     options=["-- Không chọn --"] + lay_ten_cac_loai_may(),
                     key="adm_loai_may",
+                    on_change=_adm_on_loai_may_change,
                 )
             with col_tt_adm:
                 adm_tinh_trang = st.selectbox(
@@ -6903,9 +7062,15 @@ def giao_dien_admin():
             adm_mo_ta    = st.text_area("📝 Mô tả chi tiết", placeholder="Nhập mô tả, yêu cầu kỹ thuật...", key="adm_mo_ta")
 
             st.divider()
-            _fragment_checklist(_ADM_PREFIX, show_done=False, default_items=_MAC_DINH_CHECKLIST)
+            if _la_dong_co_dc(adm_loai_may):
+                _render_checklist_dc(_ADM_PREFIX)
+            else:
+                _fragment_checklist(_ADM_PREFIX, show_done=False, default_items=_MAC_DINH_CHECKLIST)
             st.divider()
-            _fragment_cong_viec_con(_ADM_PREFIX, ds_nhan_vien, show_done=False)
+            _fragment_cong_viec_con(
+                _ADM_PREFIX, ds_nhan_vien, show_done=False,
+                loai_may=adm_loai_may,
+            )
             st.divider()
 
             if st.button("✅ Tạo Task", use_container_width=True, type="primary", key="adm_submit_task"):
@@ -6929,7 +7094,7 @@ def giao_dien_admin():
                             cong_ty=adm_cong_ty, cong_so="",
                             nam=adm_nam.strip(), trang_thai=adm_trang_thai,
                             nguoi_phe_duyet=phe_duyet_luu,
-                            checklist=list(st.session_state.get(f"{_ADM_PREFIX}_checklist", [])),
+                            checklist=_collect_dc_checklist(_ADM_PREFIX) if _la_dong_co_dc(adm_loai_may) else list(st.session_state.get(f"{_ADM_PREFIX}_checklist", [])),
                             cong_viec_con=list(st.session_state.get(f"{_ADM_PREFIX}_cong_viec_con", [])),
                             cong_doan="",
                             loai_may=adm_loai_may if adm_loai_may != "-- Không chọn --" else "",
@@ -7416,6 +7581,9 @@ def giao_dien_nhan_vien():
                 ds_nv_nv         = lay_danh_sach_nhan_vien()
                 ds_trang_thai_nv = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
 
+                # Tính _vp sớm để dùng trong callback on_change
+                _vp = f"{_nv_prefix}_v{_v}"
+
                 # ── Hàng đầu: Công Ty ──
                 # Các field sticky (giữ lại sau khi tạo task) dùng key không có version
                 nv_cong_ty = st.selectbox("🏢 Công Ty *", options=["-- Chọn Công Ty --"] + ds_cong_ty_nv, key=f"{_nv_prefix}_ct")
@@ -7431,10 +7599,16 @@ def giao_dien_nhan_vien():
                 col_lm_nv, col_tt_nv = st.columns(2)
                 with col_lm_nv:
                     ds_loai_may_nv = lay_ten_cac_loai_may()
+                    def _nv_on_loai_may_change(_p=_vp, _nv_key=f"{_nv_prefix}_loai_may"):
+                        st.session_state.pop(f"{_p}_last_loai_may", None)
+                        for _k in list(st.session_state.keys()):
+                            if _k.startswith(f"{_p}_cv_txt_") or _k.startswith(f"{_p}_cv_nv_sel_"):
+                                del st.session_state[_k]
                     nv_loai_may = st.selectbox(
                         "🔧 Loại Máy",
                         options=["-- Không chọn --"] + ds_loai_may_nv,
                         key=f"{_nv_prefix}_loai_may",
+                        on_change=_nv_on_loai_may_change,
                     )
                 with col_tt_nv:
                     ds_tinh_trang_nv = lay_ten_cac_tinh_trang()
@@ -7473,10 +7647,16 @@ def giao_dien_nhan_vien():
                 _cv_key = f"{_vp}_cong_viec_con"
 
                 st.divider()
-                _fragment_checklist(_vp, show_done=False, default_items=_MAC_DINH_CHECKLIST)
+                if _la_dong_co_dc(nv_loai_may):
+                    _render_checklist_dc(_vp)
+                else:
+                    _fragment_checklist(_vp, show_done=False, default_items=_MAC_DINH_CHECKLIST)
 
                 st.divider()
-                _fragment_cong_viec_con(_vp, ds_nv_nv, show_done=False)
+                _fragment_cong_viec_con(
+                    _vp, ds_nv_nv, show_done=False,
+                    loai_may=nv_loai_may,
+                )
 
                 st.divider()
 
@@ -7505,7 +7685,7 @@ def giao_dien_nhan_vien():
                                 nam             = nv_nam.strip(),
                                 trang_thai      = nv_trang_thai,
                                 nguoi_phe_duyet = phe_duyet_nv,
-                                checklist       = list(st.session_state.get(_cl_key, [])),
+                                checklist       = _collect_dc_checklist(_vp) if _la_dong_co_dc(nv_loai_may) else list(st.session_state.get(_cl_key, [])),
                                 cong_viec_con   = list(st.session_state.get(_cv_key, [])),
                                 cong_doan       = "",
                                 loai_may        = nv_loai_may if nv_loai_may != "-- Không chọn --" else "",
