@@ -5272,8 +5272,37 @@ def _parse_date_display(val: str):
 
 def _save_cv_to_sheet(task_id, cv_key):
     data = list(st.session_state.get(cv_key, []))
-    payload = json.dumps(data, ensure_ascii=False)
     task_id = int(task_id)
+    def _merge_with_existing(new_data, sh, row):
+        """Merge new_data với data hiện có trên sheet.
+        - Nếu new_data rỗng hoàn toàn → dùng data cũ (tránh ghi đè mất dữ liệu).
+        - Nếu có data → preserve nhan_vien/anh từ sheet cho công đoạn còn tồn tại.
+        """
+        try:
+            raw = sh.cell(row, 14).value or "[]"
+            existing = json.loads(raw) if raw.strip() else []
+        except Exception:
+            existing = []
+        if not existing:
+            return new_data
+        # new_data hoàn toàn rỗng → dùng existing (session chưa load được)
+        if not new_data:
+            return existing
+        ex_by_name = {i.get("ten", ""): i for i in existing if isinstance(i, dict)}
+        merged = []
+        for item in new_data:
+            ten = item.get("ten", "")
+            ex  = ex_by_name.get(ten, {})
+            mi  = dict(item)
+            # Giữ nhan_vien từ sheet nếu session không có
+            if not mi.get("nhan_vien", "").strip() and ex.get("nhan_vien", "").strip():
+                mi["nhan_vien"] = ex["nhan_vien"]
+            # Giữ anh từ sheet nếu session không có
+            if not mi.get("anh") and ex.get("anh"):
+                mi["anh"] = ex["anh"]
+            merged.append(mi)
+        return merged
+
     def _write():
         try:
             sh = lay_sheet()
@@ -5283,7 +5312,8 @@ def _save_cv_to_sheet(task_id, cv_key):
                 if not o: return
                 row = o.row
                 _ROW_CACHE[task_id] = row
-            sh.update_cell(row, 14, payload)
+            final = _merge_with_existing(data, sh, row)
+            sh.update_cell(row, 14, json.dumps(final, ensure_ascii=False))
             lay_danh_sach_cong_viec.clear()
         except Exception:
             try:
@@ -5292,7 +5322,8 @@ def _save_cv_to_sheet(task_id, cv_key):
                 o = sh.find(str(task_id), in_column=1)
                 if o:
                     _ROW_CACHE[task_id] = o.row
-                    sh.update_cell(o.row, 14, payload)
+                    final = _merge_with_existing(data, sh, o.row)
+                    sh.update_cell(o.row, 14, json.dumps(final, ensure_ascii=False))
                     lay_danh_sach_cong_viec.clear()
             except Exception:
                 pass
