@@ -919,7 +919,7 @@ def _tai_media_len_drive(file_obj) -> str:
     import re as _re
     mime = getattr(file_obj, "type", "")
     # Ảnh: compress 900px/75 thay vì 1200px/82 để upload nhanh hơn
-    url = tai_anh_len_drive(file_obj, max_px=900, quality=75)
+    url = tai_anh_len_drive(file_obj, max_px=600, quality=65)
     if mime.startswith("video/"):
         m = _re.search(r"[?&]id=([^&]+)", url)
         if m:
@@ -4018,27 +4018,24 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                 key=_up_key_m,
                 label_visibility="collapsed",
             )
-            if st.button("📤 Tải ảnh", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True,
-                         disabled=not bool(st.session_state.get(_up_key_m))):
-                _files_m = st.session_state.get(_up_key_m) or []
-                if _files_m:
-                    with st.spinner(f"Đang tải {len(_files_m)} ảnh lên..."):
-                        _cvl = st.session_state.get(_cv_key, [])
-                        if len(_files_m) == 1:
-                            _new_url = _tai_media_len_drive(_files_m[0])
-                            _cvl[_cvi].setdefault("anh", []).append(_new_url)
-                        else:
-                            import concurrent.futures as _cf
-                            with _cf.ThreadPoolExecutor(max_workers=4) as _ex:
-                                _urls = list(_ex.map(_tai_media_len_drive, _files_m))
-                            _cvl[_cvi].setdefault("anh", []).extend(_urls)
-                    _save_cv_to_sheet(task_id, _cv_key)
-                    # Reset uploader bằng cách tăng version
-                    _vk = f"up_cv_m_v_{task_id}_{_cvi}"
-                    st.session_state[_vk] = st.session_state.get(_vk, 0) + 1
-                    st.rerun(scope="fragment")
-                else:
-                    st.warning("Chưa chọn file!")
+            def _cb_up_cv_m(_tid=task_id, _ci=_cvi, _upk=_up_key_m, _cvk=_cv_key):
+                _files_m = st.session_state.get(_upk) or []
+                if not _files_m:
+                    return
+                _cvl = st.session_state.get(_cvk, [])
+                for _f in _files_m:
+                    try:
+                        _u = _tai_media_len_drive(_f)
+                        _cvl[_ci].setdefault("anh", []).append(_u)
+                    except Exception:
+                        pass
+                import threading as _thr
+                _thr.Thread(target=_save_cv_to_sheet, args=(_tid, _cvk), daemon=True).start()
+                _vk = f"up_cv_m_v_{_tid}_{_ci}"
+                st.session_state[_vk] = st.session_state.get(_vk, 0) + 1
+            st.button("📤 Tải ảnh", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True,
+                      disabled=not bool(st.session_state.get(_up_key_m)),
+                      on_click=_cb_up_cv_m)
 
         # ── Ảnh đo lường thuộc công đoạn này ────────────────
         import unicodedata as _ucd
@@ -4604,25 +4601,21 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 key=_up_key_frag,
                 label_visibility="collapsed",
             )
-            if st.button("📤 Tải ảnh", key=f"{key_prefix}_btn_up_cv_{i}",
-                         use_container_width=True,
-                         disabled=not bool(st.session_state.get(_up_key_frag))):
-                _files = st.session_state.get(_up_key_frag) or []
-                if _files:
+            def _cb_up_cv_frag(_cvk=cv_key, _idx=i, _upk=_up_key_frag, _eok=_exp_open_key):
+                _files = st.session_state.get(_upk) or []
+                if not _files:
+                    return
+                for _f in _files:
                     try:
-                        with st.spinner(f"Đang tải {len(_files)} ảnh lên..."):
-                            if len(_files) == 1:
-                                _new_url = _tai_media_len_drive(_files[0])
-                                st.session_state[cv_key][i].setdefault("anh", []).append(_new_url)
-                            else:
-                                import concurrent.futures as _cf
-                                with _cf.ThreadPoolExecutor(max_workers=4) as _ex:
-                                    _urls = list(_ex.map(_tai_media_len_drive, _files))
-                                st.session_state[cv_key][i].setdefault("anh", []).extend(_urls)
-                        st.session_state[_exp_open_key] = True
-                        st.rerun(scope="fragment")
+                        _u = _tai_media_len_drive(_f)
+                        st.session_state[_cvk][_idx].setdefault("anh", []).append(_u)
                     except Exception:
-                        st.error("❌ File không hợp lệ. Vui lòng chọn lại và thử lại.")
+                        pass
+                st.session_state[_eok] = True
+            st.button("📤 Tải ảnh", key=f"{key_prefix}_btn_up_cv_{i}",
+                      use_container_width=True,
+                      disabled=not bool(st.session_state.get(_up_key_frag)),
+                      on_click=_cb_up_cv_frag)
 
         # Ảnh Đo Lường — chỉ hiện cho subtask "Nhận máy"
         if ten.strip().upper() == "NHẬN MÁY":
