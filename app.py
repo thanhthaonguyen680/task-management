@@ -858,9 +858,10 @@ def _compress_image(content: bytes, mime: str, max_px: int = 1200, quality: int 
         return content
 
 
-def tai_anh_len_drive(file_anh, max_px: int = 1200, quality: int = 82, ma_so: str = "") -> str:
+def tai_anh_len_drive(file_anh, max_px: int = 1200, quality: int = 82, ma_so: str = "", task_id: str = "") -> str:
     """Upload ảnh lên Google Drive qua requests, set public, trả về thumbnail URL.
     Nếu ma_so được cung cấp, ảnh sẽ được lưu vào subfolder tên mã số trong GDRIVE_FOLDER_ID.
+    task_id và ma_so được lưu vào Drive file properties để trace recovery nếu sheet write thất bại.
     """
     import io, json as _json
     session = _lay_drive_session()
@@ -886,8 +887,18 @@ def tai_anh_len_drive(file_anh, max_px: int = 1200, quality: int = 82, ma_so: st
     except Exception:
         parent_id = GDRIVE_FOLDER_ID
 
+    # Lưu task_id và ma_so vào Drive file properties để có thể trace nếu sheet write thất bại
+    props = {}
+    if task_id:
+        props["task_id"] = str(task_id)
+    if ma_so:
+        props["ma_so"] = str(ma_so)
+
     # Multipart upload trực tiếp — không qua httplib2
-    metadata = _json.dumps({"name": name, "parents": [parent_id]})
+    meta: dict = {"name": name, "parents": [parent_id]}
+    if props:
+        meta["properties"] = props
+    metadata = _json.dumps(meta)
     resp = session.post(
         "https://www.googleapis.com/upload/drive/v3/files"
         "?uploadType=multipart&supportsAllDrives=true&fields=id",
@@ -968,17 +979,17 @@ def cau_hinh_cloudinary():
     pass
 
 
-def tai_anh_len_cloudinary(file_anh, max_px: int = 1200, quality: int = 82, ma_so: str = "") -> str:
+def tai_anh_len_cloudinary(file_anh, max_px: int = 1200, quality: int = 82, ma_so: str = "", task_id: str = "") -> str:
     """Wrapper gọi sang Drive (giữ tên cũ để không cần đổi call sites)."""
-    return tai_anh_len_drive(file_anh, max_px=max_px, quality=quality, ma_so=ma_so)
+    return tai_anh_len_drive(file_anh, max_px=max_px, quality=quality, ma_so=ma_so, task_id=task_id)
 
 
-def _tai_media_len_drive(file_obj, ma_so: str = "") -> str:
+def _tai_media_len_drive(file_obj, ma_so: str = "", task_id: str = "") -> str:
     """Upload ảnh hoặc video lên Drive. Video → trả view URL; ảnh → thumbnail URL."""
     import re as _re
     mime = getattr(file_obj, "type", "")
     # Ảnh: compress 900px/75 thay vì 1200px/82 để upload nhanh hơn
-    url = tai_anh_len_drive(file_obj, max_px=600, quality=65, ma_so=ma_so)
+    url = tai_anh_len_drive(file_obj, max_px=600, quality=65, ma_so=ma_so, task_id=task_id)
     if mime.startswith("video/"):
         m = _re.search(r"[?&]id=([^&]+)", url)
         if m:
@@ -3909,16 +3920,28 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
 
     _cv_key = f"cv_editable_{task_id}"
     if _cv_key not in st.session_state:
-        st.session_state[_cv_key] = [
-            {
-                "ten":              cv.get("ten", cv.get("Tên", "")),
-                "nhan_vien":        cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))),
-                "done":             bool(cv.get("done", False)),
-                "anh":              cv.get("anh", []),
-                "ngay_hoan_thanh":  cv.get("ngay_hoan_thanh", ""),
-            }
-            for cv in _cv_parsed if isinstance(cv, dict)
-        ]
+        if _cv_parsed:
+            st.session_state[_cv_key] = [
+                {
+                    "ten":              cv.get("ten", cv.get("Tên", "")),
+                    "nhan_vien":        cv.get("nhan_vien", cv.get("Nhân Viên", cv.get("nguoi", ""))),
+                    "done":             bool(cv.get("done", False)),
+                    "anh":              cv.get("anh", []),
+                    "ngay_hoan_thanh":  cv.get("ngay_hoan_thanh", ""),
+                }
+                for cv in _cv_parsed if isinstance(cv, dict)
+            ]
+        else:
+            # CVC rỗng trong sheet — restore từ template mặc định và ghi lại sheet
+            _ds_cd = lay_ten_cac_cong_doan()
+            st.session_state[_cv_key] = [
+                {"ten": cd, "nhan_vien": "", "done": False, "anh": [], "ngay_hoan_thanh": ""}
+                for cd in _ds_cd
+            ]
+            try:
+                _save_cv_to_sheet(task_id, _cv_key)
+            except Exception:
+                pass
     ds_cv_con = st.session_state[_cv_key]
     _ds_nv_cv = ["-- Không chọn --"] + lay_danh_sach_nhan_vien()
 
@@ -4099,7 +4122,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                 _ms = _lay_ma_so_tu_task_id(_tid)
                 for _f in _files_m:
                     try:
-                        _u = _tai_media_len_drive(_f, ma_so=_ms)
+                        _u = _tai_media_len_drive(_f, ma_so=_ms, task_id=str(_tid))
                         _cvl[_ci].setdefault("anh", []).append(_u)
                     except Exception:
                         pass
@@ -5521,7 +5544,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
     import re as _re
     _EXCLUDE   = {"Đã Xuất Hóa Đơn", "Bảo Hành - Trả Lại"}
     _COMPLETED = {"Đã Hoàn Thành - Giao Máy", "Hoàn Thành"}
-    ds_show = [t for t in ds_tt if t not in _EXCLUDE]
+    ds_show = list(dict.fromkeys(t for t in ds_tt if t not in _EXCLUDE))
     today = datetime.now().date()
     COLS  = 4  # card per row
 
