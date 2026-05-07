@@ -5289,6 +5289,7 @@ def _save_cv_to_sheet(task_id, cv_key):
         if not new_data:
             return existing
         ex_by_name = {i.get("ten", ""): i for i in existing if isinstance(i, dict)}
+        new_tens = {i.get("ten", "") for i in new_data if isinstance(i, dict)}
         merged = []
         for item in new_data:
             ten = item.get("ten", "")
@@ -5301,6 +5302,10 @@ def _save_cv_to_sheet(task_id, cv_key):
             if not mi.get("anh") and ex.get("anh"):
                 mi["anh"] = ex["anh"]
             merged.append(mi)
+        # Giữ lại các item trên sheet mà session không có (tránh mất khi session load thiếu)
+        for ex_item in existing:
+            if isinstance(ex_item, dict) and ex_item.get("ten", "") not in new_tens:
+                merged.append(ex_item)
         return merged
 
     def _write():
