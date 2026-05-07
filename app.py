@@ -1673,13 +1673,18 @@ def don_dep_thung_rac():
 
 @st.dialog("🗑️ Xác nhận xóa công việc")
 def _dialog_xac_nhan_xoa(task_id, ten_cv: str):
+    try:
+        task_id = int(float(task_id))
+    except (ValueError, TypeError):
+        st.error("❌ Không xác định được ID công việc.")
+        return
     st.warning(f"Chuyển công việc vào **Thùng Rác**:\n\n**{ten_cv}**?", icon="🗑️")
     st.caption("Công việc sẽ tự xóa vĩnh viễn sau **7 ngày** nếu không khôi phục.")
     col_ok, col_cancel = st.columns(2)
     with col_ok:
         if st.button("🗑️ Vào thùng rác", type="primary", use_container_width=True):
             with st.spinner("Đang xử lý..."):
-                xoa_cong_viec(int(task_id))
+                xoa_cong_viec(task_id)
             st.session_state["_board_dirty"] = True
             st.rerun()
     with col_cancel:
