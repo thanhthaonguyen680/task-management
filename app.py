@@ -4100,8 +4100,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                         _cvl[_ci].setdefault("anh", []).append(_u)
                     except Exception:
                         pass
-                import threading as _thr
-                _thr.Thread(target=_save_cv_to_sheet, args=(_tid, _cvk), daemon=False).start()
+                _save_cv_to_sheet(_tid, _cvk)  # gọi trực tiếp để đọc session_state đúng context
                 _vk = f"up_cv_m_v_{_tid}_{_ci}"
                 st.session_state[_vk] = st.session_state.get(_vk, 0) + 1
             st.button("📤 Tải ảnh", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True,
