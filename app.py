@@ -3409,7 +3409,10 @@ def _fragment_trang_thai_dialog(hang: dict, ds_trang_thai: list):
     """Badge màu + selectbox đổi trạng thái — đặt ở đầu _task_dialog.
     Vì là @st.fragment riêng nên badge cập nhật ngay khi selectbox thay đổi.
     """
-    task_id    = int(hang.get("ID", 0))
+    try:
+        task_id = int(float(hang.get("ID", 0)))
+    except (ValueError, TypeError):
+        task_id = 0
     trang_thai = hang.get("Trạng Thái", "Chờ Làm")
     _MAU = {
         "Đang Kiểm Tra":           ("#1d4ed8", "#dbeafe"),
@@ -3568,7 +3571,10 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
         "Hoàn Thành":              ("#16a34a", "#dcfce7"),
     }
 
-    task_id    = int(hang.get("ID", 0))
+    try:
+        task_id = int(float(hang.get("ID", 0)))
+    except (ValueError, TypeError):
+        task_id = 0
     trang_thai = hang.get("Trạng Thái", "Chờ Làm")
 
     # Khởi đầu danh sách ảnh từ hang (nếu chưa có trong session_state)
@@ -5432,7 +5438,10 @@ def _task_dialog(hang_dict, ds_tt):
     _tid_qp = str(hang_dict.get("ID", ""))
     if _tid_qp:
         st.query_params["dlg"] = _tid_qp
-    tid  = hang_dict.get("ID", "")
+    try:
+        tid = int(float(hang_dict.get("ID", 0)))
+    except (ValueError, TypeError):
+        tid = 0
     ten  = hang_dict.get("Tên Công Việc", "")
     cty  = hang_dict.get("Công Ty", "")
     tt   = hang_dict.get("Trạng Thái", "")
