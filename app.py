@@ -4101,7 +4101,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                     except Exception:
                         pass
                 import threading as _thr
-                _thr.Thread(target=_save_cv_to_sheet, args=(_tid, _cvk), daemon=True).start()
+                _thr.Thread(target=_save_cv_to_sheet, args=(_tid, _cvk), daemon=False).start()
                 _vk = f"up_cv_m_v_{_tid}_{_ci}"
                 st.session_state[_vk] = st.session_state.get(_vk, 0) + 1
             st.button("📤 Tải ảnh", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True,
@@ -5459,7 +5459,7 @@ def _task_dialog(hang_dict, ds_tt):
             threading.Thread(
                 target=cap_nhat_nhieu_truong_task,
                 args=(int(tid), {"Tên Công Việc": val}),
-                daemon=True,
+                daemon=False,
             ).start()
     _ten_new = st.text_input(
         "📌 Tên công việc",
@@ -5480,7 +5480,7 @@ def _task_dialog(hang_dict, ds_tt):
         threading.Thread(
             target=cap_nhat_nhieu_truong_task,
             args=(int(tid), {"Công Ty": val}),
-            daemon=True,
+            daemon=False,
         ).start()
     _ds_cty = [""] + lay_ten_cac_cong_ty()
     _cty_idx = _ds_cty.index(cty) if cty in _ds_cty else 0
