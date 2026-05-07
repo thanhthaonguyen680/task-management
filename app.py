@@ -1898,9 +1898,12 @@ def cap_nhat_nhieu_truong_task(task_id: int, gia_tri: dict):
     """
     try:
         sheet = _lay_sheet_fresh()
-        o_tim = sheet.find(str(task_id), in_column=1)
+        o_tim = sheet.find(str(task_id), in_column=1) or sheet.find(f"{task_id}.0", in_column=1)
         if not o_tim:
             return
+        # Chuẩn hóa ID về integer nếu đang là float
+        if sheet.cell(o_tim.row, 1).value.endswith(".0"):
+            sheet.update_cell(o_tim.row, 1, str(task_id))
         r = o_tim.row
         for ten_col, val in gia_tri.items():
             col_num = _COL_MAP_TASK.get(ten_col)
