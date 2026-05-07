@@ -5678,6 +5678,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                         if meta:
                             st.caption(" · ".join(meta))
                         if st.button("📂 Xem & chỉnh sửa", key=f"kopen_{board_key}_{task_id}", use_container_width=True):
+                            st.session_state.pop("_pending_dlg", None)
                             _task_dialog(h.to_dict(), ds_tt)
 
 
