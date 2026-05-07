@@ -1714,7 +1714,7 @@ def cap_nhat_anh_do_luong(task_id: int, anh_dict: dict):
             except Exception:
                 pass
 
-    threading.Thread(target=_write, daemon=True).start()
+    threading.Thread(target=_write, daemon=False).start()
 
 
 def doc_danh_sach_anh(gia_tri: str) -> list:
@@ -5332,7 +5332,7 @@ def _save_cv_to_sheet(task_id, cv_key):
                     lay_danh_sach_cong_viec.clear()
             except Exception:
                 pass
-    threading.Thread(target=_write, daemon=True).start()
+    threading.Thread(target=_write, daemon=False).start()
 
 
 # ============================================================
