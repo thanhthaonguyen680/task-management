@@ -765,6 +765,7 @@ def _lay_sheet_fresh():
 # ============================================================
 GDRIVE_FOLDER_ID = "1-o1gny8zFKQ5NejyUjeinLVdmDpKfWgH"
 _DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
+_SUBFOLDER_ID_CACHE: dict = {}  # ma_so → Drive folder_id
 
 
 @st.cache_resource
@@ -783,6 +784,56 @@ def _lay_drive_session():
             os.path.join(_base, "gdrive_key.json"), scopes=_DRIVE_SCOPES
         )
     return AuthorizedSession(creds)
+
+
+def _get_or_create_drive_subfolder(ma_so: str) -> str:
+    """Lấy hoặc tạo subfolder tên mã số trong GDRIVE_FOLDER_ID. Cache kết quả trong session."""
+    if ma_so in _SUBFOLDER_ID_CACHE:
+        return _SUBFOLDER_ID_CACHE[ma_so]
+    session = _lay_drive_session()
+    # Tìm folder đã tồn tại
+    r = session.get(
+        "https://www.googleapis.com/drive/v3/files",
+        params={
+            "q": f"name='{ma_so}' and '{GDRIVE_FOLDER_ID}' in parents"
+                 " and mimeType='application/vnd.google-apps.folder' and trashed=false",
+            "fields": "files(id)",
+            "supportsAllDrives": "true",
+            "includeItemsFromAllDrives": "true",
+        },
+    )
+    files = r.json().get("files", [])
+    if files:
+        folder_id = files[0]["id"]
+    else:
+        import json as _json
+        r2 = session.post(
+            "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id",
+            headers={"Content-Type": "application/json; charset=UTF-8"},
+            data=_json.dumps({
+                "name": ma_so,
+                "mimeType": "application/vnd.google-apps.folder",
+                "parents": [GDRIVE_FOLDER_ID],
+            }),
+        )
+        folder_id = r2.json().get("id", GDRIVE_FOLDER_ID)
+    _SUBFOLDER_ID_CACHE[ma_so] = folder_id
+    return folder_id
+
+
+def _lay_ma_so_tu_task_id(task_id) -> str:
+    """Tra cứu mã số từ task_id (dùng cached dataframe). Trả chuỗi rỗng nếu không tìm thấy."""
+    try:
+        df = lay_danh_sach_cong_viec()
+        tid = int(float(str(task_id)))
+        row = df[df["ID"] == tid]
+        if not row.empty:
+            ma = str(row.iloc[0].get("Mã Số", "")).strip()
+            if ma and ma not in ("", "nan"):
+                return ma
+    except Exception:
+        pass
+    return ""
 
 
 def _compress_image(content: bytes, mime: str, max_px: int = 1200, quality: int = 82) -> bytes:
@@ -807,8 +858,10 @@ def _compress_image(content: bytes, mime: str, max_px: int = 1200, quality: int 
         return content
 
 
-def tai_anh_len_drive(file_anh, max_px: int = 1200, quality: int = 82) -> str:
-    """Upload ảnh lên Google Drive qua requests, set public, trả về thumbnail URL."""
+def tai_anh_len_drive(file_anh, max_px: int = 1200, quality: int = 82, ma_so: str = "") -> str:
+    """Upload ảnh lên Google Drive qua requests, set public, trả về thumbnail URL.
+    Nếu ma_so được cung cấp, ảnh sẽ được lưu vào subfolder tên mã số trong GDRIVE_FOLDER_ID.
+    """
     import io, json as _json
     session = _lay_drive_session()
     try:
@@ -827,8 +880,14 @@ def tai_anh_len_drive(file_anh, max_px: int = 1200, quality: int = 82) -> str:
         name = name.rsplit(".", 1)[0] + ".jpg"
         mime = "image/jpeg"
 
+    # Chọn folder đích: subfolder theo mã số nếu có, fallback về root
+    try:
+        parent_id = _get_or_create_drive_subfolder(str(ma_so)) if ma_so else GDRIVE_FOLDER_ID
+    except Exception:
+        parent_id = GDRIVE_FOLDER_ID
+
     # Multipart upload trực tiếp — không qua httplib2
-    metadata = _json.dumps({"name": name, "parents": [GDRIVE_FOLDER_ID]})
+    metadata = _json.dumps({"name": name, "parents": [parent_id]})
     resp = session.post(
         "https://www.googleapis.com/upload/drive/v3/files"
         "?uploadType=multipart&supportsAllDrives=true&fields=id",
@@ -909,17 +968,17 @@ def cau_hinh_cloudinary():
     pass
 
 
-def tai_anh_len_cloudinary(file_anh, max_px: int = 1200, quality: int = 82) -> str:
+def tai_anh_len_cloudinary(file_anh, max_px: int = 1200, quality: int = 82, ma_so: str = "") -> str:
     """Wrapper gọi sang Drive (giữ tên cũ để không cần đổi call sites)."""
-    return tai_anh_len_drive(file_anh, max_px=max_px, quality=quality)
+    return tai_anh_len_drive(file_anh, max_px=max_px, quality=quality, ma_so=ma_so)
 
 
-def _tai_media_len_drive(file_obj) -> str:
+def _tai_media_len_drive(file_obj, ma_so: str = "") -> str:
     """Upload ảnh hoặc video lên Drive. Video → trả view URL; ảnh → thumbnail URL."""
     import re as _re
     mime = getattr(file_obj, "type", "")
     # Ảnh: compress 900px/75 thay vì 1200px/82 để upload nhanh hơn
-    url = tai_anh_len_drive(file_obj, max_px=600, quality=65)
+    url = tai_anh_len_drive(file_obj, max_px=600, quality=65, ma_so=ma_so)
     if mime.startswith("video/"):
         m = _re.search(r"[?&]id=([^&]+)", url)
         if m:
@@ -4023,9 +4082,10 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                 if not _files_m:
                     return
                 _cvl = st.session_state.get(_cvk, [])
+                _ms = _lay_ma_so_tu_task_id(_tid)
                 for _f in _files_m:
                     try:
-                        _u = _tai_media_len_drive(_f)
+                        _u = _tai_media_len_drive(_f, ma_so=_ms)
                         _cvl[_ci].setdefault("anh", []).append(_u)
                     except Exception:
                         pass
@@ -4732,8 +4792,9 @@ def _cb_upload_anh_nt(task_id, anh_key, up_key):
     if not files:
         return
     new_urls = []
+    _ms = _lay_ma_so_tu_task_id(task_id)
     for f in files:
-        url = tai_anh_len_cloudinary(f)
+        url = tai_anh_len_cloudinary(f, ma_so=_ms)
         cap_nhat_url_anh(task_id, url)
         new_urls.append(url)
     st.session_state[anh_key] = st.session_state.get(anh_key, []) + new_urls
@@ -5118,7 +5179,7 @@ def _render_do_luong_inline(task_id, do_key, nhom_list, cvi=0):
                                     try:
                                         with st.spinner("Đang tải ảnh lên..."):
                                             # Compress mạnh hơn (800px/70) → file nhỏ hơn → upload nhanh hơn
-                                            url_new = tai_anh_len_cloudinary(f_do)
+                                            url_new = tai_anh_len_cloudinary(f_do, ma_so=_lay_ma_so_tu_task_id(task_id))
                                         st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
                                         cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
                                         st.rerun(scope="fragment")
@@ -5253,7 +5314,7 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                         if f_do:
                             try:
                                 with st.spinner("Đang tải ảnh lên..."):
-                                    url_new = tai_anh_len_cloudinary(f_do)
+                                    url_new = tai_anh_len_cloudinary(f_do, ma_so=_lay_ma_so_tu_task_id(task_id))
                                 st.session_state[do_key].setdefault(lbl_key, []).append(url_new)
                                 cap_nhat_anh_do_luong(task_id, st.session_state[do_key])
                                 st.rerun(scope="fragment")
