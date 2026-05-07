@@ -4008,7 +4008,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
 
     for _cvi, cv in enumerate(ds_cv_con):
         if not isinstance(cv, dict): continue
-        _tcv  = cv.get("ten", f"Việc {_cvi+1}")
+        _tcv  = cv.get("ten") or f"Việc {_cvi+1}"
         _nvcv = cv.get("nhan_vien", "") or ""
         _dcv  = bool(cv.get("done", False))
         _nv_idx = _ds_nv_cv.index(_nvcv) if _nvcv in _ds_nv_cv else 0
@@ -4170,7 +4170,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
 
     # ── Ảnh đo lường — fallback nếu không có công đoạn tiêu chuẩn ───────────
     _has_stage_cvc = any(
-        cv.get("ten", "").strip().upper() in _STAGE_DO_LUONG
+        (cv.get("ten") or "").strip().upper() in _STAGE_DO_LUONG
         for cv in ds_cv_con if isinstance(cv, dict)
     )
     if not _has_stage_cvc:
@@ -5099,6 +5099,8 @@ def _cb_upload_do(task_id, do_key, label, up_key, done_key=None):
 @st.fragment
 def _render_do_luong_inline(task_id, do_key, nhom_list, cvi=0):
     """Render ảnh đo lường inline bên trong thẻ công việc con."""
+    if do_key not in st.session_state:
+        st.session_state[do_key] = {}
     for nhom_entry in nhom_list:
         use_expander = len(nhom_entry) >= 3 and nhom_entry[2]
         nhom_title, labels = nhom_entry[0], nhom_entry[1]
@@ -5226,6 +5228,8 @@ def _render_do_luong_inline(task_id, do_key, nhom_list, cvi=0):
 @st.fragment
 def _fragment_upload_do_luong(task_id, do_key: str):
     """Upload ảnh đo lường — @st.fragment để rerun cục bộ, giữ nguyên scroll của outer fragment."""
+    if do_key not in st.session_state:
+        st.session_state[do_key] = {}
     for nhom_entry in _NHOM_DO:
         use_exp = len(nhom_entry) >= 3 and nhom_entry[2]
         nhom_title, labels = nhom_entry[0], nhom_entry[1]
@@ -5249,7 +5253,7 @@ def _fragment_upload_do_luong(task_id, do_key: str):
             # ── Giá trị thông số đo (chỉ Resistance + IR) ──
             if lbl_key in _DO_LUONG_VALUE_KEYS:
                 _val_key = f"{lbl_key}_val"
-                _cur_val = st.session_state[do_key].get(_val_key, "")
+                _cur_val = st.session_state.get(do_key, {}).get(_val_key, "")
                 _inp_key = f"inp_val_{task_id}_{lbl_key}"
                 _is_num = lbl_key in _DO_LUONG_NUMERIC_KEYS
                 st.text_input(
@@ -5263,7 +5267,7 @@ def _fragment_upload_do_luong(task_id, do_key: str):
                 # Kiểm tra lệch 2% so với U1U2
                 _ref_key = _DO_LUONG_REF_MAP.get(lbl_key)
                 if _ref_key and _cur_val:
-                    _ref_val_str = st.session_state[do_key].get(f"{_ref_key}_val", "")
+                    _ref_val_str = st.session_state.get(do_key, {}).get(f"{_ref_key}_val", "")
                     try:
                         _ref_f = float(_ref_val_str)
                         _this_f = float(_cur_val)
@@ -5281,7 +5285,7 @@ def _fragment_upload_do_luong(task_id, do_key: str):
             # ── Ảnh minh chứng (bỏ qua key không cần ảnh) ──────
             if lbl_key in _DO_LUONG_NO_IMG_KEYS:
                 continue
-            urls_label = st.session_state[do_key].get(lbl_key, [])
+            urls_label = st.session_state.get(do_key, {}).get(lbl_key, [])
             _exp_lbl = f"📷 Ảnh {lbl_display} ✅" if urls_label else f"📷 Ảnh {lbl_display}"
             with st.expander(_exp_lbl, expanded=False):
                 if urls_label:
