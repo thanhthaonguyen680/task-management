@@ -1685,11 +1685,11 @@ def _dialog_xac_nhan_xoa(task_id, ten_cv: str):
         if st.button("🗑️ Vào thùng rác", type="primary", use_container_width=True):
             with st.spinner("Đang xử lý..."):
                 xoa_cong_viec(task_id)
-            st.session_state["_board_dirty"] = True
-            st.rerun()
+            lay_danh_sach_cong_viec.clear()
+            st.rerun(scope="app")
     with col_cancel:
         if st.button("Hủy", use_container_width=True):
-            st.rerun()
+            st.rerun(scope="app")
 
 
 def cap_nhat_trang_thai(task_id: int, trang_thai_moi: str):
