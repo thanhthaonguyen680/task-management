@@ -7428,77 +7428,78 @@ def giao_dien_nhan_vien():
     # Tab 3: Việc Của Tôi (công việc con được giao)
     # ========================================================
     with tab_viec_cua_toi:
-        col_btn_vct, col_sq_vct = st.columns([1, 4])
-        with col_btn_vct:
-            if st.button("🔄 Làm mới", key="nv_refresh_vct"):
-                lay_danh_sach_cong_viec.clear()
-                st.session_state.pop("_last_nv_load", None)
-                st.rerun()
-        with col_sq_vct:
-            q_search_vct = st.text_input(
-                "🔍",
-                placeholder="Tìm kiếm tên công việc...",
-                key="nv_vct_search_q",
-                label_visibility="collapsed",
-            )
-
-        q_cty_vct = st.text_input(
-            "🏢",
-            placeholder="Tìm kiếm theo công ty...",
-            key="nv_vct_search_cty",
-            label_visibility="collapsed",
-        )
+        if st.button("🔄 Làm mới", key="nv_refresh_vct"):
+            lay_danh_sach_cong_viec.clear()
+            st.session_state.pop("_last_nv_load", None)
+            st.rerun()
 
         with st.spinner("Đang tải công việc..."):
             df_vct_all = lay_danh_sach_cong_viec()
 
-        # Lọc: task có ít nhất 1 công việc con được giao cho ten_nhan_vien
-        def _co_cv_cua_toi(row_cv):
-            raw = str(row_cv.get("Công Việc Con", "") or "[]")
+        # Build danh sách tasks_dang_lam / tasks_da_xong cho user hiện tại
+        _vct_dang_lam = []
+        _vct_da_xong  = []
+        _me_lower = ten_nhan_vien.strip().lower()
+        for _, _row in df_vct_all.iterrows():
             try:
-                items = json.loads(raw)
+                _ds_cv = json.loads(str(_row.get("Công Việc Con") or "[]"))
             except Exception:
-                return False
-            return any(
-                isinstance(it, dict) and
-                str(it.get("nhan_vien") or it.get("Nhân Viên") or "").strip() == ten_nhan_vien.strip()
-                for it in items
-            )
-
-        df_vct = df_vct_all[df_vct_all.apply(_co_cv_cua_toi, axis=1)].copy()
-
-        if q_search_vct.strip():
-            _q = q_search_vct.strip().lower()
-            df_vct = df_vct[
-                df_vct["Tên Công Việc"].fillna("").str.lower().str.contains(_q) |
-                df_vct["Mã Số"].fillna("").astype(str).str.lower().str.contains(_q)
+                _ds_cv = []
+            _my_sub = [
+                (_i, _cv) for _i, _cv in enumerate(_ds_cv)
+                if isinstance(_cv, dict) and
+                str(_cv.get("nhan_vien") or _cv.get("nguoi") or "").strip().lower() == _me_lower
             ]
-        if q_cty_vct.strip():
-            df_vct = df_vct[
-                df_vct["Công Ty"].fillna("").str.lower().str.contains(q_cty_vct.strip().lower())
-            ]
+            if not _my_sub:
+                continue
+            _hd = _row.to_dict()
+            _undone = [(_i, _cv) for _i, _cv in _my_sub if not _cv.get("done", False)]
+            _done   = [(_i, _cv) for _i, _cv in _my_sub if _cv.get("done", False)]
+            if _undone:
+                _vct_dang_lam.append((_hd, _ds_cv, _undone))
+            if _done:
+                _vct_da_xong.append((_hd, _ds_cv, _done))
 
-        ds_nam_vct = sorted(
-            [str(y) for y in df_vct["Năm"].dropna().unique() if str(y).strip() != ""],
-            reverse=True,
-        ) if "Năm" in df_vct.columns and not df_vct.empty else []
-        loc_nam_vct = st.selectbox(
-            "📅 Lọc theo năm",
-            options=["Tất cả"] + ds_nam_vct,
-            key="nv_vct_loc_nam",
-        ) if ds_nam_vct else "Tất cả"
-        if loc_nam_vct != "Tất cả":
-            df_vct = df_vct[df_vct["Năm"].astype(str) == loc_nam_vct]
+        _n_dang_lam = sum(len(m) for _, _, m in _vct_dang_lam)
+        _n_da_xong  = sum(len(m) for _, _, m in _vct_da_xong)
 
-        ds_tt_vct = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+        _ICON_VCT = {
+            "Đang Kiểm Tra": "🔵", "Đã Phê Duyệt": "🟢",
+            "Đã Báo Giá": "🟠", "Có Đơn": "🟣", "Chờ Giao": "🟡",
+            "Đã Hoàn Thành - Giao Máy": "✅", "Hoàn Thành": "✅",
+        }
 
-        if df_vct.empty:
-            st.info("ℹ️ Không có công việc nào có công việc con được giao cho bạn.")
-        else:
-            df_vct = df_vct.sort_values("Ngày Tạo", ascending=False, na_position="last")
-            _render_kanban_board(df_vct, ds_tt_vct, board_key="nv_vct_kb",
-                                 force_open=bool(q_search_vct.strip() or q_cty_vct.strip()),
-                                 show_delete=False)
+        def _render_vct_tab(tasks_list, show_done: bool):
+            if not tasks_list:
+                st.info("Không có việc nào đã hoàn thành." if show_done else "Không có việc nào đang làm.")
+                return
+            n_cv = sum(len(m) for _, _, m in tasks_list)
+            st.caption(f"**{n_cv} việc con** trong **{len(tasks_list)} task**")
+            for hang_dict, _, my_sub in tasks_list:
+                tt   = hang_dict.get("Trạng Thái", "")
+                icon = _ICON_VCT.get(tt, "⚪")
+                cty  = hang_dict.get("Công Ty", "")
+                ten  = hang_dict.get("Tên Công Việc", "")
+                dl   = hang_dict.get("Hạn Hoàn Thành", "") or hang_dict.get("Deadline", "")
+                nv_chu = hang_dict.get("Nhân Viên", "")
+                with st.expander(f"{icon} [{cty}] {ten}  —  {tt}", expanded=not show_done):
+                    st.markdown(f"**🏢 Công Ty:** {cty}  |  **👤** {nv_chu}  |  **📅** {dl}")
+                    for _, cv in my_sub:
+                        ten_cv_sub = cv.get("ten", cv.get("Tên", "—"))
+                        ngay_ht    = cv.get("ngay_hoan_thanh", "")
+                        if show_done:
+                            st.markdown(f"✅ ~~{ten_cv_sub}~~" + (f" &nbsp;`Hoàn thành: {ngay_ht}`" if ngay_ht else ""))
+                        else:
+                            st.markdown(f"⏳ **{ten_cv_sub}**")
+
+        _tab_dl, _tab_ht = st.tabs([
+            f"⏳ Việc Đang Làm ({_n_dang_lam})",
+            f"✅ Việc Đã Hoàn Thành ({_n_da_xong})",
+        ])
+        with _tab_dl:
+            _render_vct_tab(_vct_dang_lam, show_done=False)
+        with _tab_ht:
+            _render_vct_tab(_vct_da_xong, show_done=True)
 
     # ========================================================
     # Tab 4: Việc Cần Phê Duyệt
