@@ -1561,8 +1561,16 @@ def them_cong_viec(ten_task: str, mo_ta: str, nguoi_duoc_giao: str, deadline: st
     # Đọc col A 1 lần duy nhất — dùng để tính cả ID mới lẫn vị trí hàng mới
     _col_a = sheet.col_values(1)          # 1 API call thay vì 2
     _ids_hien_co = _col_a[1:]            # bỏ header
-    _so_ids = [int(x) for x in _ids_hien_co if str(x).strip().isdigit()]
-    id_moi   = (max(_so_ids) + 1) if _so_ids else 1
+    _so_ids = set()
+    for x in _ids_hien_co:
+        try:
+            _so_ids.add(int(float(str(x).strip())))
+        except (ValueError, TypeError):
+            pass
+    id_moi = (max(_so_ids) + 1) if _so_ids else 1
+    # Đảm bảo ID chưa tồn tại (tránh race condition)
+    while id_moi in _so_ids:
+        id_moi += 1
     _dong_moi = len(_col_a) + 1          # row tiếp theo
     ngay_tao = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -7125,8 +7133,10 @@ def giao_dien_admin():
             df_board = lay_danh_sach_cong_viec()
 
         if adm_q.strip():
+            _q = adm_q.strip().lower()
             df_board = df_board[
-                df_board["Tên Công Việc"].fillna("").str.lower().str.contains(adm_q.strip().lower())
+                df_board["Tên Công Việc"].fillna("").str.lower().str.contains(_q) |
+                df_board["Mã Số"].fillna("").astype(str).str.lower().str.contains(_q)
             ]
 
         col_f1, col_f2 = st.columns(2)
@@ -7374,8 +7384,10 @@ def giao_dien_nhan_vien():
         df_cua_toi = df.copy()
 
         if q_search.strip():
+            _q = q_search.strip().lower()
             df_cua_toi = df_cua_toi[
-                df_cua_toi["Tên Công Việc"].fillna("").str.lower().str.contains(q_search.strip().lower())
+                df_cua_toi["Tên Công Việc"].fillna("").str.lower().str.contains(_q) |
+                df_cua_toi["Mã Số"].fillna("").astype(str).str.lower().str.contains(_q)
             ]
 
         if q_cty.strip():
@@ -7450,8 +7462,10 @@ def giao_dien_nhan_vien():
         df_vct = df_vct_all[df_vct_all.apply(_co_cv_cua_toi, axis=1)].copy()
 
         if q_search_vct.strip():
+            _q = q_search_vct.strip().lower()
             df_vct = df_vct[
-                df_vct["Tên Công Việc"].fillna("").str.lower().str.contains(q_search_vct.strip().lower())
+                df_vct["Tên Công Việc"].fillna("").str.lower().str.contains(_q) |
+                df_vct["Mã Số"].fillna("").astype(str).str.lower().str.contains(_q)
             ]
         if q_cty_vct.strip():
             df_vct = df_vct[
