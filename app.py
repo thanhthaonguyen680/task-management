@@ -5544,7 +5544,7 @@ def _task_dialog(hang_dict, ds_tt):
 
 
 @st.fragment
-def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
+def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False, show_delete=True):
     """Kanban board: header màu + toggle thu/mở, cards 4 cột/hàng.
     Bấm 📂 → @st.dialog chỉnh sửa.
     """
@@ -5664,15 +5664,20 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
                         if anh_lst:
                             _hien_thi_anh_drive(anh_lst[0], use_container_width=True)
                         # Tên + nút xóa cùng hàng
-                        _col_ten, _col_del = st.columns([5, 1], gap="small")
+                        if show_delete:
+                            _col_ten, _col_del = st.columns([5, 1], gap="small")
+                        else:
+                            _col_ten = st.container()
+                            _col_del = None
                         with _col_ten:
                             short = ten_cv[:40] + ("…" if len(ten_cv) > 40 else "")
                             st.markdown(f"**{short}**")
-                        with _col_del:
-                            if st.button("✕", key=f"kdel_{board_key}_{task_id}",
-                                         help="Xóa công việc này",
-                                         use_container_width=True):
-                                _dialog_xac_nhan_xoa(task_id, ten_cv)
+                        if _col_del:
+                            with _col_del:
+                                if st.button("✕", key=f"kdel_{board_key}_{task_id}",
+                                             help="Xóa công việc này",
+                                             use_container_width=True):
+                                    _dialog_xac_nhan_xoa(task_id, ten_cv)
                         if mo_ta:
                             short_mo_ta = mo_ta[:120] + ("…" if len(mo_ta) > 120 else "")
                             st.caption(f"📝 {short_mo_ta}")
@@ -7416,7 +7421,8 @@ def giao_dien_nhan_vien():
             # ── KANBAN BOARD ────────────────────────────────────
             df_cua_toi = df_cua_toi.sort_values("Ngày Tạo", ascending=False, na_position="last")
             _render_kanban_board(df_cua_toi, ds_tt, board_key="nv_kb",
-                                 force_open=bool(q_search.strip() or q_cty.strip()))
+                                 force_open=bool(q_search.strip() or q_cty.strip()),
+                                 show_delete=False)
 
     # ========================================================
     # Tab 3: Việc Của Tôi (công việc con được giao)
@@ -7491,7 +7497,8 @@ def giao_dien_nhan_vien():
         else:
             df_vct = df_vct.sort_values("Ngày Tạo", ascending=False, na_position="last")
             _render_kanban_board(df_vct, ds_tt_vct, board_key="nv_vct_kb",
-                                 force_open=bool(q_search_vct.strip() or q_cty_vct.strip()))
+                                 force_open=bool(q_search_vct.strip() or q_cty_vct.strip()),
+                                 show_delete=False)
 
     # ========================================================
     # Tab 4: Việc Cần Phê Duyệt
