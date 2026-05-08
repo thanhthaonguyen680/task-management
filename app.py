@@ -7469,6 +7469,8 @@ def giao_dien_nhan_vien():
             "Đã Hoàn Thành - Giao Máy": "✅", "Hoàn Thành": "✅",
         }
 
+        _ds_tt_vct = lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH
+
         def _render_vct_tab(tasks_list, show_done: bool):
             if not tasks_list:
                 st.info("Không có việc nào đã hoàn thành." if show_done else "Không có việc nào đang làm.")
@@ -7476,12 +7478,13 @@ def giao_dien_nhan_vien():
             n_cv = sum(len(m) for _, _, m in tasks_list)
             st.caption(f"**{n_cv} việc con** trong **{len(tasks_list)} task**")
             for hang_dict, _, my_sub in tasks_list:
-                tt   = hang_dict.get("Trạng Thái", "")
-                icon = _ICON_VCT.get(tt, "⚪")
-                cty  = hang_dict.get("Công Ty", "")
-                ten  = hang_dict.get("Tên Công Việc", "")
-                dl   = hang_dict.get("Hạn Hoàn Thành", "") or hang_dict.get("Deadline", "")
+                tt     = hang_dict.get("Trạng Thái", "")
+                icon   = _ICON_VCT.get(tt, "⚪")
+                cty    = hang_dict.get("Công Ty", "")
+                ten    = hang_dict.get("Tên Công Việc", "")
+                dl     = hang_dict.get("Hạn Hoàn Thành", "") or hang_dict.get("Deadline", "")
                 nv_chu = hang_dict.get("Nhân Viên", "")
+                tid    = hang_dict.get("ID", "")
                 with st.expander(f"{icon} [{cty}] {ten}  —  {tt}", expanded=not show_done):
                     st.markdown(f"**🏢 Công Ty:** {cty}  |  **👤** {nv_chu}  |  **📅** {dl}")
                     for _, cv in my_sub:
@@ -7491,6 +7494,10 @@ def giao_dien_nhan_vien():
                             st.markdown(f"✅ ~~{ten_cv_sub}~~" + (f" &nbsp;`Hoàn thành: {ngay_ht}`" if ngay_ht else ""))
                         else:
                             st.markdown(f"⏳ **{ten_cv_sub}**")
+                    if st.button("📂 Xem & chỉnh sửa", key=f"vct_open_{tid}_{show_done}",
+                                 use_container_width=True):
+                        st.session_state.pop("_pending_dlg", None)
+                        _task_dialog(hang_dict, _ds_tt_vct)
 
         _tab_dl, _tab_ht = st.tabs([
             f"⏳ Việc Đang Làm ({_n_dang_lam})",
