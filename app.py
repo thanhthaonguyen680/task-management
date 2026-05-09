@@ -791,15 +791,13 @@ def _get_or_create_drive_subfolder(ma_so: str) -> str:
     if ma_so in _SUBFOLDER_ID_CACHE:
         return _SUBFOLDER_ID_CACHE[ma_so]
     session = _lay_drive_session()
-    import json as _json
-    # Tìm folder đã tồn tại (corpora=allDrives để tìm trong Shared Drive)
+    # Tìm folder đã tồn tại
     r = session.get(
         "https://www.googleapis.com/drive/v3/files",
         params={
             "q": f"name='{ma_so}' and '{GDRIVE_FOLDER_ID}' in parents"
                  " and mimeType='application/vnd.google-apps.folder' and trashed=false",
             "fields": "files(id)",
-            "corpora": "allDrives",
             "supportsAllDrives": "true",
             "includeItemsFromAllDrives": "true",
         },
@@ -808,6 +806,7 @@ def _get_or_create_drive_subfolder(ma_so: str) -> str:
     if files:
         folder_id = files[0]["id"]
     else:
+        import json as _json
         r2 = session.post(
             "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id",
             headers={"Content-Type": "application/json; charset=UTF-8"},
@@ -817,10 +816,7 @@ def _get_or_create_drive_subfolder(ma_so: str) -> str:
                 "parents": [GDRIVE_FOLDER_ID],
             }),
         )
-        r2_data = r2.json()
-        if "id" not in r2_data:
-            raise RuntimeError(f"Tạo subfolder '{ma_so}' thất bại: {r2_data}")
-        folder_id = r2_data["id"]
+        folder_id = r2.json().get("id", GDRIVE_FOLDER_ID)
     _SUBFOLDER_ID_CACHE[ma_so] = folder_id
     return folder_id
 
@@ -886,14 +882,9 @@ def tai_anh_len_drive(file_anh, max_px: int = 1200, quality: int = 82, ma_so: st
         mime = "image/jpeg"
 
     # Chọn folder đích: subfolder theo mã số nếu có, fallback về root
-    st.toast(f"[DEBUG] upload ma_so='{ma_so}' task_id='{task_id}'")
-    if ma_so:
-        try:
-            parent_id = _get_or_create_drive_subfolder(str(ma_so))
-        except Exception as _e:
-            st.warning(f"⚠️ Không tạo được subfolder '{ma_so}': {_e} — lưu vào folder gốc.")
-            parent_id = GDRIVE_FOLDER_ID
-    else:
+    try:
+        parent_id = _get_or_create_drive_subfolder(str(ma_so)) if ma_so else GDRIVE_FOLDER_ID
+    except Exception:
         parent_id = GDRIVE_FOLDER_ID
 
     # Lưu task_id và ma_so vào Drive file properties để có thể trace nếu sheet write thất bại
@@ -4540,7 +4531,7 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
 
 
 @st.fragment
-def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool = True, ma_so_key: str = ""):
+def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool = True):
     cv_key      = f"{key_prefix}_cong_viec_con"
     cv_inp_v    = f"{key_prefix}_cv_inp_v"
     cv_seeded   = f"{key_prefix}_cv_seeded"
@@ -4730,14 +4721,13 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 key=_up_key_frag,
                 label_visibility="collapsed",
             )
-            def _cb_up_cv_frag(_cvk=cv_key, _idx=i, _upk=_up_key_frag, _eok=_exp_open_key, _msk=ma_so_key):
+            def _cb_up_cv_frag(_cvk=cv_key, _idx=i, _upk=_up_key_frag, _eok=_exp_open_key):
                 _files = st.session_state.get(_upk) or []
                 if not _files:
                     return
-                _ms_val = st.session_state.get(_msk, "").strip() if _msk else ""
                 for _f in _files:
                     try:
-                        _u = _tai_media_len_drive(_f, ma_so=_ms_val)
+                        _u = _tai_media_len_drive(_f)
                         st.session_state[_cvk][_idx].setdefault("anh", []).append(_u)
                     except Exception:
                         pass
@@ -4797,7 +4787,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                             _dn_k  = f"{key_prefix}_dn_nm_{i}_{_lbl_key}"
                             st.file_uploader("Chọn ảnh", type=["jpg", "jpeg", "png"],
                                              key=_up_k, label_visibility="collapsed")
-                            def _cb_up_nm(dk=_nm_do_key, lk=_lbl_key, uk=_up_k, dnk=_dn_k, _msk=ma_so_key):
+                            def _cb_up_nm(dk=_nm_do_key, lk=_lbl_key, uk=_up_k, dnk=_dn_k):
                                 f = st.session_state.get(uk)
                                 if not f:
                                     return
@@ -4805,8 +4795,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                                 if st.session_state.get(dnk) == fid:
                                     return
                                 st.session_state[dnk] = fid
-                                _ms_val = st.session_state.get(_msk, "").strip() if _msk else ""
-                                url = tai_anh_len_cloudinary(f, ma_so=_ms_val)
+                                url = tai_anh_len_cloudinary(f)
                                 st.session_state.setdefault(dk, {}).setdefault(lk, []).append(url)
                             st.button("📤 Tải ảnh", key=f"{key_prefix}_btn_nm_{i}_{_lbl_key}",
                                       use_container_width=True, on_click=_cb_up_nm,
@@ -7092,7 +7081,7 @@ def giao_dien_admin():
             st.divider()
             _fragment_checklist(_ADM_PREFIX, show_done=False, default_items=_MAC_DINH_CHECKLIST)
             st.divider()
-            _fragment_cong_viec_con(_ADM_PREFIX, ds_nhan_vien, show_done=False, ma_so_key=f"{_ADM_PREFIX}_ma_so")
+            _fragment_cong_viec_con(_ADM_PREFIX, ds_nhan_vien, show_done=False)
             st.divider()
 
             if st.button("✅ Tạo Task", use_container_width=True, type="primary", key="adm_submit_task"):
@@ -7683,7 +7672,7 @@ def giao_dien_nhan_vien():
                 _fragment_checklist(_vp, show_done=False, default_items=_MAC_DINH_CHECKLIST)
 
                 st.divider()
-                _fragment_cong_viec_con(_vp, ds_nv_nv, show_done=False, ma_so_key=f"{_nv_prefix}_ma_so_{_v}")
+                _fragment_cong_viec_con(_vp, ds_nv_nv, show_done=False)
 
                 st.divider()
 
