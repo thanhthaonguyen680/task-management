@@ -791,13 +791,15 @@ def _get_or_create_drive_subfolder(ma_so: str) -> str:
     if ma_so in _SUBFOLDER_ID_CACHE:
         return _SUBFOLDER_ID_CACHE[ma_so]
     session = _lay_drive_session()
-    # Tìm folder đã tồn tại
+    import json as _json
+    # Tìm folder đã tồn tại (corpora=allDrives để tìm trong Shared Drive)
     r = session.get(
         "https://www.googleapis.com/drive/v3/files",
         params={
             "q": f"name='{ma_so}' and '{GDRIVE_FOLDER_ID}' in parents"
                  " and mimeType='application/vnd.google-apps.folder' and trashed=false",
             "fields": "files(id)",
+            "corpora": "allDrives",
             "supportsAllDrives": "true",
             "includeItemsFromAllDrives": "true",
         },
@@ -806,7 +808,6 @@ def _get_or_create_drive_subfolder(ma_so: str) -> str:
     if files:
         folder_id = files[0]["id"]
     else:
-        import json as _json
         r2 = session.post(
             "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id",
             headers={"Content-Type": "application/json; charset=UTF-8"},
@@ -816,7 +817,10 @@ def _get_or_create_drive_subfolder(ma_so: str) -> str:
                 "parents": [GDRIVE_FOLDER_ID],
             }),
         )
-        folder_id = r2.json().get("id", GDRIVE_FOLDER_ID)
+        r2_data = r2.json()
+        if "id" not in r2_data:
+            raise RuntimeError(f"Tạo subfolder '{ma_so}' thất bại: {r2_data}")
+        folder_id = r2_data["id"]
     _SUBFOLDER_ID_CACHE[ma_so] = folder_id
     return folder_id
 
