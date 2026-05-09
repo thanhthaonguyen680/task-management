@@ -886,9 +886,14 @@ def tai_anh_len_drive(file_anh, max_px: int = 1200, quality: int = 82, ma_so: st
         mime = "image/jpeg"
 
     # Chọn folder đích: subfolder theo mã số nếu có, fallback về root
-    try:
-        parent_id = _get_or_create_drive_subfolder(str(ma_so)) if ma_so else GDRIVE_FOLDER_ID
-    except Exception:
+    st.toast(f"[DEBUG] upload ma_so='{ma_so}' task_id='{task_id}'")
+    if ma_so:
+        try:
+            parent_id = _get_or_create_drive_subfolder(str(ma_so))
+        except Exception as _e:
+            st.warning(f"⚠️ Không tạo được subfolder '{ma_so}': {_e} — lưu vào folder gốc.")
+            parent_id = GDRIVE_FOLDER_ID
+    else:
         parent_id = GDRIVE_FOLDER_ID
 
     # Lưu task_id và ma_so vào Drive file properties để có thể trace nếu sheet write thất bại
