@@ -4006,6 +4006,10 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
         padding: 4px 0 8px 0; margin-bottom: 6px;
     }}
     .cv-item-wrap-{task_id}.done {{ opacity: 0.6; }}
+    [data-testid="stHorizontalBlock"]:has(.{_mk_cv}) input[type="text"] {{
+        color: #4c1d95 !important; font-weight: 700 !important;
+        font-size: 0.95rem !important; border-color: #ddd6fe !important;
+    }}
     </style>""", unsafe_allow_html=True)
 
     def _cb_cv_done(i):
