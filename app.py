@@ -4068,7 +4068,19 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                         label_visibility="collapsed",
                         on_change=_cb_cv_done, args=(_cvi,))
         with col_txt:
-            st.markdown(f"<p>{_tcv}</p>", unsafe_allow_html=True)
+            _ten_key = f"dlg_cv_ten_{task_id}_{_cvi}"
+            _ten_input = st.text_input(
+                "Tên công đoạn", value=_tcv, key=_ten_key,
+                label_visibility="collapsed",
+            )
+            if _ten_input.strip() and _ten_input.strip() != _tcv:
+                def _cb_luu_ten(_cvi=_cvi, _ten_key=_ten_key):
+                    _new = st.session_state.get(_ten_key, "").strip()
+                    if _new:
+                        st.session_state[_cv_key][_cvi]["ten"] = _new
+                        _save_cv_to_sheet(task_id, _cv_key)
+                st.button("💾 Lưu tên", key=f"dlg_cv_luu_ten_{task_id}_{_cvi}",
+                          on_click=_cb_luu_ten, use_container_width=True)
         with col_del:
             st.button("🗑️", key=f"dlg_cv_del_{task_id}_{_cvi}",
                       use_container_width=True,
@@ -7307,6 +7319,10 @@ def giao_dien_nhan_vien():
     # Chuẩn hóa tên (trim khoảng trắng) để so sánh chính xác
     ten_nhan_vien = ten_nhan_vien.strip()
 
+    # Nhân viên được cấp quyền xóa task (ngoài admin)
+    _NV_CO_QUYEN_XOA = {"Nguyễn Anh Minh"}
+    _co_quyen_xoa = ten_nhan_vien in _NV_CO_QUYEN_XOA
+
     # Mỗi lần tải trang luôn xóa cache để lấy dữ liệu mới nhất từ Google Sheets
     if "_last_nv_load" not in st.session_state or st.session_state["_last_nv_load"] != ten_nhan_vien:
         lay_danh_sach_cong_viec.clear()
@@ -7422,7 +7438,7 @@ def giao_dien_nhan_vien():
             df_cua_toi = df_cua_toi.sort_values("Ngày Tạo", ascending=False, na_position="last")
             _render_kanban_board(df_cua_toi, ds_tt, board_key="nv_kb",
                                  force_open=bool(q_search.strip() or q_cty.strip()),
-                                 show_delete=False)
+                                 show_delete=_co_quyen_xoa)
 
     # ========================================================
     # Tab 3: Việc Của Tôi (công việc con được giao)
