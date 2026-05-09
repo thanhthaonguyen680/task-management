@@ -4531,7 +4531,7 @@ def _fragment_checklist(key_prefix: str, show_done: bool = True, default_items=N
 
 
 @st.fragment
-def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool = True):
+def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool = True, ma_so_key: str = ""):
     cv_key      = f"{key_prefix}_cong_viec_con"
     cv_inp_v    = f"{key_prefix}_cv_inp_v"
     cv_seeded   = f"{key_prefix}_cv_seeded"
@@ -4721,13 +4721,14 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 key=_up_key_frag,
                 label_visibility="collapsed",
             )
-            def _cb_up_cv_frag(_cvk=cv_key, _idx=i, _upk=_up_key_frag, _eok=_exp_open_key):
+            def _cb_up_cv_frag(_cvk=cv_key, _idx=i, _upk=_up_key_frag, _eok=_exp_open_key, _msk=ma_so_key):
                 _files = st.session_state.get(_upk) or []
                 if not _files:
                     return
+                _ms_val = st.session_state.get(_msk, "").strip() if _msk else ""
                 for _f in _files:
                     try:
-                        _u = _tai_media_len_drive(_f)
+                        _u = _tai_media_len_drive(_f, ma_so=_ms_val)
                         st.session_state[_cvk][_idx].setdefault("anh", []).append(_u)
                     except Exception:
                         pass
@@ -4787,7 +4788,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                             _dn_k  = f"{key_prefix}_dn_nm_{i}_{_lbl_key}"
                             st.file_uploader("Chọn ảnh", type=["jpg", "jpeg", "png"],
                                              key=_up_k, label_visibility="collapsed")
-                            def _cb_up_nm(dk=_nm_do_key, lk=_lbl_key, uk=_up_k, dnk=_dn_k):
+                            def _cb_up_nm(dk=_nm_do_key, lk=_lbl_key, uk=_up_k, dnk=_dn_k, _msk=ma_so_key):
                                 f = st.session_state.get(uk)
                                 if not f:
                                     return
@@ -4795,7 +4796,8 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                                 if st.session_state.get(dnk) == fid:
                                     return
                                 st.session_state[dnk] = fid
-                                url = tai_anh_len_cloudinary(f)
+                                _ms_val = st.session_state.get(_msk, "").strip() if _msk else ""
+                                url = tai_anh_len_cloudinary(f, ma_so=_ms_val)
                                 st.session_state.setdefault(dk, {}).setdefault(lk, []).append(url)
                             st.button("📤 Tải ảnh", key=f"{key_prefix}_btn_nm_{i}_{_lbl_key}",
                                       use_container_width=True, on_click=_cb_up_nm,
@@ -7081,7 +7083,7 @@ def giao_dien_admin():
             st.divider()
             _fragment_checklist(_ADM_PREFIX, show_done=False, default_items=_MAC_DINH_CHECKLIST)
             st.divider()
-            _fragment_cong_viec_con(_ADM_PREFIX, ds_nhan_vien, show_done=False)
+            _fragment_cong_viec_con(_ADM_PREFIX, ds_nhan_vien, show_done=False, ma_so_key=f"{_ADM_PREFIX}_ma_so")
             st.divider()
 
             if st.button("✅ Tạo Task", use_container_width=True, type="primary", key="adm_submit_task"):
@@ -7672,7 +7674,7 @@ def giao_dien_nhan_vien():
                 _fragment_checklist(_vp, show_done=False, default_items=_MAC_DINH_CHECKLIST)
 
                 st.divider()
-                _fragment_cong_viec_con(_vp, ds_nv_nv, show_done=False)
+                _fragment_cong_viec_con(_vp, ds_nv_nv, show_done=False, ma_so_key=f"{_nv_prefix}_ma_so_{_v}")
 
                 st.divider()
 
