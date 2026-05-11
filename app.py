@@ -2197,7 +2197,7 @@ def tao_pdf_nghiem_thu(thong_tin_task: dict) -> bytes:
              align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(*BLACK)
     pdf.set_font("DejaVu", "", 8.5)
-    pdf.cell(W, 5, "Địa chỉ : 8/5,hẻm 04, tổ 9, khu Kim Sơn, Xã Long Thành, Tỉnh Đồng Nai, Việt Nam",
+    pdf.cell(W, 5, "Địa chỉ : 8/5, hẻm 4, tổ 9, Khu phố Kim Sơn, Phường Long Thành, Thành phố Đồng Nai",
              align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.cell(W, 5, "Website: ngoctrammotor.com   Mail: kd@ngoctrammotor.com",
              align="C", new_x="LMARGIN", new_y="NEXT")
@@ -2765,7 +2765,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     row += 1
 
     for txt in [
-        "Địa chỉ : 8/5, hẻm 04, tổ 9, khu Kim Sơn, Xã Long Thành, Tỉnh Đồng Nai, Việt Nam",
+        "Địa chỉ : 8/5, hẻm 4, tổ 9, Khu phố Kim Sơn, Phường Long Thành, Thành phố Đồng Nai",
         "Website: ngoctrammotor.com   Mail: kd@ngoctrammotor.com",
         "MST: 3603238978  ĐT: 0907 042 043 (Mr.Hiệp) – 0908 062 291 (Ms.Linh)",
     ]:
