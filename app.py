@@ -8844,9 +8844,11 @@ def main():
 
     if _pdlg:
         # Mở dialog từ click button / row selection
+        st.session_state["_dlg_x_close_count"] = 0
         _task_dialog(_pdlg[0], _pdlg[1])
     elif _dlg_qp and _is_fresh_session:
         # Session mới (page reload / reconnect sau khi background) → khôi phục dialog
+        st.session_state["_dlg_x_close_count"] = 0
         try:
             _df_r  = lay_danh_sach_cong_viec()
             _row_r = _df_r[_df_r["ID"].astype(str) == _dlg_qp]
@@ -8861,11 +8863,30 @@ def main():
             except Exception:
                 pass
     elif _dlg_qp and not _is_fresh_session and _dlg_was_active and not _dlg_currently_active:
-        # Cùng session, dialog đóng bằng nút X → xóa query param
-        try:
-            del st.query_params["dlg"]
-        except Exception:
-            pass
+        # Cùng session, dialog đóng đột ngột — có thể do Android reconnect hoặc bấm X
+        # Lần 1: thử mở lại (xử lý Android background → WebSocket timeout → reconnect)
+        # Lần 2 liên tiếp: bấm X thật → đóng hẳn
+        _xcc = st.session_state.get("_dlg_x_close_count", 0)
+        if _xcc < 1:
+            st.session_state["_dlg_x_close_count"] = _xcc + 1
+            try:
+                _df_r = lay_danh_sach_cong_viec()
+                _row_r = _df_r[_df_r["ID"].astype(str) == _dlg_qp]
+                if not _row_r.empty:
+                    _task_dialog(_row_r.iloc[0].to_dict(),
+                                 lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH)
+                else:
+                    try: del st.query_params["dlg"]
+                    except Exception: pass
+            except Exception:
+                try: del st.query_params["dlg"]
+                except Exception: pass
+        else:
+            st.session_state["_dlg_x_close_count"] = 0
+            try:
+                del st.query_params["dlg"]
+            except Exception:
+                pass
 
 
 # ============================================================
