@@ -4104,7 +4104,6 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
         if _exp_open_key not in st.session_state:
             st.session_state[_exp_open_key] = False
         with st.expander(_exp_lbl, expanded=st.session_state[_exp_open_key]):
-            st.session_state[_exp_open_key] = True  # giữ mở khi đang trong expander
             if _cv_media:
                 _cols_m = st.columns(min(len(_cv_media), 3))
                 for _mi, _url_m in enumerate(_cv_media):
@@ -4153,6 +4152,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                 _save_cv_to_sheet(_tid, _cvk)  # gọi trực tiếp để đọc session_state đúng context
                 _vk = f"up_cv_m_v_{_tid}_{_ci}"
                 st.session_state[_vk] = st.session_state.get(_vk, 0) + 1
+                st.session_state[f"exp_cv_m_open_{_tid}_{_ci}"] = True  # giữ expander mở sau upload
             st.button("📤 Tải ảnh", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True,
                       disabled=not bool(st.session_state.get(_up_key_m)),
                       on_click=_cb_up_cv_m)
