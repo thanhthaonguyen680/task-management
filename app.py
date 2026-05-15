@@ -4713,8 +4713,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                         st.button("🗑️ Xoá", key=f"{key_prefix}_del_cvanh_{i}_{_ai}",
                                   use_container_width=True,
                                   on_click=_del_cv_anh_frag)
-            _up_ver_key_frag = f"{key_prefix}_up_cv_v_{i}"
-            _up_key_frag = f"{key_prefix}_up_cv_{i}_{st.session_state.get(_up_ver_key_frag, 0)}"
+            _up_key_frag = f"{key_prefix}_up_cv_{i}"
             st.file_uploader(
                 "Chọn hình hoặc video",
                 type=["jpg", "jpeg", "png", "mp4", "mov", "avi"],
@@ -4722,7 +4721,7 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                 key=_up_key_frag,
                 label_visibility="collapsed",
             )
-            def _cb_up_cv_frag(_cvk=cv_key, _idx=i, _upk=_up_key_frag, _eok=_exp_open_key, _vk=_up_ver_key_frag):
+            def _cb_up_cv_frag(_cvk=cv_key, _idx=i, _upk=_up_key_frag, _eok=_exp_open_key):
                 _files = st.session_state.get(_upk) or []
                 if not _files:
                     return
@@ -4733,7 +4732,6 @@ def _fragment_cong_viec_con(key_prefix: str, ds_nhan_vien: list, show_done: bool
                     except Exception:
                         pass
                 st.session_state[_eok] = True
-                st.session_state[_vk] = st.session_state.get(_vk, 0) + 1
             st.button("📤 Tải ảnh", key=f"{key_prefix}_btn_up_cv_{i}",
                       use_container_width=True,
                       disabled=not bool(st.session_state.get(_up_key_frag)),
@@ -4861,7 +4859,6 @@ def _cb_upload_anh_nt(task_id, anh_key, up_key):
         new_urls.append(url)
     st.session_state[anh_key] = st.session_state.get(anh_key, []) + new_urls
     st.session_state[f"_nt_msg_{task_id}"] = f"✅ Đã upload {len(new_urls)} ảnh!"
-    st.session_state[f"up_anh_nt_v_{task_id}"] = st.session_state.get(f"up_anh_nt_v_{task_id}", 0) + 1
 
 
 def _tao_zip_anh(ds_url: list, ten_file: str = "anh") -> bytes:
@@ -4888,7 +4885,7 @@ def _tao_zip_anh(ds_url: list, ten_file: str = "anh") -> bytes:
 
 def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
     """Upload ảnh nghiệm thu — explicit button + spinner để hiện ảnh ngay."""
-    up_key = f"up_anh_nt_{task_id}_{st.session_state.get(f'up_anh_nt_v_{task_id}', 0)}"
+    up_key = f"up_anh_nt_{task_id}"
     ds_anh = st.session_state.get(anh_key, [])
     st.markdown("**📸 Ảnh Nghiệm Thu**")
     if ds_anh:
@@ -4927,7 +4924,6 @@ def _fragment_upload_anh_nghiem_thu(task_id, anh_key: str):
     st.button(
         "📤 Upload ảnh", key=f"btn_up_nt_{task_id}",
         use_container_width=True,
-        disabled=not bool(st.session_state.get(up_key)),
         on_click=_cb_upload_anh_nt,
         args=(task_id, anh_key, up_key),
     )
