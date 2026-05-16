@@ -3342,6 +3342,801 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     return buf.read()
 
 
+def tao_excel_nghiem_thu_dc(thong_tin_task: dict) -> bytes:
+    """Tạo file Excel biên bản nghiệm thu cho Động cơ DC — 11 trang tối đa.
+    Cấu trúc giống AC nhưng trang 2 có cột Before/After cho R và IR,
+    và trang ảnh 3-11 theo cấu trúc DC.
+    """
+    import io, os as _os
+    from openpyxl import Workbook
+    from openpyxl.styles import (Font, PatternFill, Alignment, Border, Side)
+    from openpyxl.utils import get_column_letter
+    from openpyxl.drawing.image import Image as XLImage
+    from openpyxl.drawing.spreadsheet_drawing import TwoCellAnchor, AnchorMarker
+    from openpyxl.worksheet.pagebreak import Break
+
+    _LOGO_PATH = _os.path.join(_os.path.dirname(__file__), "image.png")
+    _logo_bio: io.BytesIO | None = None
+    if _os.path.exists(_LOGO_PATH):
+        with open(_LOGO_PATH, "rb") as _lf:
+            _logo_bio = io.BytesIO(_lf.read())
+
+    ten_dong_co  = str(thong_tin_task.get("Tên Công Việc", ""))
+    khach_hang   = str(thong_tin_task.get("Công Ty", ""))
+    cong_so      = str(thong_tin_task.get("Công Số", ""))
+    ma_so        = str(thong_tin_task.get("Mã Số", ""))
+    so_po_kh     = str(thong_tin_task.get("Số PO KH/HĐ", ""))
+    so_bao_gia   = str(thong_tin_task.get("Số Báo Giá", ""))
+    mo_ta        = str(thong_tin_task.get("Mô Tả", ""))
+    nhan_vien    = str(thong_tin_task.get("Nhân Viên", ""))
+    ngay_tao_str = str(thong_tin_task.get("Ngày Tạo", ""))
+    anh_do_luong = doc_anh_do_luong(
+        str(thong_tin_task.get("Ảnh Đo Lường", "") or ""))
+
+    _dia_chi_kh = ""
+    try:
+        _df_ct = lay_danh_sach_cong_ty()
+        _match = _df_ct[_df_ct["Tên Công Ty"].str.strip() == khach_hang.strip()]
+        if not _match.empty:
+            _dia_chi_kh = str(_match.iloc[0].get("Địa Chỉ", "") or "")
+    except Exception:
+        pass
+
+    try:
+        dt = datetime.strptime(ngay_tao_str[:10], "%Y-%m-%d")
+        ngay_en = dt.strftime("%d %B %Y")
+        ngay_vi = f"Ngày {dt.day:02d} Tháng {dt.month:02d} Năm {dt.year}"
+    except Exception:
+        ngay_en = ngay_tao_str
+        ngay_vi = ngay_tao_str
+
+    _raw_cl = str(thong_tin_task.get("Checklist", "") or "[]")
+    try:
+        _cl_items = json.loads(_raw_cl)
+    except Exception:
+        _cl_items = []
+    hang_muc = [
+        it["text"].strip() for it in _cl_items
+        if isinstance(it, dict) and it.get("done") and it.get("text", "").strip()
+    ]
+    if not hang_muc:
+        hang_muc = [h.strip() for h in mo_ta.split("\n") if h.strip()]
+
+    thin  = Side(style="thin",   color="000000")
+    thick = Side(style="medium", color="000000")
+    brd_all   = Border(left=thin, right=thin, top=thin, bottom=thin)
+    brd_thick = Border(left=thick, right=thick, top=thick, bottom=thick)
+
+    BLUE_HDR   = "5B84CC"
+    BLUE_CELL  = "BDD7EE"
+    BLUE_LABEL = "E2EFF8"
+    PURPLE    = "70309F"
+    WHITE     = "FFFFFF"
+    YELLOW    = "FFF2CC"
+    LIGHT_BLUE = "DAEEF3"
+
+    def _font(bold=False, size=10, color="000000", italic=False):
+        return Font(bold=bold, size=size, color=color, italic=italic,
+                    name="Times New Roman")
+
+    def _fill(hex_color):
+        return PatternFill("solid", fgColor=hex_color)
+
+    def _align(h="center", v="center", wrap=True):
+        return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
+
+    NCOLS = 6
+    COL_W = 25
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Biên Bản"
+    for ci in "ABCDEF":
+        ws.column_dimensions[ci].width = COL_W
+
+    row = 1
+
+    def _sc(r, col, value="", bold=False, size=10, color="000000",
+            h_align="center", fill_color=None, border=None, wrap=True):
+        c = ws.cell(row=r, column=col, value=value)
+        c.font      = _font(bold=bold, size=size, color=color)
+        c.alignment = _align(h=h_align, wrap=wrap)
+        if fill_color:
+            c.fill  = _fill(fill_color)
+        if border:
+            c.border = border
+        return c
+
+    def _brd_merge(r, c1, c2, brd, r_end=None):
+        _re = r_end if r_end is not None else r
+        for _r in range(r, _re + 1):
+            for _c in range(c1, c2 + 1):
+                left   = brd.left   if _c == c1 else Side(style=None)
+                right  = brd.right  if _c == c2 else Side(style=None)
+                top    = brd.top    if _r == r  else Side(style=None)
+                bottom = brd.bottom if _r == _re else Side(style=None)
+                ws.cell(row=_r, column=_c).border = Border(
+                    left=left, right=right, top=top, bottom=bottom)
+
+    def _apply_outer_thick(r_start, r_end):
+        tk = Side(style="thick", color="000000")
+        for _r in range(r_start, r_end + 1):
+            for _c in range(1, 7):
+                cell = ws.cell(row=_r, column=_c)
+                b = cell.border
+                cell.border = Border(
+                    top    = tk if _r == r_start else b.top,
+                    bottom = tk if _r == r_end   else b.bottom,
+                    left   = tk if _c == 1       else b.left,
+                    right  = tk if _c == 6       else b.right,
+                )
+
+    # ── Header công ty ─────────────────────────────────────────
+    _hdr_start = row
+    _hdr_end   = row + 3
+    ws.merge_cells(f"A{_hdr_start}:A{_hdr_end}")
+    _brd_merge(_hdr_start, 1, 1, brd_all, r_end=_hdr_end)
+    if _logo_bio is not None:
+        _logo_bio.seek(0)
+        _xl_logo = XLImage(io.BytesIO(_logo_bio.read()))
+        PAD_L = 18288
+        _logo_anchor = TwoCellAnchor(editAs="twoCell")
+        _logo_anchor._from = AnchorMarker(col=0, colOff=PAD_L,
+                                          row=_hdr_start - 1, rowOff=PAD_L)
+        _logo_anchor.to   = AnchorMarker(col=1, colOff=-PAD_L,
+                                          row=_hdr_end, rowOff=-PAD_L)
+        _xl_logo.anchor = _logo_anchor
+        ws.add_image(_xl_logo)
+
+    ws.merge_cells(f"B{row}:F{row}")
+    _sc(row, 2, "CÔNG TY TNHH MỘT THÀNH VIÊN ĐIỆN CƠ NGỌC TRÂM",
+        bold=True, size=14, color=PURPLE, h_align="center")
+    ws.row_dimensions[row].height = 22
+    row += 1
+
+    for txt in [
+        "Địa chỉ : 8/5, hẻm 04, tổ 9, khu Kim Sơn, Xã Long Thành, Tỉnh Đồng Nai, Việt Nam",
+        "Website: ngoctrammotor.com   Mail: kd@ngoctrammotor.com",
+        "MST: 3603238978  ĐT: 0907 042 043 (Mr.Hiệp) – 0908 062 291 (Ms.Linh)",
+    ]:
+        ws.merge_cells(f"B{row}:F{row}")
+        _sc(row, 2, txt, size=13, h_align="center")
+        ws.row_dimensions[row].height = 20
+        row += 1
+    _brd_merge(_hdr_start, 2, 6, brd_all, r_end=_hdr_end)
+
+    row += 1
+    ws.row_dimensions[row - 1].height = 20
+
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1, "REPAIR ACCEPTANCE CERTIFICATE",
+        bold=True, size=13, color="1F3864", h_align="center")
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 22
+    row += 1
+
+    ws.merge_cells(f"A{row}:F{row}")
+    c = ws.cell(row=row, column=1, value="BIÊN BẢN NGHIỆM THU")
+    c.font      = _font(bold=True, size=16, color="1F3864")
+    c.alignment = _align()
+    c.fill      = _fill(BLUE_CELL)
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 28
+    row += 1
+
+    row += 1
+    ws.row_dimensions[row - 1].height = 20
+
+    for en_lbl, vi_lbl, val in [
+        ("Engine",   "Động cơ",    ten_dong_co),
+        ("Customer", "Khách hàng", khach_hang),
+        ("Address",  "Địa chỉ",   _dia_chi_kh),
+    ]:
+        ws.merge_cells(f"A{row}:B{row}")
+        _sc(row, 1, f"{en_lbl} / {vi_lbl}",
+            bold=True, size=13, fill_color=BLUE_CELL, border=brd_all, h_align="left")
+        _brd_merge(row, 1, 2, brd_all)
+        ws.merge_cells(f"C{row}:F{row}")
+        _sc(row, 3, val, size=13, border=brd_all, h_align="left")
+        _brd_merge(row, 3, 6, brd_all)
+        ws.row_dimensions[row].height = 30
+        row += 1
+
+    row += 1
+    ws.row_dimensions[row - 1].height = 20
+
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1,
+        "I. Time and place of the test / Thời gian và địa điểm kiểm tra",
+        bold=True, size=13, h_align="left", border=brd_all)
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 26
+    row += 1
+
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1, f"At 7:30 AM on {ngay_en}, at Ngoc Tram Motor",
+        size=13, h_align="left", border=brd_all)
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 26
+    row += 1
+
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1, f"Lúc 7h30 - {ngay_vi}, tại Điện cơ Ngọc Trâm",
+        size=13, h_align="left", border=brd_all)
+    _brd_merge(row, 1, 6, brd_all)
+    ws.row_dimensions[row].height = 26
+    row += 1
+    row += 1
+    ws.row_dimensions[row - 1].height = 20
+
+    _confirm_start = row
+    _confirm_end   = row + 4
+    ws.merge_cells(f"A{_confirm_start}:F{_confirm_end}")
+    _cc = ws.cell(row=_confirm_start, column=1)
+    _en_text = (
+        "We hereby confirm that all electrical tests on this machine have been "
+        "performed in accordance with the relevant standards. This electronically "
+        "generated report is also valid without a handwritten signature."
+    )
+    _vi_text = (
+        "Chúng tôi xác nhận rằng tất cả các thử nghiệm điện trên máy này đã được "
+        "thực hiện theo các tiêu chuẩn liên quan. Báo cáo được tạo bằng điện tử "
+        "này cũng có giá trị mà không cần chữ ký viết tay."
+    )
+    _cc.value     = f"{_en_text}\n{_vi_text}"
+    _cc.font      = Font(name="Times New Roman", size=13, italic=True)
+    _cc.alignment = Alignment(horizontal="center", vertical="center",
+                              wrap_text=True)
+    _cc.fill = _fill("F2F2F2")
+    _brd_merge(_confirm_start, 1, 6, brd_all, r_end=_confirm_end)
+    for _r in range(_confirm_start, _confirm_end + 1):
+        ws.row_dimensions[_r].height = 28
+    row = _confirm_end + 1
+    row += 1
+    ws.row_dimensions[row - 1].height = 20
+
+    ws.merge_cells(f"A{row}:C{row}")
+    _sc(row, 1, "CLIENT / CHỦ ĐẦU TƯ",
+        bold=True, size=13, color="000000", fill_color=BLUE_CELL,
+        border=brd_all, h_align="center")
+    _brd_merge(row, 1, 3, brd_all)
+    ws.merge_cells(f"D{row}:F{row}")
+    _sc(row, 4, "CONTRACTOR / NHÀ THẦU",
+        bold=True, size=13, color="000000", fill_color=BLUE_CELL,
+        border=brd_all, h_align="center")
+    _brd_merge(row, 4, 6, brd_all)
+    ws.row_dimensions[row].height = 28
+    row += 1
+
+    ws.merge_cells(f"A{row}:C{row}")
+    _sc(row, 1, "Position / Chức vụ :",
+        size=13, border=brd_all, h_align="left")
+    _brd_merge(row, 1, 3, brd_all)
+    ws.merge_cells(f"D{row}:F{row}")
+    _sc(row, 4, "Position / Chức vụ : Trưởng bộ phận Kỹ thuật",
+        size=13, border=brd_all, h_align="left")
+    _brd_merge(row, 4, 6, brd_all)
+    ws.row_dimensions[row].height = 28
+    row += 1
+
+    _sig_start = row
+    _sig_end   = row + 2
+    ws.merge_cells(f"A{_sig_start}:C{_sig_end}")
+    _sc(_sig_start, 1, "", size=13, border=brd_all)
+    _brd_merge(_sig_start, 1, 3, brd_all, r_end=_sig_end)
+    ws.merge_cells(f"D{_sig_start}:F{_sig_end}")
+    _sc(_sig_start, 4, "", size=13, border=brd_all)
+    _brd_merge(_sig_start, 4, 6, brd_all, r_end=_sig_end)
+    for _r in range(_sig_start, _sig_end + 1):
+        ws.row_dimensions[_r].height = 40
+    row = _sig_end + 1
+
+    ws.merge_cells(f"A{row}:C{row}")
+    _sc(row, 1, "Full name / Họ và tên :",
+        size=13, border=brd_all, h_align="left")
+    _brd_merge(row, 1, 3, brd_all)
+    ws.merge_cells(f"D{row}:F{row}")
+    _sc(row, 4, "Full name / Họ và tên :",
+        size=13, border=brd_all, h_align="left")
+    _brd_merge(row, 4, 6, brd_all)
+    ws.row_dimensions[row].height = 28
+    row += 1
+
+    ws.merge_cells(f"A{row}:C{row}")
+    _sc(row, 1, "Date / Ngày :",
+        size=13, border=brd_all, h_align="left")
+    _brd_merge(row, 1, 3, brd_all)
+    ws.merge_cells(f"D{row}:F{row}")
+    _sc(row, 4, "Date / Ngày :",
+        size=13, border=brd_all, h_align="left")
+    _brd_merge(row, 4, 6, brd_all)
+    ws.row_dimensions[row].height = 28
+    row += 1
+    row += 1
+    ws.row_dimensions[row - 1].height = 20
+
+    ws.merge_cells(f"A{row}:F{row}")
+    _sc(row, 1, "II. Hạng mục sửa chữa / Repair catalog",
+        bold=True, size=13, h_align="left")
+    ws.row_dimensions[row].height = 26
+    row += 1
+
+    _sc(row, 1, "STT", bold=True, size=13, color="000000",
+        fill_color=BLUE_CELL, border=brd_all)
+    ws.merge_cells(f"B{row}:D{row}")
+    _sc(row, 2, "Repair catalog / Hạng mục sửa chữa",
+        bold=True, size=13, color="000000", fill_color=BLUE_CELL, border=brd_all)
+    _brd_merge(row, 2, 4, brd_all)
+    _sc(row, 5, "Date / Ngày", bold=True, size=13, color="000000",
+        fill_color=BLUE_CELL, border=brd_all)
+    _sc(row, 6, "Passed / Thông qua", bold=True, size=13, color="000000",
+        fill_color=BLUE_CELL, border=brd_all)
+    ws.row_dimensions[row].height = 28
+    row += 1
+
+    _hm_rows = hang_muc if hang_muc else [""]
+    for i, noi_dung in enumerate(_hm_rows, start=1):
+        fill = YELLOW if i % 2 == 0 else WHITE
+        _sc(row, 1, f"{i}", size=13, border=brd_all, fill_color=fill)
+        ws.merge_cells(f"B{row}:D{row}")
+        _sc(row, 2, noi_dung, size=13, border=brd_all,
+            h_align="left", fill_color=fill)
+        _brd_merge(row, 2, 4, brd_all)
+        _sc(row, 5, "", size=13, border=brd_all, fill_color=fill)
+        _sc(row, 6, "", size=13, border=brd_all, fill_color=fill)
+        ws.row_dimensions[row].height = 26
+        row += 1
+
+    row += 1
+    ws.row_dimensions[row - 1].height = 14
+
+    # ═══════════════════════════════════════════════════════════
+    # DC IMAGE_PAGES definition (pages 3-11)
+    # ═══════════════════════════════════════════════════════════
+    DC_IMAGE_PAGES = [
+        ("3/11", 72, [
+            ("Resistance / Điện trở", "",
+             ["R (F1-F2)", "R (A1-A2)"],
+             ["dc_R_F1F2_img", "dc_R_A1A2_img"]),
+            ("Insulation Resistance / Cách điện", "",
+             ["IR (F1-F2)", "IR (A1-A2)", "IR (ROTOR)"],
+             ["dc_IR_F1F2_img", "dc_IR_A1A2_img", "dc_IR_ROTOR_img"]),
+            ("Engine Overview / Tổng Quan Động Cơ", "",
+             ["Before", "After"],
+             ["dc_eng_before", "dc_eng_after"]),
+        ]),
+        ("4/11", 72, [
+            ("Terminal Box / Hộp Điện", "",
+             ["Before", "After"],
+             ["dc_tb_before", "dc_tb_after"]),
+            ("Coil Stator / Cuộn dây Stator", "",
+             ["Vệ sinh cuộn dây", "Sơn cuộn dây"],
+             ["dc_stator_ve_sinh", "dc_stator_son"]),
+            ("Main Field Winding / Cuộn dây kích từ chính", "",
+             ["Before", "After"],
+             ["dc_mfw_before", "dc_mfw_after"]),
+        ]),
+        ("5/11", 72, [
+            ("Interpole Winding / Cuộn dây kích từ phụ", "",
+             ["Before", "After"],
+             ["dc_iw_before", "dc_iw_after"]),
+            ("Compensating Winding / Cuộn dây bù", "",
+             ["Before", "After"],
+             ["dc_cw_before", "dc_cw_after"]),
+            ("Coil Rotor / Cuộn dây Rotor", "",
+             ["Vệ sinh cuộn dây", "Sơn cuộn dây"],
+             ["dc_rotor_ve_sinh", "dc_rotor_son"]),
+        ]),
+        ("6/11", 72, [
+            ("Skimming and polishing of commutator / Vớt Láng Cổ Góp", "",
+             ["Before", "After"],
+             ["dc_skim_before", "dc_skim_after"]),
+            ("Rotor Balancing / Cân bằng động", "",
+             ["Before", "After"],
+             ["dc_bal_bd_before", "dc_bal_bd_after"]),
+            ("Voltage Drop Measurement / Đo Điện Áp Rơi", "",
+             ["Before", "After"],
+             ["dc_vdrop_bd_before", "dc_vdrop_bd_after"]),
+        ]),
+        ("7/11", 72, [
+            ("Coil Rotor / Cuộn dây Rotor", "",
+             ["Before", "After"],
+             ["dc_sc_rotor_before", "dc_sc_rotor_after"]),
+            ("Commutator Resurfacing / Làm mới phần cổ góp", "",
+             ["Before", "After"],
+             ["dc_comm_before", "dc_comm_after"]),
+            ("Rotor Balancing / Cân bằng động", "",
+             ["Before", "After"],
+             ["dc_bal_sc_before", "dc_bal_sc_after"]),
+        ]),
+        ("8/11", 72, [
+            ("Voltage Drop Measurement / Đo Điện Áp Rơi", "",
+             ["Before", "After"],
+             ["dc_vdrop_sc_before", "dc_vdrop_sc_after"]),
+            ("End Cover DE / Nắp Đầu Tải", "",
+             ["Before", "After"],
+             ["dc_ec_de_before", "dc_ec_de_after"]),
+            ("End Cover NDE / Nắp Đầu Không Tải", "",
+             ["Before", "After"],
+             ["dc_ec_nde_before", "dc_ec_nde_after"]),
+        ]),
+        ("9/11", 72, [
+            ("Shaft at DE / Trục Đầu Tải", "",
+             ["Before", "After"],
+             ["dc_shaft_de_before", "dc_shaft_de_after"]),
+            ("Shaft at NDE / Trục Đầu Không Tải", "",
+             ["Before", "After"],
+             ["dc_shaft_nde_before", "dc_shaft_nde_after"]),
+            ("DE Bearing / Vòng Bi Đầu Tải", "",
+             ["Before", "After"],
+             ["dc_de_brg_before", "dc_de_brg_after"]),
+        ]),
+        ("10/11", 72, [
+            ("NDE Bearing / Vòng Bi Đầu Không Tải", "",
+             ["Before", "After"],
+             ["dc_nde_brg_before", "dc_nde_brg_after"]),
+            ("Replacement of carbon brushes / Thay chổi than", "",
+             ["Before", "After"],
+             ["dc_carbon_before", "dc_carbon_after"]),
+            ("Carbon brush holder / Gá đỡ chổi than", "",
+             ["Before", "After"],
+             ["dc_cbh_before", "dc_cbh_after"]),
+        ]),
+        ("11/11", 72, [
+            ("Sandblasting and cleaning of brush rocker assembly / Bắn cát gông than", "",
+             ["Before", "After"],
+             ["dc_sandblast_before", "dc_sandblast_after"]),
+            ("Sơn mới motor", "",
+             ["Before", "After"],
+             ["dc_paint_before", "dc_paint_after"]),
+        ]),
+    ]
+
+    # ── Tải ảnh vào BytesIO ──────────────────────────────────────
+    _all_skeys: list = []
+    for _, _, tbls in DC_IMAGE_PAGES:
+        for _, _, _, skeys in tbls:
+            _all_skeys.extend(skeys)
+
+    _img_cache: dict = {}
+    for key in _all_skeys:
+        if key not in _img_cache:
+            urls = anh_do_luong.get(key, [])
+            _img_cache[key] = None
+            if urls:
+                tmp = _tai_anh_tam(urls[0])
+                if tmp and os.path.exists(tmp):
+                    try:
+                        with open(tmp, "rb") as _f:
+                            _img_cache[key] = io.BytesIO(_f.read())
+                    except Exception:
+                        pass
+                    try:
+                        os.unlink(tmp)
+                    except Exception:
+                        pass
+
+    _active_pages = [
+        (pg_lbl, img_h, tables)
+        for pg_lbl, img_h, tables in DC_IMAGE_PAGES
+        if any(
+            _img_cache.get(k) is not None
+            for _, _, _, skeys in tables
+            for k in skeys
+        )
+    ]
+    _total_pages = 2 + len(_active_pages)
+
+    def _col_ranges(n: int) -> list:
+        if n == 3:
+            return [(1, 2), (3, 4), (5, 6)]
+        if n == 2:
+            return [(1, 3), (4, 6)]
+        step = NCOLS // n
+        return [(i * step + 1, (i + 1) * step) for i in range(n)]
+
+    def _nt_mini_header(page_lbl):
+        nonlocal row
+        ws.merge_cells(f"A{row}:A{row+1}")
+        _nt2 = ws.cell(row=row, column=1,
+                       value="" if _logo_bio is not None else "NT")
+        _nt2.font      = _font(bold=True, size=11)
+        _nt2.alignment = _align()
+        _brd_merge(row, 1, 1, brd_all, r_end=row + 1)
+        if _logo_bio is not None:
+            _logo_bio.seek(0)
+            _xl_nt2 = XLImage(io.BytesIO(_logo_bio.read()))
+            PAD_NT2 = 9144
+            _nt2_anchor = TwoCellAnchor(editAs="twoCell")
+            _nt2_anchor._from = AnchorMarker(col=0, colOff=PAD_NT2,
+                                              row=row - 1, rowOff=PAD_NT2)
+            _nt2_anchor.to   = AnchorMarker(col=1, colOff=-PAD_NT2,
+                                              row=row + 1, rowOff=-PAD_NT2)
+            _xl_nt2.anchor = _nt2_anchor
+            ws.add_image(_xl_nt2)
+        ws.merge_cells(f"B{row}:C{row}")
+        _sc(row, 2, f"Quotation / Báo giá: {so_bao_gia}", size=12, border=brd_all, h_align="left")
+        _brd_merge(row, 2, 3, brd_all)
+        ws.merge_cells(f"D{row}:E{row}")
+        _sc(row, 4, f"Engine number / Số máy: {ma_so}", size=12, border=brd_all, h_align="left")
+        _brd_merge(row, 4, 5, brd_all)
+        _sc(row, 6, f"Order number / Số ĐH: {so_po_kh}", size=12, border=brd_all, h_align="left")
+        ws.merge_cells(f"B{row+1}:C{row+1}")
+        _sc(row + 1, 2,
+            "Management document / Tài liệu quản lý: QT-NT-029-1A",
+            size=12, border=brd_all, h_align="left")
+        _brd_merge(row + 1, 2, 3, brd_all)
+        ws.merge_cells(f"D{row+1}:E{row+1}")
+        _sc(row + 1, 4, "Edition date / Ngày ban hành: 24/04/2025",
+            size=12, border=brd_all, h_align="left")
+        _brd_merge(row + 1, 4, 5, brd_all)
+        _sc(row + 1, 6, f"Page / Trang: {page_lbl}", size=12, border=brd_all, h_align="left")
+        ws.row_dimensions[row].height     = 26
+        ws.row_dimensions[row + 1].height = 24
+        ws.row_dimensions[row + 2].height = 14
+        _apply_outer_thick(row, row + 1)
+        row += 3
+
+    ws.row_breaks.append(Break(id=row - 1))   # page break: page 1 → 2
+    row += 1  # blank row = đầu trang 2
+
+    # ═══════════════════════════════════════════════════════════
+    # TRANG 2 — BẢNG SỐ LIỆU ĐO LƯỜNG DC (Before / After)
+    # ═══════════════════════════════════════════════════════════
+    _nt_mini_header(f"2/{_total_pages}")
+
+    def _cat_label_dc(r_start, r_end, label):
+        """Dark-blue category label merged vertically in col A+B (2 columns)."""
+        ws.merge_cells(f"A{r_start}:B{r_end}")
+        c = ws.cell(row=r_start, column=1, value=label)
+        c.font      = Font(bold=True, size=13, color=WHITE,
+                           name="Times New Roman")
+        c.alignment = Alignment(horizontal="center", vertical="center",
+                                wrap_text=True, text_rotation=0)
+        c.fill   = _fill(BLUE_HDR)
+        _brd_merge(r_start, 1, 2, brd_all, r_end=r_end)
+
+    _terminal_tbl_start = row
+
+    # Table header row: A:B blank dark blue, C:D blank dark blue, E=Trước/Before, F=Sau/After
+    _sc(row, 1, "", size=13, border=brd_all, fill_color=BLUE_HDR)
+    _sc(row, 2, "", size=13, border=brd_all, fill_color=BLUE_HDR)
+    ws.merge_cells(f"C{row}:D{row}")
+    _tc = ws.cell(row=row, column=3, value="Terminal / Đầu cực đấu (DC)")
+    _tc.font      = Font(bold=True, size=13, color=WHITE, name="Times New Roman")
+    _tc.alignment = Alignment(horizontal="center", vertical="center")
+    _tc.fill      = _fill(BLUE_HDR)
+    _brd_merge(row, 3, 4, brd_all)
+    _sc(row, 5, "Trước/Before", bold=True, size=12, color=WHITE,
+        border=brd_all, fill_color=BLUE_HDR)
+    _sc(row, 6, "Sau/After", bold=True, size=12, color=WHITE,
+        border=brd_all, fill_color=BLUE_HDR)
+    ws.row_dimensions[row].height = 26
+    row += 1
+
+    # Resistance rows (Before in col E, After in col F)
+    _res_dc_rows = [
+        ("R(F1-F2)", "dc_R_F1F2_b", "dc_R_F1F2_a"),
+        ("R(A1-A2)", "dc_R_A1A2_b", "dc_R_A1A2_a"),
+        ("R(PTC)",   "dc_R_PTC_b",  "dc_R_PTC_a"),
+        ("R(PT100)", "dc_R_PT100_b","dc_R_PT100_a"),
+        ("R(HEATER)","dc_R_HEATER_b","dc_R_HEATER_a"),
+    ]
+    _res_start = row
+    _res_end   = row + len(_res_dc_rows) - 1
+    _cat_label_dc(_res_start, _res_end, "Resistance (mΩ) / Điện trở")
+    for _lbl, _bkey, _akey in _res_dc_rows:
+        _bval = str(anh_do_luong.get(f"{_bkey}_val", "") or "")
+        _aval = str(anh_do_luong.get(f"{_akey}_val", "") or "")
+        ws.merge_cells(f"C{row}:D{row}")
+        _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
+        _brd_merge(row, 3, 4, brd_all)
+        _sc(row, 5, _bval, size=13, border=brd_all, h_align="center")
+        _sc(row, 6, _aval, size=13, border=brd_all, h_align="center")
+        ws.row_dimensions[row].height = 28
+        row += 1
+
+    # Insulation Resistance rows
+    _ir_dc_rows = [
+        ("IR(F1-F2)", "dc_IR_F1F2_b", "dc_IR_F1F2_a"),
+        ("IR(A1-A2)", "dc_IR_A1A2_b", "dc_IR_A1A2_a"),
+        ("IR(ROTOR)", "dc_IR_ROTOR_b","dc_IR_ROTOR_a"),
+        ("IR(PTC)",   "dc_IR_PTC_b",  "dc_IR_PTC_a"),
+        ("IR(PT100)", "dc_IR_PT100_b","dc_IR_PT100_a"),
+        ("IR(HT)",    "dc_IR_HT_b",   "dc_IR_HT_a"),
+    ]
+    _ir_start = row
+    _ir_end   = row + len(_ir_dc_rows) - 1
+    _cat_label_dc(_ir_start, _ir_end, "Insulation Resistance (MΩ) / Cách điện")
+    for _lbl, _bkey, _akey in _ir_dc_rows:
+        _bval = str(anh_do_luong.get(f"{_bkey}_val", "") or "")
+        _aval = str(anh_do_luong.get(f"{_akey}_val", "") or "")
+        ws.merge_cells(f"C{row}:D{row}")
+        _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
+        _brd_merge(row, 3, 4, brd_all)
+        _sc(row, 5, _bval, size=13, border=brd_all, h_align="center")
+        _sc(row, 6, _aval, size=13, border=brd_all, h_align="center")
+        ws.row_dimensions[row].height = 28
+        row += 1
+
+    # No-load test (After values only in col F, col E blank)
+    _nl_dc_rows = [
+        ("Voltage (V) Kích từ",  "dc_nlV_kt"),
+        ("Current (A) Kích từ",  "dc_nlI_kt"),
+        ("Voltage (V) Phản ứng", "dc_nlV_pu"),
+        ("Current (A) Phản ứng", "dc_nlI_pu"),
+    ]
+    _nl_start = row
+    _nl_end   = row + len(_nl_dc_rows) - 1
+    _cat_label_dc(_nl_start, _nl_end, "No-load test / Kiểm tra không tải")
+    for _lbl, _vkey in _nl_dc_rows:
+        _aval = str(anh_do_luong.get(f"{_vkey}_val", "") or "")
+        ws.merge_cells(f"C{row}:D{row}")
+        _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
+        _brd_merge(row, 3, 4, brd_all)
+        _sc(row, 5, "", size=13, border=brd_all, h_align="center")  # Before: blank
+        _sc(row, 6, _aval, size=13, border=brd_all, h_align="center")
+        ws.row_dimensions[row].height = 28
+        row += 1
+
+    # Vibration row — 6-column label row then values row
+    _dc_vib_labels = [
+        "Radial ↔ DE/AS", "Radial ↕ DE/AS", "Axial (X) DE/AS",
+        "Radial ↔ NDE/AS", "Radial ↕ NDE/AS", "Axial (X) NDE/AS",
+    ]
+    for _c_idx, _lbl in enumerate(_dc_vib_labels, start=1):
+        _sc(row, _c_idx, _lbl, bold=True, size=13, color=WHITE,
+            border=brd_all, fill_color=BLUE_HDR, h_align="center")
+    ws.row_dimensions[row].height = 28
+    row += 1
+    _dc_vib_keys = ["dc_vib_h_de", "dc_vib_v_de", "dc_vib_ax_de",
+                    "dc_vib_h_nde", "dc_vib_v_nde", "dc_vib_ax_nde"]
+    for _c_idx, _vk in enumerate(_dc_vib_keys, start=1):
+        _vib_val = anh_do_luong.get(f"{_vk}_val", "")
+        _sc(row, _c_idx, _vib_val, size=13, border=brd_all, h_align="center")
+    ws.row_dimensions[row].height = 30
+    row += 1
+    _apply_outer_thick(_terminal_tbl_start, row - 1)
+
+    # blank filler rows to fill page 2
+    for _fi in range(8):
+        ws.row_dimensions[row].height = 40
+        row += 1
+    ws.row_breaks.append(Break(id=row - 1))   # page break: page 2 → 3
+
+    # ═══════════════════════════════════════════════════════════
+    # TRANG 3-11 — ẢNH (dùng _active_pages đã lọc)
+    # ═══════════════════════════════════════════════════════════
+    for _pi, (_, img_h_mm, tables) in enumerate(_active_pages):
+        page_str = f"{_pi + 3}/{_total_pages}"
+        _nt_mini_header(page_str)
+
+        _no_brd    = Border()
+        _white_fill = PatternFill("solid", fgColor="FFFFFF")
+
+        for ten_en, ten_vi, display_labels, storage_keys in tables:
+            _tbl_start = row
+            n      = len(display_labels)
+            ranges = _col_ranges(n)
+            _h_scale = 1.4 if n == 2 else 1.0
+            img_row_h_pt = img_h_mm * 2.835 * _h_scale
+
+            _has_any_img = any(_img_cache.get(k) is not None for k in storage_keys)
+
+            def _blank_row(r, c_from, c_to):
+                for _mr in list(ws.merged_cells.ranges):
+                    if _mr.min_row <= r <= _mr.max_row and _mr.min_col >= c_from and _mr.max_col <= c_to:
+                        ws.unmerge_cells(str(_mr))
+                for _c in range(c_from, c_to + 1):
+                    _cell = ws.cell(row=r, column=_c)
+                    _cell.border = _no_brd
+                    _cell.fill   = _white_fill
+                    try:
+                        _cell.value = None
+                    except AttributeError:
+                        pass
+
+            _title_row = None
+            if ten_en:
+                _title_row = row
+                ws.merge_cells(f"A{row}:F{row}")
+                title_txt = f"{ten_en} / {ten_vi}" if ten_vi else ten_en
+                tc = ws.cell(row=row, column=1, value=title_txt)
+                tc.font      = Font(bold=True, size=16, color="000000",
+                                    name="Times New Roman")
+                tc.alignment = Alignment(horizontal="center", vertical="center")
+                tc.fill      = PatternFill("solid", fgColor=BLUE_CELL)
+                tc.border    = brd_thick
+                _brd_merge(row, 1, 6, brd_thick)
+                ws.row_dimensions[row].height = 26
+                row += 1
+
+            _label_row = row
+            for lbl, (c1, c2) in zip(display_labels, ranges):
+                if c1 != c2:
+                    ws.merge_cells(
+                        f"{get_column_letter(c1)}{row}:"
+                        f"{get_column_letter(c2)}{row}")
+                lc = ws.cell(row=row, column=c1, value=lbl)
+                lc.font      = Font(bold=True, size=14, name="Times New Roman")
+                lc.alignment = Alignment(horizontal="center", vertical="center",
+                                         wrap_text=True)
+                lc.fill      = PatternFill("solid", fgColor=BLUE_LABEL)
+                lc.border    = brd_thick
+                _brd_merge(row, c1, c2, brd_thick)
+            ws.row_dimensions[row].height = 20
+            row += 1
+
+            _img_row = row
+            ws.row_dimensions[row].height = img_row_h_pt
+            for key, (c1, c2) in zip(storage_keys, ranges):
+                if c1 != c2:
+                    ws.merge_cells(
+                        f"{get_column_letter(c1)}{row}:"
+                        f"{get_column_letter(c2)}{row}")
+
+                img_bio = _img_cache.get(key)
+                if img_bio is not None:
+                    ws.cell(row=row, column=c1).border = brd_thick
+                    _brd_merge(row, c1, c2, brd_thick)
+                else:
+                    for _c in range(c1, c2 + 1):
+                        _cell = ws.cell(row=row, column=_c)
+                        _cell.border = _no_brd
+                        _cell.fill   = _white_fill
+
+                if img_bio is not None:
+                    try:
+                        img_bio.seek(0)
+                        xl_img = XLImage(io.BytesIO(img_bio.read()))
+                        PAD = 9144
+                        _anchor = TwoCellAnchor(editAs="twoCell")
+                        _anchor._from = AnchorMarker(
+                            col=c1 - 1, colOff=PAD,
+                            row=row - 1, rowOff=PAD)
+                        _anchor.to = AnchorMarker(
+                            col=c2, colOff=-PAD,
+                            row=row, rowOff=-PAD)
+                        xl_img.anchor = _anchor
+                        ws.add_image(xl_img)
+                    except Exception:
+                        pass
+
+            if not _has_any_img:
+                if _title_row:
+                    _blank_row(_title_row, 1, 6)
+                    ws.row_dimensions[_title_row].height = 0
+                _blank_row(_label_row, 1, 6)
+                ws.row_dimensions[_label_row].height = 0
+                ws.row_dimensions[_img_row].height = 0
+            else:
+                _apply_outer_thick(_tbl_start, row)
+            row += 1
+            ws.row_dimensions[row].height = 5
+            row += 1
+
+        ws.row_breaks.append(Break(id=row - 1))
+
+    # ── Page setup ───────────────────────────────────────────────
+    from openpyxl.worksheet.page import PageMargins
+    ws.page_setup.paperSize        = 9
+    ws.page_setup.orientation      = "portrait"
+    ws.page_setup.fitToPage        = True
+    ws.page_setup.fitToWidth       = 1
+    ws.page_setup.fitToHeight      = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_margins = PageMargins(
+        left=0.39, right=0.39,
+        top=0.59,  bottom=0.59,
+        header=0.2, footer=0.2,
+    )
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.read()
+
+
 # ============================================================
 # FRAGMENT: BADGE + SELECTBOX TRẠNG THÁI (dùng trong dialog, rerun riêng)
 # ============================================================
@@ -4043,7 +4838,11 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
         # ── Ảnh đo lường thuộc công đoạn này ────────────────
         import unicodedata as _ucd
         _cv_name_upper = _ucd.normalize("NFC", _tcv.strip()).upper()
-        _cv_do_slots   = _STAGE_DO_LUONG.get(_cv_name_upper)
+        _loai_may_task = hang.get("Loại Máy", "")
+        if _la_dong_co_dc(_loai_may_task):
+            _cv_do_slots = _DC_STAGE_DO_LUONG.get(_cv_name_upper)
+        else:
+            _cv_do_slots = _STAGE_DO_LUONG.get(_cv_name_upper)
         if _cv_do_slots:
             _do_open_key = f"cv_do_open_{task_id}_{_cvi}"
             if _do_open_key not in st.session_state:
@@ -4112,8 +4911,10 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
     st.divider()
 
     # ── Ảnh đo lường — fallback nếu không có công đoạn tiêu chuẩn ───────────
+    _loai_may_fallback = hang.get("Loại Máy", "")
+    _stage_map_fallback = _DC_STAGE_DO_LUONG if _la_dong_co_dc(_loai_may_fallback) else _STAGE_DO_LUONG
     _has_stage_cvc = any(
-        cv.get("ten", "").strip().upper() in _STAGE_DO_LUONG
+        cv.get("ten", "").strip().upper() in _stage_map_fallback
         for cv in ds_cv_con if isinstance(cv, dict)
     )
     if not _has_stage_cvc:
@@ -4129,11 +4930,17 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                 df_moi = lay_danh_sach_cong_viec()
                 rows = df_moi[df_moi["ID"].astype(str) == str(task_id)]
                 if not rows.empty:
-                    du_lieu_excel = tao_excel_nghiem_thu(rows.iloc[0].to_dict())
+                    _row_data = rows.iloc[0].to_dict()
+                    if _la_dong_co_dc(_row_data.get("Loại Máy", "")):
+                        du_lieu_excel = tao_excel_nghiem_thu_dc(_row_data)
+                        _fname = f"BBNT_DC_task_{task_id}.xlsx"
+                    else:
+                        du_lieu_excel = tao_excel_nghiem_thu(_row_data)
+                        _fname = f"BBNT_task_{task_id}.xlsx"
                     st.download_button(
                         "💾 Tải Xuống Excel",
                         data=du_lieu_excel,
-                        file_name=f"BBNT_task_{task_id}.xlsx",
+                        file_name=_fname,
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"dl_xl_{task_id}",
                         use_container_width=True,
@@ -5062,12 +5869,26 @@ _DO_LUONG_NUMERIC_KEYS = {
     "cur_L1", "cur_L2", "cur_L3",
     "vib_rad_h_de", "vib_rad_v_de", "vib_axial_de",
     "vib_rad_h_nde", "vib_rad_v_nde", "vib_axial_nde",
+    # DC motor numeric keys
+    "dc_R_F1F2_b", "dc_R_A1A2_b", "dc_R_PTC_b", "dc_R_PT100_b", "dc_R_HEATER_b",
+    "dc_R_F1F2_a", "dc_R_A1A2_a", "dc_R_PTC_a", "dc_R_PT100_a", "dc_R_HEATER_a",
+    "dc_IR_F1F2_b", "dc_IR_A1A2_b", "dc_IR_ROTOR_b", "dc_IR_PTC_b", "dc_IR_PT100_b", "dc_IR_HT_b",
+    "dc_IR_F1F2_a", "dc_IR_A1A2_a", "dc_IR_ROTOR_a", "dc_IR_PTC_a", "dc_IR_PT100_a", "dc_IR_HT_a",
+    "dc_nlV_kt", "dc_nlI_kt", "dc_nlV_pu", "dc_nlI_pu",
+    "dc_vib_h_de", "dc_vib_v_de", "dc_vib_ax_de", "dc_vib_h_nde", "dc_vib_v_nde", "dc_vib_ax_nde",
 }
 # Keys không cần upload ảnh (chỉ nhập số)
 _DO_LUONG_NO_IMG_KEYS = {
     "cur_L1", "cur_L2", "cur_L3",
     "vib_rad_h_de", "vib_rad_v_de", "vib_axial_de",
     "vib_rad_h_nde", "vib_rad_v_nde", "vib_axial_nde",
+    # DC motor no-image keys (text input only)
+    "dc_R_F1F2_b", "dc_R_A1A2_b", "dc_R_PTC_b", "dc_R_PT100_b", "dc_R_HEATER_b",
+    "dc_R_F1F2_a", "dc_R_A1A2_a", "dc_R_PTC_a", "dc_R_PT100_a", "dc_R_HEATER_a",
+    "dc_IR_F1F2_b", "dc_IR_A1A2_b", "dc_IR_ROTOR_b", "dc_IR_PTC_b", "dc_IR_PT100_b", "dc_IR_HT_b",
+    "dc_IR_F1F2_a", "dc_IR_A1A2_a", "dc_IR_ROTOR_a", "dc_IR_PTC_a", "dc_IR_PT100_a", "dc_IR_HT_a",
+    "dc_nlV_kt", "dc_nlI_kt", "dc_nlV_pu", "dc_nlI_pu",
+    "dc_vib_h_de", "dc_vib_v_de", "dc_vib_ax_de", "dc_vib_h_nde", "dc_vib_v_nde", "dc_vib_ax_nde",
 }
 # V1V2, W1W2 không được lệch quá 2% so với U1U2
 _DO_LUONG_REF_MAP = {"R_V1V2": "R_U1U2", "R_W1W2": "R_U1U2"}
@@ -5162,6 +5983,165 @@ _STAGE_DO_LUONG = {
         ("⚙️ Shaft at NDE / Trục Đầu Không Tải",[("After / Sau", "shaft_nde_after")]),
         ("🔵 DE Bearing / Vòng Bi Đầu Tải",     [("After / Sau", "de_brg_after")]),
         ("🔵 NDE Bearing / Vòng Bi Đầu Không Tải",[("After / Sau", "nde_brg_after")]),
+    ],
+}
+
+# Mapping cho Động cơ DC: TÊN CÔNG ĐOẠn (uppercase) → nhóm ảnh/đo lường
+_DC_STAGE_DO_LUONG = {
+    "NHẬN MÁY": [
+        ("🔧 Engine Overview / Tổng Quan Động Cơ", [
+            ("Before / Trước", "dc_eng_before"),
+            ("After / Sau",    "dc_eng_after"),
+        ]),
+    ],
+    "THÁO MÁY": [
+        ("🔌 Terminal Box / Hộp Điện",        [("Before / Trước", "dc_tb_before")]),
+        ("📐 Resistance (mΩ) [Trước]", [
+            ("R (F1-F2)", "dc_R_F1F2_b"),
+            ("R (A1-A2)", "dc_R_A1A2_b"),
+            ("R (PTC)",   "dc_R_PTC_b"),
+            ("R (PT100)", "dc_R_PT100_b"),
+            ("R (HEATER)","dc_R_HEATER_b"),
+        ]),
+        ("🔒 Insulation Resistance (MΩ) [Trước]", [
+            ("IR (F1-F2)", "dc_IR_F1F2_b"),
+            ("IR (A1-A2)", "dc_IR_A1A2_b"),
+            ("IR (ROTOR)", "dc_IR_ROTOR_b"),
+            ("IR (PTC)",   "dc_IR_PTC_b"),
+            ("IR (PT100)", "dc_IR_PT100_b"),
+            ("IR (HT)",    "dc_IR_HT_b"),
+        ]),
+    ],
+    "STATOR": [
+        ("🌀 Coil Stator - Vệ sinh cuộn dây",   [("Vệ sinh", "dc_stator_ve_sinh")]),
+        ("🎨 Coil Stator - Sơn cuộn dây",         [("Sơn",    "dc_stator_son")]),
+        ("⚡ Main Field Winding / Cuộn dây kích từ chính", [
+            ("Before / Trước", "dc_mfw_before"),
+            ("After / Sau",    "dc_mfw_after"),
+        ]),
+        ("⚡ Interpole Winding / Cuộn dây kích từ phụ", [
+            ("Before / Trước", "dc_iw_before"),
+            ("After / Sau",    "dc_iw_after"),
+        ]),
+        ("⚡ Compensating Winding / Cuộn dây bù", [
+            ("Before / Trước", "dc_cw_before"),
+            ("After / Sau",    "dc_cw_after"),
+        ]),
+    ],
+    "ROTOR": [
+        ("🌀 Coil Rotor - Vệ sinh [Bảo dưỡng]",  [("Vệ sinh", "dc_rotor_ve_sinh")]),
+        ("🎨 Coil Rotor - Sơn [Bảo dưỡng]",        [("Sơn",    "dc_rotor_son")]),
+        ("🔧 Skimming & Polishing / Vớt Láng Cổ Góp", [
+            ("Before / Trước", "dc_skim_before"),
+            ("After / Sau",    "dc_skim_after"),
+        ]),
+        ("⚖️ Rotor Balancing / Cân bằng động [Bảo dưỡng]", [
+            ("Before / Trước", "dc_bal_bd_before"),
+            ("After / Sau",    "dc_bal_bd_after"),
+        ]),
+        ("📊 Voltage Drop / Đo Điện Áp Rơi [Bảo dưỡng]", [
+            ("Before / Trước", "dc_vdrop_bd_before"),
+            ("After / Sau",    "dc_vdrop_bd_after"),
+        ]),
+        ("🌀 Coil Rotor / Cuộn dây Rotor [Sửa chữa]", [
+            ("Before / Trước", "dc_sc_rotor_before"),
+            ("After / Sau",    "dc_sc_rotor_after"),
+        ]),
+        ("🔧 Commutator Resurfacing / Làm mới phần cổ góp", [
+            ("Before / Trước", "dc_comm_before"),
+            ("After / Sau",    "dc_comm_after"),
+        ]),
+        ("⚖️ Rotor Balancing / Cân bằng động [Sửa chữa]", [
+            ("Before / Trước", "dc_bal_sc_before"),
+            ("After / Sau",    "dc_bal_sc_after"),
+        ]),
+        ("📊 Voltage Drop / Đo Điện Áp Rơi [Sửa chữa]", [
+            ("Before / Trước", "dc_vdrop_sc_before"),
+            ("After / Sau",    "dc_vdrop_sc_after"),
+        ]),
+    ],
+    "CƠ KHÍ": [
+        ("🔩 End Cover DE / Nắp Đầu Tải", [
+            ("Before / Trước", "dc_ec_de_before"),
+            ("After / Sau",    "dc_ec_de_after"),
+        ]),
+        ("🔩 End Cover NDE / Nắp Đầu Không Tải", [
+            ("Before / Trước", "dc_ec_nde_before"),
+            ("After / Sau",    "dc_ec_nde_after"),
+        ]),
+        ("⚙️ Shaft at DE / Trục Đầu Tải", [
+            ("Before / Trước", "dc_shaft_de_before"),
+            ("After / Sau",    "dc_shaft_de_after"),
+        ]),
+        ("⚙️ Shaft at NDE / Trục Đầu Không Tải", [
+            ("Before / Trước", "dc_shaft_nde_before"),
+            ("After / Sau",    "dc_shaft_nde_after"),
+        ]),
+        ("🔵 DE Bearing / Vòng Bi Đầu Tải", [
+            ("Before / Trước", "dc_de_brg_before"),
+            ("After / Sau",    "dc_de_brg_after"),
+        ]),
+        ("🔵 NDE Bearing / Vòng Bi Đầu Không Tải", [
+            ("Before / Trước", "dc_nde_brg_before"),
+            ("After / Sau",    "dc_nde_brg_after"),
+        ]),
+        ("🖌️ Replacement of carbon brushes / Thay chổi than", [
+            ("Before / Trước", "dc_carbon_before"),
+            ("After / Sau",    "dc_carbon_after"),
+        ]),
+        ("🖌️ Carbon brush holder / Gá đỡ chổi than", [
+            ("Before / Trước", "dc_cbh_before"),
+            ("After / Sau",    "dc_cbh_after"),
+        ]),
+        ("💨 Sandblasting / Bắn cát gông than", [
+            ("Before / Trước", "dc_sandblast_before"),
+            ("After / Sau",    "dc_sandblast_after"),
+        ]),
+    ],
+    "LẮP MÁY": [
+        ("📐 Resistance (mΩ) [Sau]", [
+            ("R (F1-F2) [img]", "dc_R_F1F2_img"),
+            ("R (A1-A2) [img]", "dc_R_A1A2_img"),
+        ]),
+        ("🔒 Insulation Resistance (MΩ) [Sau]", [
+            ("IR (F1-F2) [img]", "dc_IR_F1F2_img"),
+            ("IR (A1-A2) [img]", "dc_IR_A1A2_img"),
+            ("IR (ROTOR) [img]", "dc_IR_ROTOR_img"),
+        ]),
+        ("📐 Resistance (mΩ) [Giá trị-Sau]", [
+            ("R (F1-F2)", "dc_R_F1F2_a"),
+            ("R (A1-A2)", "dc_R_A1A2_a"),
+            ("R (PTC)",   "dc_R_PTC_a"),
+            ("R (PT100)", "dc_R_PT100_a"),
+            ("R (HEATER)","dc_R_HEATER_a"),
+        ]),
+        ("🔒 Insulation Resistance (MΩ) [Giá trị-Sau]", [
+            ("IR (F1-F2)", "dc_IR_F1F2_a"),
+            ("IR (A1-A2)", "dc_IR_A1A2_a"),
+            ("IR (ROTOR)", "dc_IR_ROTOR_a"),
+            ("IR (PTC)",   "dc_IR_PTC_a"),
+            ("IR (PT100)", "dc_IR_PT100_a"),
+            ("IR (HT)",    "dc_IR_HT_a"),
+        ]),
+        ("⚡ No-load Test / Kiểm tra không tải", [
+            ("Voltage (V) Kích từ",  "dc_nlV_kt"),
+            ("Current (A) Kích từ",  "dc_nlI_kt"),
+            ("Voltage (V) Phản ứng", "dc_nlV_pu"),
+            ("Current (A) Phản ứng", "dc_nlI_pu"),
+        ]),
+        ("📳 Vibration / Rung Động", [
+            ("Radial ↔ DE/AS",  "dc_vib_h_de"),
+            ("Radial ↑ DE/AS",  "dc_vib_v_de"),
+            ("Axial (X) DE/AS", "dc_vib_ax_de"),
+            ("Radial ↔ NDE/AS", "dc_vib_h_nde"),
+            ("Radial ↑ NDE/AS", "dc_vib_v_nde"),
+            ("Axial (X) NDE/AS","dc_vib_ax_nde"),
+        ], True),
+        ("🔌 Terminal Box / Hộp Điện [Sau]",  [("After / Sau", "dc_tb_after")]),
+        ("🎨 Sơn mới motor", [
+            ("Before / Trước", "dc_paint_before"),
+            ("After / Sau",    "dc_paint_after"),
+        ]),
     ],
 }
 
