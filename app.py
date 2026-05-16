@@ -5563,7 +5563,7 @@ def _render_kanban_board(df, ds_tt, board_key="kb", force_open=False):
     import re as _re
     _EXCLUDE   = {"Đã Xuất Hóa Đơn", "Bảo Hành - Trả Lại"}
     _COMPLETED = {"Đã Hoàn Thành - Giao Máy", "Hoàn Thành"}
-    ds_show = [t for t in ds_tt if t not in _EXCLUDE]
+    ds_show = list(dict.fromkeys(t for t in ds_tt if t not in _EXCLUDE))
     today = datetime.now().date()
     COLS  = 4  # card per row
 
