@@ -3959,22 +3959,23 @@ def tao_excel_nghiem_thu_dc(thong_tin_task: dict) -> bytes:
         ws.row_dimensions[row].height = 28
         row += 1
 
-    # No-load test (After values only in col F, col E blank)
+    # No-load test — Before (col E) from THÁO MÁY keys, After (col F) from LẮP MÁY keys
     _nl_dc_rows = [
-        ("Voltage (V) Kích từ",  "dc_nlV_kt"),
-        ("Current (A) Kích từ",  "dc_nlI_kt"),
-        ("Voltage (V) Phản ứng", "dc_nlV_pu"),
-        ("Current (A) Phản ứng", "dc_nlI_pu"),
+        ("Voltage (V) Kích từ",  "dc_nlV_kt_b", "dc_nlV_kt"),
+        ("Current (A) Kích từ",  "dc_nlI_kt_b", "dc_nlI_kt"),
+        ("Voltage (V) Phần ứng", "dc_nlV_pu_b", "dc_nlV_pu"),
+        ("Current (A) Phần ứng", "dc_nlI_pu_b", "dc_nlI_pu"),
     ]
     _nl_start = row
     _nl_end   = row + len(_nl_dc_rows) - 1
     _cat_label_dc(_nl_start, _nl_end, "No-load test / Kiểm tra không tải")
-    for _lbl, _vkey in _nl_dc_rows:
-        _aval = str(anh_do_luong.get(f"{_vkey}_val", "") or "")
+    for _lbl, _bkey, _akey in _nl_dc_rows:
+        _bval = str(anh_do_luong.get(f"{_bkey}_val", "") or "")
+        _aval = str(anh_do_luong.get(f"{_akey}_val", "") or "")
         ws.merge_cells(f"C{row}:D{row}")
         _sc(row, 3, _lbl, bold=True, size=13, border=brd_all, h_align="left", fill_color=LIGHT_BLUE)
         _brd_merge(row, 3, 4, brd_all)
-        _sc(row, 5, "", size=13, border=brd_all, h_align="center")  # Before: blank
+        _sc(row, 5, _bval, size=13, border=brd_all, h_align="center")
         _sc(row, 6, _aval, size=13, border=brd_all, h_align="center")
         ws.row_dimensions[row].height = 28
         row += 1
@@ -4775,11 +4776,7 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
         # ── Hình / Video cho công việc con ────────────────────
         _cv_media = cv.get("anh", [])
         _exp_lbl = f"📎 Hình/Video ({len(_cv_media)})" if _cv_media else "📎 Thêm hình/video"
-        _exp_open_key = f"exp_cv_m_open_{task_id}_{_cvi}"
-        if _exp_open_key not in st.session_state:
-            st.session_state[_exp_open_key] = False
-        with st.expander(_exp_lbl, expanded=st.session_state[_exp_open_key]):
-            st.session_state[_exp_open_key] = True  # giữ mở khi đang trong expander
+        with st.expander(_exp_lbl, expanded=False):
             if _cv_media:
                 _cols_m = st.columns(min(len(_cv_media), 3))
                 for _mi, _url_m in enumerate(_cv_media):
@@ -5862,6 +5859,14 @@ _DO_LUONG_VALUE_KEYS = {
     "cur_L1", "cur_L2", "cur_L3",
     "vib_rad_h_de", "vib_rad_v_de", "vib_axial_de",
     "vib_rad_h_nde", "vib_rad_v_nde", "vib_axial_nde",
+    # DC motor value keys
+    "dc_R_F1F2_b", "dc_R_A1A2_b", "dc_R_PTC_b", "dc_R_PT100_b", "dc_R_HEATER_b",
+    "dc_R_F1F2_a", "dc_R_A1A2_a", "dc_R_PTC_a", "dc_R_PT100_a", "dc_R_HEATER_a",
+    "dc_IR_F1F2_b", "dc_IR_A1A2_b", "dc_IR_ROTOR_b", "dc_IR_PTC_b", "dc_IR_PT100_b", "dc_IR_HT_b",
+    "dc_IR_F1F2_a", "dc_IR_A1A2_a", "dc_IR_ROTOR_a", "dc_IR_PTC_a", "dc_IR_PT100_a", "dc_IR_HT_a",
+    "dc_nlV_kt_b", "dc_nlI_kt_b", "dc_nlV_pu_b", "dc_nlI_pu_b",
+    "dc_nlV_kt", "dc_nlI_kt", "dc_nlV_pu", "dc_nlI_pu",
+    "dc_vib_h_de", "dc_vib_v_de", "dc_vib_ax_de", "dc_vib_h_nde", "dc_vib_v_nde", "dc_vib_ax_nde",
 }
 # Keys chỉ chấp nhận số
 _DO_LUONG_NUMERIC_KEYS = {
@@ -5874,6 +5879,7 @@ _DO_LUONG_NUMERIC_KEYS = {
     "dc_R_F1F2_a", "dc_R_A1A2_a", "dc_R_PTC_a", "dc_R_PT100_a", "dc_R_HEATER_a",
     "dc_IR_F1F2_b", "dc_IR_A1A2_b", "dc_IR_ROTOR_b", "dc_IR_PTC_b", "dc_IR_PT100_b", "dc_IR_HT_b",
     "dc_IR_F1F2_a", "dc_IR_A1A2_a", "dc_IR_ROTOR_a", "dc_IR_PTC_a", "dc_IR_PT100_a", "dc_IR_HT_a",
+    "dc_nlV_kt_b", "dc_nlI_kt_b", "dc_nlV_pu_b", "dc_nlI_pu_b",
     "dc_nlV_kt", "dc_nlI_kt", "dc_nlV_pu", "dc_nlI_pu",
     "dc_vib_h_de", "dc_vib_v_de", "dc_vib_ax_de", "dc_vib_h_nde", "dc_vib_v_nde", "dc_vib_ax_nde",
 }
@@ -5887,6 +5893,7 @@ _DO_LUONG_NO_IMG_KEYS = {
     "dc_R_F1F2_a", "dc_R_A1A2_a", "dc_R_PTC_a", "dc_R_PT100_a", "dc_R_HEATER_a",
     "dc_IR_F1F2_b", "dc_IR_A1A2_b", "dc_IR_ROTOR_b", "dc_IR_PTC_b", "dc_IR_PT100_b", "dc_IR_HT_b",
     "dc_IR_F1F2_a", "dc_IR_A1A2_a", "dc_IR_ROTOR_a", "dc_IR_PTC_a", "dc_IR_PT100_a", "dc_IR_HT_a",
+    "dc_nlV_kt_b", "dc_nlI_kt_b", "dc_nlV_pu_b", "dc_nlI_pu_b",
     "dc_nlV_kt", "dc_nlI_kt", "dc_nlV_pu", "dc_nlI_pu",
     "dc_vib_h_de", "dc_vib_v_de", "dc_vib_ax_de", "dc_vib_h_nde", "dc_vib_v_nde", "dc_vib_ax_nde",
 }
@@ -6010,6 +6017,12 @@ _DC_STAGE_DO_LUONG = {
             ("IR (PTC)",   "dc_IR_PTC_b"),
             ("IR (PT100)", "dc_IR_PT100_b"),
             ("IR (HT)",    "dc_IR_HT_b"),
+        ]),
+        ("⚡ No-load Test / Kiểm tra không tải [Trước]", [
+            ("Voltage (V) Kích từ",  "dc_nlV_kt_b"),
+            ("Current (A) Kích từ",  "dc_nlI_kt_b"),
+            ("Voltage (V) Phần ứng", "dc_nlV_pu_b"),
+            ("Current (A) Phần ứng", "dc_nlI_pu_b"),
         ]),
     ],
     "STATOR": [
