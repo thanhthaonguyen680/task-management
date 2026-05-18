@@ -2630,9 +2630,10 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
     so_po_kh     = str(thong_tin_task.get("Số PO KH/HĐ", ""))
     so_bao_gia   = str(thong_tin_task.get("Số Báo Giá", ""))
     mo_ta        = str(thong_tin_task.get("Mô Tả", ""))
-    nhan_vien    = str(thong_tin_task.get("Nhân Viên", ""))
-    ngay_tao_str = str(thong_tin_task.get("Ngày Tạo", ""))
-    anh_do_luong = doc_anh_do_luong(
+    nhan_vien      = str(thong_tin_task.get("Nhân Viên", ""))
+    ngay_tao_str   = str(thong_tin_task.get("Ngày Tạo", ""))
+    ngay_ket_thuc  = str(thong_tin_task.get("Ngày Kết Thúc", "") or "")[:10]
+    anh_do_luong   = doc_anh_do_luong(
         str(thong_tin_task.get("Ảnh Đo Lường", "") or ""))
 
     # Lookup địa chỉ khách hàng từ danh sách công ty
@@ -2911,13 +2912,13 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         ws.row_dimensions[_r].height = 40
     row = _sig_end + 1
 
-    # Full name row — bỏ tên nhân viên, để trống để điền tay
+    # Full name row
     ws.merge_cells(f"A{row}:C{row}")
     _sc(row, 1, "Full name / Họ và tên :",
         size=13, border=brd_all, h_align="left")
     _brd_merge(row, 1, 3, brd_all)
     ws.merge_cells(f"D{row}:F{row}")
-    _sc(row, 4, "Full name / Họ và tên :",
+    _sc(row, 4, "Full name / Họ và tên :  Trần Tuấn Anh",
         size=13, border=brd_all, h_align="left")
     _brd_merge(row, 4, 6, brd_all)
     ws.row_dimensions[row].height = 28
@@ -2929,7 +2930,7 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
         size=13, border=brd_all, h_align="left")
     _brd_merge(row, 1, 3, brd_all)
     ws.merge_cells(f"D{row}:F{row}")
-    _sc(row, 4, "Date / Ngày :",
+    _sc(row, 4, f"Date / Ngày :  {ngay_ket_thuc}",
         size=13, border=brd_all, h_align="left")
     _brd_merge(row, 4, 6, brd_all)
     ws.row_dimensions[row].height = 28
@@ -4359,7 +4360,7 @@ div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div > div >
 
 # 12 mục checklist mặc định cho motor repair
 _MAC_DINH_CHECKLIST = [
-    {"text": "Quấn",                      "done": False},
+    {"text": "Quấn lại cuộn dây",          "done": False},
     {"text": "Thay bạc đạn trước",         "done": False},
     {"text": "Thay bạc đạn sau",           "done": False},
     {"text": "Thay phốt",                  "done": False},
