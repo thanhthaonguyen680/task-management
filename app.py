@@ -858,7 +858,7 @@ def _compress_image(content: bytes, mime: str, max_px: int = 1200, quality: int 
         return content
 
 
-def tai_anh_len_drive(file_anh, max_px: int = 1200, quality: int = 82, ma_so: str = "", task_id: str = "") -> str:
+def tai_anh_len_drive(file_anh, max_px: int = 800, quality: int = 72, ma_so: str = "", task_id: str = "") -> str:
     """Upload ảnh lên Google Drive qua requests, set public, trả về thumbnail URL.
     Nếu ma_so được cung cấp, ảnh sẽ được lưu vào subfolder tên mã số trong GDRIVE_FOLDER_ID.
     task_id và ma_so được lưu vào Drive file properties để trace recovery nếu sheet write thất bại.
@@ -4138,21 +4138,26 @@ def _fragment_chi_tiet_task(hang: dict, ds_trang_thai: list, show_status: bool =
                 label_visibility="collapsed",
             )
             def _cb_up_cv_m(_tid=task_id, _ci=_cvi, _upk=_up_key_m, _cvk=_cv_key):
+                import concurrent.futures as _cf
                 _files_m = st.session_state.get(_upk) or []
                 if not _files_m:
                     return
                 _cvl = st.session_state.get(_cvk, [])
                 _ms = _lay_ma_so_tu_task_id(_tid)
-                for _f in _files_m:
+                def _up_one_media(_f):
                     try:
-                        _u = _tai_media_len_drive(_f, ma_so=_ms, task_id=str(_tid))
-                        _cvl[_ci].setdefault("anh", []).append(_u)
+                        return _tai_media_len_drive(_f, ma_so=_ms, task_id=str(_tid))
                     except Exception:
-                        pass
-                _save_cv_to_sheet(_tid, _cvk)  # gọi trực tiếp để đọc session_state đúng context
+                        return None
+                workers = min(len(_files_m), 4)
+                with _cf.ThreadPoolExecutor(max_workers=workers) as ex:
+                    urls = list(ex.map(_up_one_media, _files_m))
+                for _u in urls:
+                    if _u:
+                        _cvl[_ci].setdefault("anh", []).append(_u)
+                _save_cv_to_sheet(_tid, _cvk)
                 _vk = f"up_cv_m_v_{_tid}_{_ci}"
                 st.session_state[_vk] = st.session_state.get(_vk, 0) + 1
-                st.session_state[f"exp_cv_m_open_{_tid}_{_ci}"] = True  # giữ expander mở sau upload
             st.button("📤 Tải ảnh", key=f"btn_up_cv_m_{task_id}_{_cvi}", use_container_width=True,
                       disabled=not bool(st.session_state.get(_up_key_m)),
                       on_click=_cb_up_cv_m)
@@ -4847,16 +4852,24 @@ def _cb_xoa_anh_nt(task_id, anh_key, url_a):
 
 
 def _cb_upload_anh_nt(task_id, anh_key, up_key):
-    """Callback upload ảnh — chạy trước khi re-render, không cần st.rerun()"""
+    """Callback upload ảnh — song song nếu nhiều file."""
+    import concurrent.futures as _cf
     files = st.session_state.get(up_key) or []
     if not files:
         return
-    new_urls = []
     _ms = _lay_ma_so_tu_task_id(task_id)
-    for f in files:
+    def _up_one(f):
+        try:
+            f.seek(0)
+        except Exception:
+            pass
         url = tai_anh_len_cloudinary(f, ma_so=_ms)
         cap_nhat_url_anh(task_id, url)
-        new_urls.append(url)
+        return url
+    workers = min(len(files), 4)
+    with _cf.ThreadPoolExecutor(max_workers=workers) as ex:
+        new_urls = list(ex.map(_up_one, files))
+    new_urls = [u for u in new_urls if u]
     st.session_state[anh_key] = st.session_state.get(anh_key, []) + new_urls
     st.session_state[f"_nt_msg_{task_id}"] = f"✅ Đã upload {len(new_urls)} ảnh!"
 
