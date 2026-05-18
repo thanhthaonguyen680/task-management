@@ -2802,9 +2802,10 @@ def tao_excel_nghiem_thu(thong_tin_task: dict) -> bytes:
 
     # ── Bảng Engine / Customer / Address ────────────────────────
     for en_lbl, vi_lbl, val in [
-        ("Engine",   "Động cơ",    ten_dong_co),
-        ("Customer", "Khách hàng", khach_hang),
-        ("Address",  "Địa chỉ",   _dia_chi_kh),
+        ("Engine",   "Động cơ",        ten_dong_co),
+        ("Contract", "Hợp đồng - PO",  so_po_kh),
+        ("Customer", "Khách hàng",     khach_hang),
+        ("Address",  "Địa chỉ",        _dia_chi_kh),
     ]:
         # A:B merged = label, C:F merged = value
         ws.merge_cells(f"A{row}:B{row}")
