@@ -5516,14 +5516,13 @@ def _task_dialog(hang_dict, ds_tt):
     tt   = hang_dict.get("Trạng Thái", "")
 
     # Nút Đóng ở đầu dialog
-    def _cb_dong_dialog():
+    if st.button("✕ Đóng", key=f"btn_dong_dlg_{tid}", use_container_width=True):
         st.session_state["_dlg_close_requested"] = True
         try:
             del st.query_params["dlg"]
         except Exception:
             pass
-    st.button("✕ Đóng", key=f"btn_dong_dlg_{tid}", use_container_width=True,
-              on_click=_cb_dong_dialog)
+        st.rerun(scope="app")
 
     # Badge + selectbox trạng thái — fragment riêng để cập nhật ngay khi đổi
     _fragment_trang_thai_dialog(hang_dict, ds_tt)
