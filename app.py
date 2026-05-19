@@ -8894,17 +8894,15 @@ def main():
     elif _dlg_qp and _is_fresh_session:
         # Session mới (page reload / Android reconnect sau file picker) → khôi phục dialog
         _reopen_dlg_from_qp(_dlg_qp)
-    elif _dlg_qp and not _is_fresh_session and _dlg_was_active and not _dlg_currently_active:
-        # Cùng session — có thể là file_uploader rerun HOẶC user bấm nút X
+    elif _dlg_qp and not _is_fresh_session:
         if st.session_state.pop("_dlg_close_requested", False):
-            # User bấm nút Đóng bên trong dialog → xóa query param
+            # User bấm nút Đóng → xóa query param (dialog tự đóng vì không được gọi lại)
             try:
                 del st.query_params["dlg"]
             except Exception:
                 pass
-        else:
-            # Full rerun do file picker / file_uploader → giữ dialog mở
-            _reopen_dlg_from_qp(_dlg_qp)
+        # else: cùng session, full rerun do file_uploader/file picker
+        # → Streamlit tự giữ dialog mở, KHÔNG gọi lại để tránh reset file_uploader state
 
 
 # ============================================================
