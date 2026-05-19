@@ -8835,9 +8835,6 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Trạng thái dialog ─────────────────────────────────────────────────
-    # _is_fresh_session = True chỉ khi page thực sự reload (session mới hoàn toàn)
-    # Khác với st.rerun() — rerun trong cùng session vẫn giữ session_marker
-    _is_fresh_session = "session_marker" not in st.session_state
     st.session_state["session_marker"] = True
     _dlg_was_active = st.session_state.get("_dlg_active_flag", False)
     st.session_state["_dlg_active_flag"] = False
@@ -8891,18 +8888,18 @@ def main():
     if _pdlg:
         # Mở dialog từ click button / row selection
         _task_dialog(_pdlg[0], _pdlg[1])
-    elif _dlg_qp and _is_fresh_session:
-        # Session mới (page reload / Android reconnect sau file picker) → khôi phục dialog
-        _reopen_dlg_from_qp(_dlg_qp)
-    elif _dlg_qp and not _is_fresh_session:
+    elif _dlg_qp:
         if st.session_state.pop("_dlg_close_requested", False):
-            # User bấm nút Đóng → xóa query param (dialog tự đóng vì không được gọi lại)
+            # User bấm nút Đóng → xóa query param, không gọi lại dialog
             try:
                 del st.query_params["dlg"]
             except Exception:
                 pass
-        # else: cùng session, full rerun do file_uploader/file picker
-        # → Streamlit tự giữ dialog mở, KHÔNG gọi lại để tránh reset file_uploader state
+        else:
+            # Fresh session (Android reconnect) HOẶC cùng session full rerun:
+            # Phải gọi _task_dialog mỗi lần để giữ dialog mở.
+            # Streamlit bảo toàn widget state (file_uploader) qua cùng key → files không bị mất.
+            _reopen_dlg_from_qp(_dlg_qp)
 
 
 # ============================================================
