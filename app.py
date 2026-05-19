@@ -5514,6 +5514,17 @@ def _task_dialog(hang_dict, ds_tt):
     ten  = hang_dict.get("Tên Công Việc", "")
     cty  = hang_dict.get("Công Ty", "")
     tt   = hang_dict.get("Trạng Thái", "")
+
+    # Nút Đóng ở đầu dialog
+    def _cb_dong_dialog():
+        st.session_state["_dlg_close_requested"] = True
+        try:
+            del st.query_params["dlg"]
+        except Exception:
+            pass
+    st.button("✕ Đóng", key=f"btn_dong_dlg_{tid}", use_container_width=True,
+              on_click=_cb_dong_dialog)
+
     # Badge + selectbox trạng thái — fragment riêng để cập nhật ngay khi đổi
     _fragment_trang_thai_dialog(hang_dict, ds_tt)
     # ── Tên công việc có thể chỉnh sửa ──────────────────────────
@@ -8857,30 +8868,44 @@ def main():
 
     _dlg_currently_active = st.session_state.get("_dlg_active_flag", False)
 
+    def _reopen_dlg_from_qp(qp_id: str):
+        """Khôi phục dialog từ query param — dùng cho cả fresh session lẫn file-picker rerun."""
+        try:
+            _df_r = lay_danh_sach_cong_viec()
+            # So sánh ID theo số nguyên để tránh mismatch "12" vs "12.0"
+            try:
+                _qp_int = int(float(qp_id))
+                _row_r = _df_r[_df_r["ID"].apply(
+                    lambda x: int(float(str(x))) == _qp_int
+                    if str(x).replace(".", "", 1).isdigit() else False
+                )]
+            except Exception:
+                _row_r = _df_r[_df_r["ID"].astype(str) == qp_id]
+            if not _row_r.empty:
+                _task_dialog(_row_r.iloc[0].to_dict(),
+                             lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH)
+                return True
+        except Exception:
+            pass
+        return False
+
     if _pdlg:
         # Mở dialog từ click button / row selection
         _task_dialog(_pdlg[0], _pdlg[1])
     elif _dlg_qp and _is_fresh_session:
-        # Session mới (page reload / reconnect sau khi background) → khôi phục dialog
-        try:
-            _df_r  = lay_danh_sach_cong_viec()
-            _row_r = _df_r[_df_r["ID"].astype(str) == _dlg_qp]
-            if not _row_r.empty:
-                _task_dialog(_row_r.iloc[0].to_dict(),
-                             lay_ten_cac_trang_thai() or _DS_TRANG_THAI_MAC_DINH)
-            else:
-                del st.query_params["dlg"]
-        except Exception:
+        # Session mới (page reload / Android reconnect sau file picker) → khôi phục dialog
+        _reopen_dlg_from_qp(_dlg_qp)
+    elif _dlg_qp and not _is_fresh_session and _dlg_was_active and not _dlg_currently_active:
+        # Cùng session — có thể là file_uploader rerun HOẶC user bấm nút X
+        if st.session_state.pop("_dlg_close_requested", False):
+            # User bấm nút Đóng bên trong dialog → xóa query param
             try:
                 del st.query_params["dlg"]
             except Exception:
                 pass
-    elif _dlg_qp and not _is_fresh_session and _dlg_was_active and not _dlg_currently_active:
-        # Cùng session, dialog đóng bằng nút X → xóa query param
-        try:
-            del st.query_params["dlg"]
-        except Exception:
-            pass
+        else:
+            # Full rerun do file picker / file_uploader → giữ dialog mở
+            _reopen_dlg_from_qp(_dlg_qp)
 
 
 # ============================================================
